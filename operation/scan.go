@@ -255,8 +255,8 @@ func (s *ScanResult) OutputError() ([]*dynamodb.ScanOutput, error) {
 // ScanOperation handles scan Input operations
 type ScanOperation struct {
 	*Base
-	input   *dynamodb.ScanInput
-	handler ItemSliceHandler
+	input     *dynamodb.ScanInput
+	handler   ItemSliceHandler
 	handlerMu *sync.Mutex
 }
 
@@ -298,7 +298,6 @@ func (s *ScanOperation) SetHandler(handler ItemSliceHandler) *ScanOperation {
 	s.handler = handler
 	return s
 }
-
 
 // SetHandlerMutex sets the optional handler mutex that will be locked before handler is called
 func (s *ScanOperation) SetHandlerMutex(mu *sync.Mutex) *ScanOperation {
@@ -455,7 +454,7 @@ func (s *ScanCountResult) OutputError() (int64, error) {
 // ScanOperation is used to run a scan
 type ScanCountOperation struct {
 	*Base
-	input *dynamodb.ScanInput
+	input     *dynamodb.ScanInput
 	handlerMu *sync.Mutex
 }
 

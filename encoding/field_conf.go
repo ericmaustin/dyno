@@ -6,11 +6,12 @@ import (
 )
 
 const (
-	// FieldStructTagName is the struct FieldConfig used to denote a document field
+	// FieldStructTagName is the struct fieldConfig used to denote a document field
 	FieldStructTagName = "dyno"
 )
 
-type FieldConfig struct {
+// fieldConfig represents a field configuration
+type fieldConfig struct {
 	Name     string
 	Append   string
 	Prepend  string
@@ -21,8 +22,8 @@ type FieldConfig struct {
 	Json     bool
 }
 
-func parseTag(tagStr string) *FieldConfig {
-	conf := &FieldConfig{}
+func parseTag(tagStr string) *fieldConfig {
+	conf := &fieldConfig{}
 	if len(tagStr) == 0 {
 		return conf
 	}
@@ -40,12 +41,12 @@ func parseTag(tagStr string) *FieldConfig {
 		conf.Name = tagStr
 	}
 	if !conf.Embed && (len(conf.Append) > 0 || len(conf.Prepend) > 0) {
-		panic(fmt.Errorf("append and prepend cannot be used if field is not embeded"))
+		panic(fmt.Errorf("append and prepend cannot be used if field is not embedded"))
 	}
 	return conf
 }
 
-func parseTagPart(part string, conf *FieldConfig) {
+func parseTagPart(part string, conf *fieldConfig) {
 	if strings.Contains(part, "=") {
 		subParts := strings.Split(part, "=")
 		switch strings.ToLower(strings.TrimSpace(subParts[0])) {

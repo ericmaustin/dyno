@@ -91,8 +91,8 @@ func (g *GetBuilder) Operation() *GetOperation {
 // GetOperation used for running a get operation on dynamodb
 type GetOperation struct {
 	*Base
-	input   *dynamodb.GetItemInput
-	handler ItemHandler
+	input     *dynamodb.GetItemInput
+	handler   ItemHandler
 	handlerMu *sync.Mutex
 }
 

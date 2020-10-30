@@ -9,6 +9,7 @@ import (
 	"reflect"
 )
 
+// UnmarshalItems decodes a slice of items into the given input that must be a ptr to a slice
 func UnmarshalItems(items []map[string]*dynamodb.AttributeValue, input interface{}) error {
 	rv := reflect.ValueOf(input)
 
@@ -110,7 +111,7 @@ func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.
 		fn := fieldName(fc.Name, ft.Name, prepend, append)
 
 		if fc.Embed {
-			// treat this object as a embeded struct
+			// treat this object as a embedded struct
 			fv := indirect(rv.Elem().Field(i), false)
 
 			switch fv.Kind() {
@@ -119,7 +120,7 @@ func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.
 				if err := unmarshalItemToStruct(item, targetVal, fc.Prepend, fc.Append); err != nil {
 					return &dyno.Error{
 						Code: dyno.ErrEncodingEmbeddedStructUnmarshalFailed,
-						Message: fmt.Sprintf("could not process embeded struct field '%s' failed with error: %v",
+						Message: fmt.Sprintf("could not process embedded struct field '%s' failed with error: %v",
 							ft.Name, err),
 					}
 				}
@@ -128,14 +129,14 @@ func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.
 				if err := unmarshalItemToEmbededMap(item, fv, fc.Prepend, fc.Append); err != nil {
 					return &dyno.Error{
 						Code: dyno.ErrEncodingEmbeddedMapUnmarshalFailed,
-						Message: fmt.Sprintf("could not process embeded map field '%s' failed with error: %v",
+						Message: fmt.Sprintf("could not process embedded map field '%s' failed with error: %v",
 							ft.Name, err),
 					}
 				}
 			default:
 				return &dyno.Error{
 					Code:    dyno.ErrEncodingEmbeddedBadKind,
-					Message: fmt.Sprintf("cannot process embeded value with kind '%v'", fv.Kind()),
+					Message: fmt.Sprintf("cannot process embedded value with kind '%v'", fv.Kind()),
 				}
 			}
 
@@ -202,13 +203,6 @@ func unmarshalItemToEmbededMap(item map[string]*dynamodb.AttributeValue, rv refl
 	}
 	if item == nil {
 		return nil
-	}
-
-	if rv.IsNil() {
-		return &dyno.Error{
-			Code:    dyno.ErrEncodingBadValue,
-			Message: "map cannot be empty",
-		}
 	}
 
 	if rv.Type().Key().Kind() != reflect.String {

@@ -37,6 +37,7 @@ const (
 	OperatorNotExists = Operator("nex")
 )
 
+// StringToOperator converts a string input to an Operator
 func StringToOperator(in string) Operator {
 	// if we have ae string, figure out which operator const to use
 	switch in {
@@ -126,26 +127,32 @@ func Condition(name string, operator interface{}, values ...interface{}) express
 	}
 }
 
+// GreaterThan returns a ConditionBuilder with a GreaterThan condition for the input name and value
 func GreaterThan(name string, value interface{}) expression.ConditionBuilder {
 	return expression.Name(name).GreaterThan(expression.Value(value))
 }
 
+// GreaterThanEqual returns a ConditionBuilder with a GreaterThanEqual condition for the input name and value
 func GreaterThanEqual(name string, value interface{}) expression.ConditionBuilder {
 	return expression.Name(name).GreaterThanEqual(expression.Value(value))
 }
 
+// LessThan returns a ConditionBuilder with a LessThan condition for the input name and value
 func LessThan(name string, value interface{}) expression.ConditionBuilder {
 	return expression.Name(name).LessThan(expression.Value(value))
 }
 
+// LessThanEqual returns a ConditionBuilder with a LessThanEqual condition for the input name and value
 func LessThanEqual(name string, value interface{}) expression.ConditionBuilder {
 	return expression.Name(name).LessThanEqual(expression.Value(value))
 }
 
+// Equal returns a ConditionBuilder with a In condition for the input name and value
 func Equal(name string, value interface{}) expression.ConditionBuilder {
 	return expression.Name(name).Equal(expression.Value(value))
 }
 
+// In returns a ConditionBuilder with a In condition for the input name and values
 func In(name string, values ...interface{}) expression.ConditionBuilder {
 	encoded := make([]expression.ValueBuilder, len(values))
 	for i, val := range values {
@@ -163,26 +170,32 @@ func In(name string, values ...interface{}) expression.ConditionBuilder {
 	return expression.Name(name).In(right, other...)
 }
 
+// Between returns a ConditionBuilder with a Between condition for the input name and values
 func Between(name string, lower, upper interface{}) expression.ConditionBuilder {
 	return expression.Name(name).Between(expression.Value(lower), expression.Value(upper))
 }
 
+// NotEqual returns a ConditionBuilder with a NotEqual condition for the input name and value
 func NotEqual(name string, value interface{}) expression.ConditionBuilder {
 	return expression.Name(name).NotEqual(expression.Value(value))
 }
 
+// BeginsWith returns a ConditionBuilder with a BeginsWith condition for the input name and value
 func BeginsWith(name string, value interface{}) expression.ConditionBuilder {
 	return expression.Name(name).BeginsWith(encoding.ToString(value))
 }
 
+// Contains returns a ConditionBuilder with a Contains condition for the input name and value
 func Contains(name string, value interface{}) expression.ConditionBuilder {
 	return expression.Name(name).Contains(encoding.ToString(value))
 }
 
+// Exists returns a ConditionBuilder with a AttributeExists condition for the input name
 func Exists(name string) expression.ConditionBuilder {
 	return expression.Name(name).AttributeExists()
 }
 
+// NotExists returns a ConditionBuilder with a AttributeNotExists condition for the input name
 func NotExists(name string) expression.ConditionBuilder {
 	return expression.Name(name).AttributeNotExists()
 }
@@ -230,18 +243,22 @@ func Or(conditions ...expression.ConditionBuilder) expression.ConditionBuilder {
 	return cnd
 }
 
+// Set represents a condition builder that can have conditions set dynmaically
 type Set struct {
 	dynamoConditionBuilder *expression.ConditionBuilder
 }
 
+// NewSet creates a new condition builder set
 func NewSet() *Set {
 	return &Set{}
 }
 
-func (b *Set) Empty() bool {
+// IsEmpty checks is the condition set is empty
+func (b *Set) IsEmpty() bool {
 	return b.dynamoConditionBuilder == nil
 }
 
+// AddAnd adds an And condition to the set
 func (b *Set) AddAnd(conditions ...expression.ConditionBuilder) {
 	builder := And(conditions...)
 	if b.dynamoConditionBuilder != nil {
@@ -250,6 +267,7 @@ func (b *Set) AddAnd(conditions ...expression.ConditionBuilder) {
 	b.dynamoConditionBuilder = &builder
 }
 
+// AddOr adds an Or condition to the set
 func (b *Set) AddOr(conditions ...expression.ConditionBuilder) {
 	builder := Or(conditions...)
 	if b.dynamoConditionBuilder != nil {
@@ -259,6 +277,7 @@ func (b *Set) AddOr(conditions ...expression.ConditionBuilder) {
 
 }
 
+// Builder returns the condition set's complete ConditionBuilder
 func (b *Set) Builder() expression.ConditionBuilder {
 	if b.dynamoConditionBuilder == nil {
 		return expression.ConditionBuilder{}

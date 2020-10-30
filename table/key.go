@@ -149,9 +149,9 @@ func (sk *SortKey) Between(lower, upper interface{}) *expression.KeyConditionBui
 
 // Key represents the key for a table with a partitionKey ProjectionColumns name and a sortKey ProjectionColumns name
 type Key struct {
-	partitionKey                 *PartitionKey
-	sortKey                      *SortKey
-	schema                       []*dynamodb.KeySchemaElement
+	partitionKey *PartitionKey
+	sortKey      *SortKey
+	schema       []*dynamodb.KeySchemaElement
 }
 
 // NewKey

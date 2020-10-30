@@ -9,12 +9,13 @@ import (
 	"time"
 )
 
+// ExecutionFunction is a function that can be executed by a Request
 type ExecutionFunction func(ctx context.Context) error
 
 type execution struct {
-	ctx           context.Context
-	cancel        context.CancelFunc
-	sleeper       *timer.Sleeper
+	ctx     context.Context
+	cancel  context.CancelFunc
+	sleeper *timer.Sleeper
 }
 
 func (e *execution) checkError(err error) bool {
@@ -95,6 +96,7 @@ func (r *Request) SetTimeout(timeout time.Duration) *Request {
 	return r
 }
 
+// SetContext sets the request context
 func (r *Request) SetContext(ctx context.Context) *Request {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -127,6 +129,7 @@ func (r *Request) Execute(execFunc ExecutionFunction) error {
 	return exec.do(execFunc)
 }
 
+// Scan executes a scan api call with a ScanInput
 func (r *Request) Scan(in *dynamodb.ScanInput) (out *dynamodb.ScanOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().ScanWithContext(ctx, in)
@@ -135,6 +138,7 @@ func (r *Request) Scan(in *dynamodb.ScanInput) (out *dynamodb.ScanOutput, err er
 	return
 }
 
+// Query executes a query api call with a QueryInput
 func (r *Request) Query(in *dynamodb.QueryInput) (out *dynamodb.QueryOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().QueryWithContext(ctx, in)
@@ -143,6 +147,7 @@ func (r *Request) Query(in *dynamodb.QueryInput) (out *dynamodb.QueryOutput, err
 	return
 }
 
+// PutItem runs a put item api call with a PutItemInput
 func (r *Request) PutItem(in *dynamodb.PutItemInput) (out *dynamodb.PutItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().PutItemWithContext(ctx, in)
@@ -159,6 +164,7 @@ func (r *Request) GetItem(in *dynamodb.GetItemInput) (out *dynamodb.GetItemOutpu
 	return
 }
 
+// UpdateItem runs an update item api call with a UpdateItemInput
 func (r *Request) UpdateItem(in *dynamodb.UpdateItemInput) (out *dynamodb.UpdateItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().UpdateItemWithContext(ctx, in)
@@ -167,6 +173,7 @@ func (r *Request) UpdateItem(in *dynamodb.UpdateItemInput) (out *dynamodb.Update
 	return
 }
 
+// DeleteItem runs a delete item api call with a DeleteItemInput
 func (r *Request) DeleteItem(in *dynamodb.DeleteItemInput) (out *dynamodb.DeleteItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().DeleteItemWithContext(ctx, in)
@@ -175,6 +182,7 @@ func (r *Request) DeleteItem(in *dynamodb.DeleteItemInput) (out *dynamodb.Delete
 	return
 }
 
+// BatchGetItem runs a batch get item api call with a BatchGetItemInput
 func (r *Request) BatchGetItem(in *dynamodb.BatchGetItemInput) (out *dynamodb.BatchGetItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().BatchGetItemWithContext(ctx, in)

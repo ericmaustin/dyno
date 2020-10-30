@@ -30,6 +30,7 @@ func MustMarshalItems(input interface{}) []map[string]*dynamodb.AttributeValue {
 	return records
 }
 
+// AppendItems encodes a given input and appends these items to the given slice of items
 func AppendItems(items *[]map[string]*dynamodb.AttributeValue, input interface{}) error {
 	rv := indirect(reflect.ValueOf(input), false)
 
@@ -50,32 +51,12 @@ func AppendItems(items *[]map[string]*dynamodb.AttributeValue, input interface{}
 	return nil
 }
 
-func AppendItemsWithCallback(items *[]map[string]*dynamodb.AttributeValue, input interface{}) error {
-	rv := indirect(reflect.ValueOf(input), false)
-
-	if rv.Kind() != reflect.Slice {
-		return &dyno.Error{
-			Code:    dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("cannot marshal non-slice kind: %v", rv.Kind()),
-		}
-	}
-
-	for i := 0; i < rv.Len(); i++ {
-		rec, err := marshalValueToRecord(rv.Index(i))
-		if err != nil {
-			return err
-		}
-		*items = append(*items, rec)
-	}
-	return nil
-}
-
 // MarshalItem marshals a given input that is a map or a struct into an attribute value map
 func MarshalItem(input interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	return marshalValueToRecord(reflect.ValueOf(input))
 }
 
-// MarshalItem marshals a given input that is a map or a struct into an attribute value map
+// MustMarshalItem marshals a given input that is a map or a struct into an attribute value map
 // panics on error
 func MustMarshalItem(input interface{}) map[string]*dynamodb.AttributeValue {
 	itemMap, err := MarshalItem(input)
@@ -277,14 +258,14 @@ func addStructToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValu
 		val := rv.Field(i)
 
 		if fc.Embed {
-			// treat this object as a embeded struct or map
+			// treat this object as a embedded struct or map
 			fv := indirect(val, false)
 			switch fv.Kind() {
 			case reflect.Struct:
 				if err := addStructToRecord(fv, item, fc.Prepend, fc.Append); err != nil {
 					return &dyno.Error{
 						Code: dyno.ErrEncodingEmbeddedStructMarshalFailed,
-						Message: fmt.Sprintf("addStructToRecord on embeded struct field '%s' failed with error: %v",
+						Message: fmt.Sprintf("addStructToRecord on embedded struct field '%s' failed with error: %v",
 							ft.Name, err),
 					}
 				}
@@ -298,14 +279,14 @@ func addStructToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValu
 				if err := addMapToRecord(fv, item, fc.Prepend, fc.Append); err != nil {
 					return &dyno.Error{
 						Code: dyno.ErrEncodingEmbeddedMapMarshalFailed,
-						Message: fmt.Sprintf("addStructToRecord on embeded map field '%s' failed with error: %v",
+						Message: fmt.Sprintf("addStructToRecord on embedded map field '%s' failed with error: %v",
 							ft.Name, err),
 					}
 				}
 			default:
 				return &dyno.Error{
 					Code:    dyno.ErrEncodingEmbeddedBadKind,
-					Message: fmt.Sprintf("embeded kind %v is not suported", fv.Kind()),
+					Message: fmt.Sprintf("embedded kind %v is not suported", fv.Kind()),
 				}
 			}
 			continue
@@ -422,6 +403,7 @@ func reflectValueIsZero(v reflect.Value) bool {
 	return reflect.DeepEqual(ind.Interface(), reflect.Zero(ind.Type()).Interface())
 }
 
+// FieldNames returns a string slice with the field names for the given input
 func FieldNames(input interface{}) (names []string, err error) {
 	names = make([]string, 0)
 	names, err = appendFieldNames(names, reflect.ValueOf(input))
@@ -473,12 +455,12 @@ func appendStructFieldNames(names []string, rv reflect.Value, prependStr, append
 
 			switch fv.Kind() {
 			case reflect.Struct:
-				// treat this object as a embeded struct
+				// treat this object as a embedded struct
 				subNames, err = appendStructFieldNames(subNames, fv, fc.Prepend, fc.Append)
 				if err != nil {
 					return nil, &dyno.Error{
 						Code: dyno.ErrEncodingEmbeddedStructMarshalFailed,
-						Message: fmt.Sprintf("addStructFieldNames on embeded field '%s' failed with error: %v",
+						Message: fmt.Sprintf("addStructFieldNames on embedded field '%s' failed with error: %v",
 							ft.Name, err),
 					}
 				}
@@ -487,7 +469,7 @@ func appendStructFieldNames(names []string, rv reflect.Value, prependStr, append
 			default:
 				return nil, &dyno.Error{
 					Code:    dyno.ErrEncodingEmbeddedBadKind,
-					Message: fmt.Sprintf("embeded kind %v is not suported", fv.Kind()),
+					Message: fmt.Sprintf("embedded kind %v is not suported", fv.Kind()),
 				}
 			}
 

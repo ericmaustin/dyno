@@ -142,11 +142,11 @@ func (t *Timing) TotalTime() time.Duration {
 
 // Base used as the Base struct type for all operations
 type Base struct {
-	ctx     context.Context
-	done    context.CancelFunc
-	mu      sync.RWMutex
-	status  Status
-	timing  *Timing
+	ctx    context.Context
+	done   context.CancelFunc
+	mu     sync.RWMutex
+	status Status
+	timing *Timing
 }
 
 func newBase() *Base {

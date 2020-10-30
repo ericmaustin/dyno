@@ -104,7 +104,7 @@ func New(awsSession *session.Session) *Session {
 }
 
 // NewWithContext generates a new session with provided aws session and a context
-func NewWithContext(awsSession *session.Session, ctx context.Context) *Session {
+func NewWithContext(ctx context.Context, awsSession *session.Session) *Session {
 	return &Session{
 		awsSession: awsSession,
 		mu:         &sync.RWMutex{},
