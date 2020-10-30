@@ -71,7 +71,6 @@ func createTestTable(sess *dyno.Session) {
 	if err != nil {
 		panic(err)
 	}
-	return
 }
 
 func destroytestTable(sess *dyno.Session) {

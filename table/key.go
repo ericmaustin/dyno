@@ -152,7 +152,6 @@ type Key struct {
 	partitionKey                 *PartitionKey
 	sortKey                      *SortKey
 	schema                       []*dynamodb.KeySchemaElement
-	partitionAttributeDefinition *dynamodb.AttributeDefinition
 }
 
 // NewKey

@@ -76,7 +76,8 @@ func TestLock(t *testing.T) {
 
 	resultItems := make([]*testItem, 0)
 
-	queryOut, err := operation.Query(queryInput, operation.ItemSliceUnmarshaler(&resultItems)).
+	queryOut, err := operation.Query(queryInput).
+		SetHandler(operation.ItemSliceUnmarshaler(&resultItems)).
 		Execute(sess.RequestWithTimeout(time.Minute)).
 		OutputError()
 
@@ -106,6 +107,11 @@ func TestLock(t *testing.T) {
 
 	// release
 	err = lock.Release()
+
+	assert.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 
 	/* TEAR DOWN */
 	delRes, err := (<-tbl.Delete(sess.Request(), nil)).OutputError()

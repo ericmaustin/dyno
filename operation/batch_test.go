@@ -45,7 +45,7 @@ func (s *BatchTestSuite) getGets() []Operation {
 			SetKey(map[string]string{
 				"id": rec.ID,
 			}).Input()
-		out[i] = Get(getInput, nil)
+		out[i] = Get(getInput)
 	}
 	return out
 }

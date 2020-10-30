@@ -234,7 +234,7 @@ func unmarshalItemToEmbededMap(item map[string]*dynamodb.AttributeValue, rv refl
 }
 
 func unmarshalItem(item *dynamodb.AttributeValue, rv reflect.Value, fromJson bool) error {
-	if item.NULL != nil && *item.NULL == true {
+	if item.NULL != nil && *item.NULL {
 		// ignore nil values
 		return nil
 	}

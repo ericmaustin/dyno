@@ -78,10 +78,6 @@ This func will panic on error
 func Condition(name string, operator interface{}, values ...interface{}) expression.ConditionBuilder {
 	var op Operator
 
-	var (
-		builder expression.ConditionBuilder
-	)
-
 	switch o := operator.(type) {
 	case string:
 		op = StringToOperator(o)
@@ -128,7 +124,6 @@ func Condition(name string, operator interface{}, values ...interface{}) express
 			Message: fmt.Sprintf("No operator exists for '%v'", operator),
 		})
 	}
-	return builder
 }
 
 func GreaterThan(name string, value interface{}) expression.ConditionBuilder {

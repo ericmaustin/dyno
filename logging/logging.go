@@ -12,11 +12,6 @@ import (
 )
 
 const (
-	logFormatter = `%{color}%{time:Jan _2 15:04:05.000} %{module}[%{pid}] %{level:.4s} ▶ (%{shortfile} %{longfunc})%{color:reset} %{message}`
-	CWFormatter  = `{timestamp:"%{time:Jan _2 15:04:05.000}",level:"%{level:.4s}",pid:%{pid},file:"%{longfile}",mod:"%{module}",func:"%{longfunc}",message:"%{message}"}`
-)
-
-const (
 	DEBUG   = log.DebugLevel
 	INFO    = log.InfoLevel
 	WARNING = log.WarnLevel
@@ -233,8 +228,6 @@ func (c *CloudWatchLogWriter) Write(p []byte) (n int, err error) {
 			if err != nil {
 				return
 			}
-			// try again
-			res, err = putEvent(c.seq)
 		default:
 			err = awsErr
 			return
@@ -252,7 +245,7 @@ func (c *CloudWatchLogWriter) Write(p []byte) (n int, err error) {
 
 	if res.RejectedLogEventsInfo != nil {
 		// try again
-		res, err = putEvent(c.seq)
+		_, err = putEvent(c.seq)
 		if err != nil {
 			return
 		}

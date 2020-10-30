@@ -14,7 +14,6 @@ type ExecutionFunction func(ctx context.Context) error
 type execution struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
-	sleepDuration *time.Duration
 	sleeper       *timer.Sleeper
 }
 
@@ -92,7 +91,7 @@ func (r *Request) SetTimeout(timeout time.Duration) *Request {
 	if r.ctx == nil {
 		r.ctx = context.Background()
 	}
-	r.ctx, _ = context.WithTimeout(r.ctx, timeout)
+	r.ctx, r.cancel = context.WithTimeout(r.ctx, timeout)
 	return r
 }
 

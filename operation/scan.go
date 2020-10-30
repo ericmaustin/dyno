@@ -600,8 +600,6 @@ func scanSegment(req *dyno.Request,
 		// set the start to key to the last evaluated key to keep looping
 		segment.ExclusiveStartKey = output.LastEvaluatedKey
 	}
-
-	return
 }
 
 func splitScanInputIntoSegments(input *dynamodb.ScanInput) (inputs []*dynamodb.ScanInput) {

@@ -57,10 +57,7 @@ func (t *UnixTime) Equal(other UnixTime) bool {
 // Equal calls the underlying ``unixtime.Time`` type's equal method against ``other`` UnixTime
 func (t *UnixTime) EqualPtr(other *UnixTime) bool {
 	if other == nil {
-		if t == nil {
-			return true
-		}
-		return false
+		return t == nil
 	}
 	return time.Time(*t).Equal(time.Time(*other))
 }
@@ -106,7 +103,7 @@ func (t *UnixTime) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) 
 		*t = UnixTime(time.Unix(0, intVal))
 		return nil
 		// handle null GetWithToken
-	} else if av.NULL != nil && *av.NULL == true {
+	} else if av.NULL != nil && *av.NULL {
 		*t = UnixTime(time.Time{})
 	}
 

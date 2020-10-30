@@ -45,10 +45,8 @@ type (
 		LockHeartbeatFrequency time.Duration // the lock heartbeat frequency. We will update the lock expiration with every heartbeat
 		LeaseDuration          time.Duration // the lease duration or how much time we will lease the lock for. This must be greater than or equal to heartbeat freq.
 		currentLeaseExpires    time.Time     // the expiration time of the current lease
-		stopCh                 chan bool     // the channel used to stop / release the lock
 		// stopHeartBeatChan      chan bool
 		stopHeartBeatAckChan chan *stopHeartBeatAck
-		errCh                chan error         // the channel used to report errors
 		Context              context.Context    // context of the lock, should be released on cancel
 		cancel               context.CancelFunc // cancel func that will release the lock
 		mu                   sync.Mutex
@@ -243,8 +241,6 @@ func (dl *Lock) StartHeartbeat() {
 			}
 		}
 	}()
-
-	return
 }
 
 // renew renews the lease for this lock

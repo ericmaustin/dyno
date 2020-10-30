@@ -38,7 +38,6 @@ TimeSlices
 type Timer struct {
 	slices   []*TimeSlice
 	running  bool
-	done     bool
 	duration time.Duration
 	mu       *sync.Mutex
 }
@@ -47,7 +46,7 @@ type Timer struct {
 func (t *Timer) Start() *Timer {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.running == true {
+	if t.running {
 		return t
 	}
 	// create a new time slice
@@ -72,8 +71,8 @@ func (t *Timer) Stop() *Timer {
 // Duration returns the total elapsed duration for the timer
 func (t *Timer) Duration() time.Duration {
 	// if we're running...
-	if t.running == true {
-		return t.duration + time.Now().Sub(t.slices[len(t.slices)-1].started)
+	if t.running {
+		return t.duration + time.Since(t.slices[len(t.slices)-1].started)
 	}
 	return t.duration
 }

@@ -73,14 +73,6 @@ func createTestTable(sess *dyno.Session) *Table {
 	return tbl
 }
 
-func putTestKeys(items []*testItem) []*testItemKey {
-	out := make([]*testItemKey, len(items))
-	for i, item := range items {
-		out[i] = item.Key
-	}
-	return out
-}
-
 func putTestRecords(sess *dyno.Session) []*testItem {
 	testRecords := []*testItem{
 		{

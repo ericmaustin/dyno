@@ -19,7 +19,6 @@ type NextSleepDuration func(sleepDuration time.Duration, count int) time.Duratio
 // Sleeper is a more complex version of the base timer
 type Sleeper struct {
 	timeout       time.Duration
-	expiresAt     time.Time
 	sleepDuration time.Duration
 	count         int
 	mu            sync.Mutex

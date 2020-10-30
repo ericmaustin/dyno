@@ -26,11 +26,6 @@ const (
 	tableStatusInaccessibleEncryptionCrednetials = "INACCESSIBLE_ENCRYPTION_CREDENTIALS"
 )
 
-type WaitForTableStatusOperation struct {
-	*Base
-	tableName string
-}
-
 func WaitForTableReady(req *dyno.Request, tableName string, timeout *time.Duration) (out *dynamodb.DescribeTableOutput, err error) {
 
 	sleeper := timer.NewSleeper(time.Millisecond * 100).
@@ -42,7 +37,7 @@ func WaitForTableReady(req *dyno.Request, tableName string, timeout *time.Durati
 	} else {
 		deadline, ok := req.Ctx().Deadline()
 		if ok {
-			sleeper.WithTimeout(deadline.Sub(time.Now()))
+			sleeper.WithTimeout(time.Until(deadline))
 		}
 	}
 
@@ -136,7 +131,7 @@ func WaitForTableDeletion(req *dyno.Request, tableName string, timeout *time.Dur
 	} else {
 		deadline, ok := req.Ctx().Deadline()
 		if ok {
-			sleeper.WithTimeout(deadline.Sub(time.Now()))
+			sleeper.WithTimeout(time.Until(deadline))
 		}
 	}
 
@@ -193,7 +188,7 @@ func WaitForBackupCompletion(req *dyno.Request, backupArn string, timeout *time.
 	} else {
 		deadline, ok := req.Ctx().Deadline()
 		if ok {
-			sleeper.WithTimeout(deadline.Sub(time.Now()))
+			sleeper.WithTimeout(time.Until(deadline))
 		}
 	}
 

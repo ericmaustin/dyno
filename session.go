@@ -60,6 +60,7 @@ func (s *Session) Ctx() context.Context {
 	return s.ctx
 }
 
+// SetContext sets the context
 func (s *Session) SetContext(ctx context.Context) *Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -123,12 +124,11 @@ func FilterName(input string) string {
 
 // Request creates a new request with a the given context
 func (s *Session) Request() *Request {
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Request{
 		mu:      &sync.RWMutex{},
 		Session: s,
-		ctx:     context.Background(),
+		ctx:     ctx,
 		cancel:  cancel,
 	}
 }
@@ -144,7 +144,7 @@ func (s *Session) RequestWithContext(ctx context.Context) *Request {
 	}
 }
 
-// WithContext creates a new session with the given timeout attached to the context
+// RequestWithTimeout creates a new session with the given timeout attached to the context
 func (s *Session) RequestWithTimeout(timeout time.Duration) *Request {
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, timeout)

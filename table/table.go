@@ -216,9 +216,7 @@ func (t *Table) Copy(name string) *Table {
 
 			// copy the ProjectionColumns
 			if lsi.ProjectionColumns != nil {
-				for _, colName := range lsi.ProjectionColumns {
-					lsiCopy.ProjectionColumns = append(lsiCopy.ProjectionColumns, colName)
-				}
+				lsiCopy.ProjectionColumns = append(lsiCopy.ProjectionColumns, lsi.ProjectionColumns...)
 			}
 
 			table.lsis[name] = lsiCopy
@@ -240,9 +238,7 @@ func (t *Table) Copy(name string) *Table {
 
 			// copy the ProjectionColumns
 			if gsi.ProjectionColumns != nil {
-				for _, colName := range gsi.ProjectionColumns {
-					gsiCopy.ProjectionColumns = append(gsiCopy.ProjectionColumns, colName)
-				}
+				gsiCopy.ProjectionColumns = append(gsiCopy.ProjectionColumns, gsi.ProjectionColumns...)
 			}
 
 			table.gsis[name] = gsiCopy
@@ -338,7 +334,7 @@ func (t *Table) CreateTableBuilder() *operation.CreateTableBuilder {
 	builder := operation.NewCreateTableBuilder(nil).
 		SetName(t.name)
 
-	if t.onDemand != true {
+	if !t.onDemand {
 
 		if t.rcus < 1 {
 			t.rcus = DefaultRCUs
@@ -540,7 +536,7 @@ func (t *Table) SetOnDemand(onDemand bool) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.onDemand = onDemand
-	if t.onDemand == true {
+	if t.onDemand {
 		t.wcus = 0
 		t.rcus = 0
 	}

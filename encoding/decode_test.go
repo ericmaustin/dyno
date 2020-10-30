@@ -17,7 +17,7 @@ func TestUnmarshalRecord(t *testing.T) {
 			"stringMap1": "",
 			"stringMap2": "",
 		},
-		NestedMap: map[string]string{
+		EmbeddedMap: map[string]string{
 			"nestedMap1": "",
 			"nestedMap2": "",
 		},
@@ -30,7 +30,7 @@ func TestUnmarshalRecord(t *testing.T) {
 	assert.Equal(t, s.String, target.String)
 	assert.Equal(t, s.Int, target.Int)
 	fmt.Printf("target = %+v\n", target)
-	fmt.Printf("nestedMap1 = %+v => %+v \n", s.NestedMap["nestedMap1"], target.NestedMap["nestedMap1"])
+	fmt.Printf("nestedMap1 = %+v => %+v \n", s.EmbeddedMap["nestedMap1"], target.EmbeddedMap["nestedMap1"])
 	fmt.Printf("prepend:\n%+v\n", target.SubStructPrepend)
 	fmt.Printf("append:\n%+v\n", target.SubStructAppend)
 	assert.Equal(t, s.SubStructPrepend.SubString, target.SubStructPrepend.SubString)
@@ -40,7 +40,7 @@ func TestUnmarshalRecord(t *testing.T) {
 	assert.Equal(t, s.SubStruct.SubString, target.SubStruct.SubString)
 	assert.Equal(t, s.StringMapJson["stringMap1"], target.StringMapJson["stringMap1"])
 	assert.Equal(t, s.StringMap["stringMap1"], target.StringMap["stringMap1"])
-	assert.Equal(t, s.NestedMap["nestedMap1"], target.NestedMap["nestedMap1"])
+	assert.Equal(t, s.EmbeddedMap["nestedMap1"], target.EmbeddedMap["nestedMap1"])
 }
 
 func TestUnmarshalRecords(t *testing.T) {

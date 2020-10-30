@@ -41,7 +41,7 @@ func (u UUID) String() string {
 
 // UnmarshalDynamoDBAttributeValue for UUID attempts to parse raw as a string GetWithToken with uuid.Parse
 func (u *UUID) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
-	if av.NULL != nil && *av.NULL == true {
+	if av.NULL != nil && *av.NULL {
 		return nil
 	}
 	// av is a String

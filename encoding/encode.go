@@ -397,16 +397,6 @@ func indirect(rv reflect.Value, decodingNil bool) reflect.Value {
 	return rv
 }
 
-func isKind(rv reflect.Value, kinds ...reflect.Kind) bool {
-	rv = indirect(rv, false)
-	for _, k := range kinds {
-		if rv.Kind() == k {
-			return true
-		}
-	}
-	return false
-}
-
 func reflectValueIsNil(rv reflect.Value) bool {
 	for {
 		if (rv.Kind() == reflect.Interface ||
@@ -440,7 +430,6 @@ func FieldNames(input interface{}) (names []string, err error) {
 
 func appendFieldNames(names []string, rv reflect.Value) (out []string, err error) {
 	rv = indirect(rv, false)
-	out = make([]string, 0)
 	switch rv.Kind() {
 	case reflect.Struct:
 		out, err = appendStructFieldNames(names, rv, "", "")

@@ -2,7 +2,6 @@ package operation
 
 import (
 	"context"
-	"fmt"
 	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
 	"sync"
 	"time"
@@ -77,7 +76,6 @@ func (r *ResultBase) Timing() *Timing {
 // SetTiming sets the Operation Result's timing
 func (r *ResultBase) SetTiming(timing *Timing) {
 	r.timing = timing
-	return
 }
 
 // Timing is used to store operation timing
@@ -101,7 +99,7 @@ func (t *Timing) Started() (time.Time, error) {
 	if t.started == nil {
 		return time.Time{}, &dyno.Error{
 			Code:    dyno.ErrOperationNeverStarted,
-			Message: fmt.Sprintf("never started"),
+			Message: "never started",
 		}
 	}
 	return *t.started, nil
@@ -111,7 +109,7 @@ func (t *Timing) Finished() (time.Time, error) {
 	if t.finished == nil {
 		return time.Time{}, &dyno.Error{
 			Code:    dyno.ErrOperationNeverFinished,
-			Message: fmt.Sprintf("never finished"),
+			Message: "never finished",
 		}
 	}
 	return *t.finished, nil
@@ -130,14 +128,14 @@ func (t *Timing) RunningTime() time.Duration {
 		return 0
 	}
 	if t.finished != nil {
-		return time.Now().Sub(*t.started)
+		return time.Since(*t.started)
 	}
 	return t.finished.Sub(*t.started)
 }
 
 func (t *Timing) TotalTime() time.Duration {
 	if t.finished != nil {
-		return time.Now().Sub(*t.created)
+		return time.Since(*t.created)
 	}
 	return t.finished.Sub(*t.created)
 }
@@ -149,7 +147,6 @@ type Base struct {
 	mu      sync.RWMutex
 	status  Status
 	timing  *Timing
-	created *time.Time
 }
 
 func newBase() *Base {

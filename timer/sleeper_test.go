@@ -13,7 +13,7 @@ func TestSleeper(t *testing.T) {
 
 	sleepFor := time.Second
 	now := time.Now()
-	sleeper := NewSleeper(sleepFor, sleepFor*5)
+	sleeper := NewSleeper(sleepFor)
 
 	<-sleeper.Sleep()
 	<-sleeper.Sleep()
@@ -21,7 +21,7 @@ func TestSleeper(t *testing.T) {
 	<-sleeper.Sleep()
 	<-sleeper.Sleep()
 
-	totalDuration := time.Now().Sub(now)
+	totalDuration := time.Since(now)
 	assert.GreaterOrEqual(t, totalDuration.Nanoseconds(), (sleepFor * 5).Nanoseconds())
 
 	err := <-sleeper.Sleep()
@@ -39,23 +39,23 @@ func TestExponentialSleeperSleeper(t *testing.T) {
 
 	sleepFor := time.Second
 	now := time.Now()
-	sleeper := NewExponentialSleeper(sleepFor, sleepFor*33)
+	sleeper := NewExponentialSleeper(sleepFor)
 	sleepStart := now
 	<-sleeper.Sleep()
-	assert.GreaterOrEqual(t, time.Now().Sub(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 0))).Nanoseconds())
+	assert.GreaterOrEqual(t, time.Since(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 0))).Nanoseconds())
 	sleepStart = time.Now()
 	<-sleeper.Sleep()
-	assert.GreaterOrEqual(t, time.Now().Sub(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 1))).Nanoseconds())
+	assert.GreaterOrEqual(t, time.Since(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 1))).Nanoseconds())
 	sleepStart = time.Now()
 	<-sleeper.Sleep()
-	assert.GreaterOrEqual(t, time.Now().Sub(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 2))).Nanoseconds())
+	assert.GreaterOrEqual(t, time.Since(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 2))).Nanoseconds())
 	sleepStart = time.Now()
 	<-sleeper.Sleep()
-	assert.GreaterOrEqual(t, time.Now().Sub(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 3))).Nanoseconds())
+	assert.GreaterOrEqual(t, time.Since(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 3))).Nanoseconds())
 	sleepStart = time.Now()
 	<-sleeper.Sleep()
-	assert.GreaterOrEqual(t, time.Now().Sub(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 4))).Nanoseconds())
-	totalDuration := time.Now().Sub(now)
+	assert.GreaterOrEqual(t, time.Since(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 4))).Nanoseconds())
+	totalDuration := time.Since(now)
 	assert.GreaterOrEqual(t, totalDuration.Nanoseconds(), (sleepFor * 31).Nanoseconds()) // should be > 31 seconds
 
 	err := <-sleeper.Sleep()
