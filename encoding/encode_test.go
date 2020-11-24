@@ -149,7 +149,7 @@ func TestMapToAttributeValueMap(t *testing.T) {
 func TestAddToAttributeValueMap(t *testing.T) {
 	mapA := map[string]string{
 		"one": "1",
-		"two": "2"
+		"two": "2",
 	}
 	mapB := map[string]string{
 		"three": "3",
