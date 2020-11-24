@@ -1,9 +1,9 @@
 package operation
 
 import (
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/encoding"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/ericmaustin/dyno"
+	"github.com/ericmaustin/dyno/encoding"
 )
 
 // DeleteTableResult is returned as the result of a DeleteTableOperation
@@ -27,6 +27,7 @@ func (d *DeleteTableResult) OutputError() (*dynamodb.DeleteTableOutput, error) {
 	return d.output, d.err
 }
 
+// DeleteTableOperation represents a delete table operation
 type DeleteTableOperation struct {
 	*Base
 	input *dynamodb.DeleteTableInput

@@ -2,15 +2,15 @@ package table
 
 import (
 	"fmt"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/logging"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/operation"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/ericmaustin/dyno"
+	"github.com/ericmaustin/dyno/logging"
+	"github.com/ericmaustin/dyno/operation"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/suite"
 )
 
 // set up the fixtures
@@ -45,13 +45,8 @@ func createTestSession() *dyno.Session {
 	log.SetLevel(logrus.DebugLevel)
 
 	// create the session
-	awsSess, err := session.NewSessionWithOptions(session.Options{
-		Config: aws.Config{
-			Region: dyno.StringPtr("us-east-1"),
-		},
-		Profile:           "mt2_dev",
-		SharedConfigState: session.SharedConfigEnable,
-	})
+	awsSess, err := session.NewSession()
+
 	if err != nil {
 		panic(err)
 	}

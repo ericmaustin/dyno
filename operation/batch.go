@@ -2,7 +2,7 @@ package operation
 
 import (
 	"context"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
+	"github.com/ericmaustin/dyno"
 	"sync"
 	"time"
 )
@@ -188,7 +188,7 @@ func (b *Batch) Execute(req *dyno.Request) (out *BatchResult) {
 				Code:    dyno.ErrBatchOutputContextCancelled,
 				Message: "batch execution context was cancelled",
 			}
-		case <-req.Ctx().Done():
+		case <-req.Context().Done():
 			b.done()
 			out.err = dyno.Error{
 				Code:    dyno.ErrRequestExecutionContextCancelled,

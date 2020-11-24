@@ -2,9 +2,9 @@ package dyno
 
 import (
 	"context"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/timer"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/ericmaustin/dyno/timer"
 	"sync"
 	"time"
 )
@@ -77,8 +77,8 @@ func (r *Request) Cancel() {
 	r.cancel()
 }
 
-// Ctx returns the context for this request
-func (r *Request) Ctx() context.Context {
+// Context returns the context for this request
+func (r *Request) Context() context.Context {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.ctx
@@ -112,7 +112,7 @@ func (r *Request) Execute(execFunc ExecutionFunction) error {
 	)
 	if _, ok := r.ctx.Deadline(); !ok {
 		// no deadline set, so use max timeout
-		ctx, cancel = context.WithTimeout(r.Ctx(), r.MaxTimeout())
+		ctx, cancel = context.WithTimeout(r.Context(), r.MaxTimeout())
 	} else {
 		r.mu.RLock()
 		ctx, cancel = r.ctx, r.cancel

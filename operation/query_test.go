@@ -1,10 +1,11 @@
 package operation
 
 import (
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/condition"
-	"github.com/stretchr/testify/suite"
 	"testing"
+
+	"github.com/ericmaustin/dyno"
+	"github.com/ericmaustin/dyno/condition"
+	"github.com/stretchr/testify/suite"
 )
 
 type QueryTestSuite struct {

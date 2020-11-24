@@ -2,9 +2,9 @@ package operation
 
 import (
 	"fmt"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/timer"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/ericmaustin/dyno"
+	"github.com/ericmaustin/dyno/timer"
 	"strings"
 	"time"
 )
@@ -26,16 +26,18 @@ const (
 	tableStatusInaccessibleEncryptionCrednetials = "INACCESSIBLE_ENCRYPTION_CREDENTIALS"
 )
 
+// WaitForTableReady waits for a table to become available to accept requests until either the provided timeout
+// is reached or the request times out
 func WaitForTableReady(req *dyno.Request, tableName string, timeout *time.Duration) (out *dynamodb.DescribeTableOutput, err error) {
 
 	sleeper := timer.NewSleeper(time.Millisecond * 100).
-		WithContext(req.Ctx()).
+		WithContext(req.Context()).
 		WithAddRandom(time.Millisecond * 100)
 
 	if timeout != nil {
 		sleeper.WithTimeout(*timeout)
 	} else {
-		deadline, ok := req.Ctx().Deadline()
+		deadline, ok := req.Context().Deadline()
 		if ok {
 			sleeper.WithTimeout(time.Until(deadline))
 		}
@@ -81,7 +83,7 @@ func WaitForTableReady(req *dyno.Request, tableName string, timeout *time.Durati
 func WaitForTableArchive(req *dyno.Request, tableName string, timeout *time.Duration) (out *dynamodb.DescribeTableOutput, err error) {
 
 	sleeper := timer.NewSleeper(time.Millisecond * 100).
-		WithContext(req.Ctx()).
+		WithContext(req.Context()).
 		WithAddRandom(time.Millisecond * 100)
 
 	if timeout != nil {
@@ -120,16 +122,17 @@ func WaitForTableArchive(req *dyno.Request, tableName string, timeout *time.Dura
 	} // end of for loop
 }
 
+// WaitForTableDeletion waits for a given table until either the provided timeout is met or the request times out
 func WaitForTableDeletion(req *dyno.Request, tableName string, timeout *time.Duration) (err error) {
 
 	sleeper := timer.NewSleeper(time.Millisecond * 100).
-		WithContext(req.Ctx()).
+		WithContext(req.Context()).
 		WithAddRandom(time.Millisecond * 100)
 
 	if timeout != nil {
 		sleeper.WithTimeout(*timeout)
 	} else {
-		deadline, ok := req.Ctx().Deadline()
+		deadline, ok := req.Context().Deadline()
 		if ok {
 			sleeper.WithTimeout(time.Until(deadline))
 		}
@@ -170,23 +173,17 @@ func WaitForTableDeletion(req *dyno.Request, tableName string, timeout *time.Dur
 	} // end of for loop
 }
 
-type WaitForBackupInput struct {
-	BackupArn string
-	Request   *dyno.Request
-	Timeout   time.Duration
-}
-
 // WaitForBackupCompletion waits for backup to be completed
 func WaitForBackupCompletion(req *dyno.Request, backupArn string, timeout *time.Duration) (out *dynamodb.DescribeBackupOutput, err error) {
 
 	sleeper := timer.NewSleeper(time.Millisecond * 100).
-		WithContext(req.Ctx()).
+		WithContext(req.Context()).
 		WithAddRandom(time.Millisecond * 100)
 
 	if timeout != nil {
 		sleeper.WithTimeout(*timeout)
 	} else {
-		deadline, ok := req.Ctx().Deadline()
+		deadline, ok := req.Context().Deadline()
 		if ok {
 			sleeper.WithTimeout(time.Until(deadline))
 		}

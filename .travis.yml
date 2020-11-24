@@ -1,0 +1,19 @@
+language: go
+go:
+- 1.14.x
+- 1.15.x
+- tip
+before_install:
+- go get github.com/mattn/goveralls
+script:
+- "$GOPATH/bin/goveralls -service=travis-ci"
+after_script:
+  - curl -d "repo=github.com/shady831213/algorithms" https://goreportcard.com/checks
+env:
+  global:
+  - AWS_DEFAULT_REGION=us-east-1
+  - secure: NzBPxZ/+/Lr3tZ9NldD15+xDTA/sF95wW0MOn2W7UlUPAcn4zrg61M+4IJ2MD0leqcIkNfTlfmEs7Tz8R2k1Fq/yqBjCBanvVe59zrMfZaTvYaifaS5bIuKyjYE5Ch8PDVLJJomQlHI70eWxHeWIkpagasKWavmTMQdLfJJnw6sOpko2Zh1TVuWY3rnhvqc3+hKbg7yIoJ7jGEMi9i2MnXfhLetW+6SaYPal9jc9LMxIYvGKp9x5fooLX4ezbV1ZfJVmRkximO2dGflm0sBhE/bkXBh5THKXDw5bgFUaaG2OS/QjwWbtG98Srr/Guj+mF8Qqhp/UfepXZAOJSPRgYZDumuoRLOl0MPZjBdC88aYb3+HXHk37DMIZ9ZpDpBu3h7jq+JtasJMSKR22tratNHe1+BA2jGGEiL6U/jJJ6BoG7ituhmbwJA4dQ2EthRwT+rohn04WPlyzksbmjkFQDYO3QTmWKNhZR5gX+io09qhwRFHoCsLonutvAIHl3jUq5igHNr4OKCQU1oKO7I9zmnX4Cn3BWqZSqjYnPbj26eKBX/k+WKzcOi9BfIhg7sEn0clSTymQ5jw3UpSnAwHlZe8ElpvzGWQVgN+xPksCDlOYN/n/89pHRoSEkRe31hlDUQchjzgL0AwJkFyu3kZxTFheXbEJt/xoPdZ0S2cCaXA=
+  - secure: AsiaLUw8j3B6ItPvYVX60+iFrtvDDeql+TBc2bYYbH9PQ8UvsnpJURYrM2/tWP/3bNzecFXEeu8vkptP3hRknLGwKbSARFu7p3iRe1mymrDbvEOTd6pv7Ho1y+RghO0N24fH0Jyud3P6zbvE/YVfMve6u/twNb7wJLm9abK7pIHGN8AK8DopDh+0i4TJiQy2rhc8UVlYD9d2sbQAMv2P/EK6BQ1Kf5s5KFNpFTKTFqc0l/Ul7XETtBh3tUo5FKAGkGYee+gsaVwsbRCgX4LTsnxScY4Bt2IGMw9XvbrOBAiSgnmANc6k+e4Gp41QxxLGgmtKxhtgsyCgkW+s3ETxdnYtIlXxqh8WU/hwyq9Ebuu+f05YKWwoPxd4gG1H5B1PkBlP53XOUzFHL3utSEFi/rCgIqcP0P8Vk8oH4q2GJDsAGnYvO9O6sQ80/NtrCWxFt2/PvJIKtibu58H5VB2M1NQQMNWTHHQcf9/fBsf4EdDkhhhwVR3w2/F2ypfTNNUHL9svqsoze/ATF2eaCwMynl3DVVATMw+G9AWVaRE9WhPt/ilDgj11t7CbyHl1mgV282cY97iMFRfr9m9VmGaCQO6n1Wk5kSo2eYGvdWW8MRXlTV3XQWmKFexB1Pyh7/IzcPk6UohCEvBxczUWOhRzI1py4Vp0Wfu4fewuW7bQybc=
+branches:
+  only:
+    - master

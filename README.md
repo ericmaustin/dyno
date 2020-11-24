@@ -1,4 +1,8 @@
-# DYNO
+DYNO
+====
+
+[![Coverage Status](https://coveralls.io/repos/github/ericmaustin/dyno/badge.svg?branch=master)](https://coveralls.io/github/ericmaustin/dyno?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ericmaustin/dyno)](https://goreportcard.com/report/github.com/ericmaustin/dyno)
 
 dyno is an AWS dynomodb API extension library with built in retry-on-failure, session management, and extensive type
 encoding features

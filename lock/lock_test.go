@@ -2,12 +2,11 @@ package lock
 
 import (
 	"fmt"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/logging"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/operation"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/table"
-	"github.com/aws/aws-sdk-go/aws"
 	awsSession "github.com/aws/aws-sdk-go/aws/session"
+	"github.com/ericmaustin/dyno"
+	"github.com/ericmaustin/dyno/logging"
+	"github.com/ericmaustin/dyno/operation"
+	"github.com/ericmaustin/dyno/table"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -19,18 +18,13 @@ type testItem struct {
 	TestField string `dyno:"test_field"`
 }
 
+// TestLock tests locking functionality
 func TestLock(t *testing.T) {
 
 	log := logging.New()
 	log.SetLevel(logrus.DebugLevel)
 	// create the session
-	awsSess, err := awsSession.NewSessionWithOptions(awsSession.Options{
-		Config: aws.Config{
-			Region: dyno.StringPtr("us-east-1"),
-		},
-		Profile:           "mt2_dev",
-		SharedConfigState: awsSession.SharedConfigEnable,
-	})
+	awsSess, err := awsSession.NewSession()
 	assert.NoError(t, err)
 
 	/* get a session */

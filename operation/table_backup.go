@@ -1,11 +1,12 @@
 package operation
 
 import (
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/encoding"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/ericmaustin/dyno"
+	"github.com/ericmaustin/dyno/encoding"
 )
 
+// BackupTableResult is the result of a BackUp table operation
 type BackupTableResult struct {
 	ResultBase
 	output *dynamodb.CreateBackupOutput
@@ -84,6 +85,7 @@ func (b *BackupTableOperation) GoExecute(req *dyno.Request) <-chan *BackupTableR
 	return outCh
 }
 
+// Execute executes the BackupTableOperation
 func (b *BackupTableOperation) Execute(req *dyno.Request) (out *BackupTableResult) {
 	out = &BackupTableResult{}
 	b.setRunning()

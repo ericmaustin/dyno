@@ -1,3 +1,6 @@
+/*
+logging is an extension to github.com/sirupsen/logrus that includes a cloudwatch logs logger
+ */
 package logging
 
 import (
@@ -126,6 +129,15 @@ func (c *CloudWatchLogWriter) AddTags(tags map[string]string) *CloudWatchLogWrit
 	return c
 }
 
+func (c *CloudWatchLogWriter) putEvent (event *cloudwatchlogs.InputLogEvent, seq *string) (*cloudwatchlogs.PutLogEventsOutput, error) {
+	return c.srv.PutLogEvents(&cloudwatchlogs.PutLogEventsInput{
+		LogEvents:     []*cloudwatchlogs.InputLogEvent{event},
+		LogGroupName:  c.GroupName,
+		LogStreamName: c.StreamName,
+		SequenceToken: seq,
+	})
+}
+
 // Write puts new event into cloudwatch
 func (c *CloudWatchLogWriter) Write(p []byte) (n int, err error) {
 	n = 0
@@ -160,15 +172,6 @@ func (c *CloudWatchLogWriter) Write(p []byte) (n int, err error) {
 		}
 		return streamDesc.LogStreams[0].UploadSequenceToken, nil
 	}
-	// putEvent puts the cw log event
-	putEvent := func(seq *string) (*cloudwatchlogs.PutLogEventsOutput, error) {
-		return c.srv.PutLogEvents(&cloudwatchlogs.PutLogEventsInput{
-			LogEvents:     []*cloudwatchlogs.InputLogEvent{event},
-			LogGroupName:  c.GroupName,
-			LogStreamName: c.StreamName,
-			SequenceToken: seq,
-		})
-	}
 	// check if seq is not set
 	if c.seq == nil || len(*c.seq) < 1 {
 		// get the sequence token from the stream
@@ -177,8 +180,9 @@ func (c *CloudWatchLogWriter) Write(p []byte) (n int, err error) {
 			return
 		}
 	}
+
 	// put the event
-	res, err := putEvent(c.seq)
+	res, err := c.putEvent(event, c.seq)
 	if err != nil {
 		awsErr, ok := err.(awserr.Error)
 		if !ok {
@@ -234,7 +238,7 @@ func (c *CloudWatchLogWriter) Write(p []byte) (n int, err error) {
 		}
 
 		// attempt to put the log event again
-		res, err = putEvent(c.seq)
+		res, err = c.putEvent(event, c.seq)
 
 		if err != nil {
 			return
@@ -245,7 +249,7 @@ func (c *CloudWatchLogWriter) Write(p []byte) (n int, err error) {
 
 	if res.RejectedLogEventsInfo != nil {
 		// try again
-		_, err = putEvent(c.seq)
+		_, err = c.putEvent(event, c.seq)
 		if err != nil {
 			return
 		}

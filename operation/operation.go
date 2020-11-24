@@ -2,9 +2,10 @@ package operation
 
 import (
 	"context"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
 	"sync"
 	"time"
+
+	"github.com/ericmaustin/dyno"
 )
 
 const LogFieldOperation = "operation"
@@ -53,6 +54,7 @@ type Result interface {
 	SetError(error)
 }
 
+// ResultBase is the base of all result structs in the operation module
 type ResultBase struct {
 	timing *Timing
 	err    error
@@ -76,43 +78,6 @@ func (r *ResultBase) Timing() *Timing {
 // SetTiming sets the Operation Result's timing
 func (r *ResultBase) SetTiming(timing *Timing) {
 	r.timing = timing
-}
-
-// Timing is used to store operation timing
-type Timing struct {
-	created  *time.Time
-	started  *time.Time
-	finished *time.Time
-}
-
-func newTiming() *Timing {
-	return &Timing{
-		created: dyno.TimePtr(time.Now()),
-	}
-}
-
-func (t *Timing) Created() time.Time {
-	return *t.created
-}
-
-func (t *Timing) Started() (time.Time, error) {
-	if t.started == nil {
-		return time.Time{}, &dyno.Error{
-			Code:    dyno.ErrOperationNeverStarted,
-			Message: "never started",
-		}
-	}
-	return *t.started, nil
-}
-
-func (t *Timing) Finished() (time.Time, error) {
-	if t.finished == nil {
-		return time.Time{}, &dyno.Error{
-			Code:    dyno.ErrOperationNeverFinished,
-			Message: "never finished",
-		}
-	}
-	return *t.finished, nil
 }
 
 func (t *Timing) start() {
@@ -203,15 +168,6 @@ func (b *Base) setDone(result Result) {
 	result.SetTiming(b.timing)
 	b.done()
 }
-
-//
-//func (b *Base) setDone() {
-//	b.mu.Lock()
-//	defer b.mu.Unlock()
-//	b.timing.done()
-//	b.status = StatusDone
-//	b.done()
-//}
 
 // RunningTime returns the execution duration of this operation
 // if operation is currently running, will return duration up to now

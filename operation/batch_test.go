@@ -2,7 +2,7 @@ package operation
 
 import (
 	"fmt"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
+	"github.com/ericmaustin/dyno"
 	"github.com/stretchr/testify/suite"
 	"testing"
 )

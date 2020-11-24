@@ -3,10 +3,11 @@ package encoding
 import (
 	"encoding/json"
 	"fmt"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
+	"reflect"
+
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"reflect"
+	"github.com/ericmaustin/dyno"
 )
 
 // UnmarshalItems decodes a slice of items into the given input that must be a ptr to a slice

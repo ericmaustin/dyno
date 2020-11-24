@@ -3,8 +3,6 @@ package logging
 import (
 	"bufio"
 	"fmt"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
-	"github.com/aws/aws-sdk-go/aws"
 	awsSession "github.com/aws/aws-sdk-go/aws/session"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -33,22 +31,16 @@ func TestFileWriterHook(t *testing.T) {
 		assert.Greater(t, len(scanner.Text()), 0)
 		fmt.Println(">", scanner.Text())
 	}
-	f.Close()
-	os.Remove("./test.log")
+	_ = f.Close()
+	_ = os.Remove("./test.log")
 }
 
 func TestCloudWatchLogging(t *testing.T) {
 	// create the session
-	awsSess, err := awsSession.NewSessionWithOptions(awsSession.Options{
-		Config: aws.Config{
-			Region: dyno.StringPtr("us-east-1"),
-		},
-		Profile:           "mt2_dev",
-		SharedConfigState: awsSession.SharedConfigEnable,
-	})
+	awsSess, err := awsSession.NewSession()
 	assert.NoError(t, err)
 
-	cwWriter := NewWriter(NewCloudWatchLogWriter(awsSess, "multitouch", "testing"),
+	cwWriter := NewWriter(NewCloudWatchLogWriter(awsSess, "testgroup", "testing"),
 		DEBUG, ERROR, INFO, WARNING).SetFormat(&logrus.JSONFormatter{})
 
 	log := New()

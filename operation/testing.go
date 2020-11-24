@@ -1,15 +1,13 @@
 package operation
 
 import (
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/logging"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-
-	//"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/table"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/sirupsen/logrus"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/ericmaustin/dyno"
+	"github.com/ericmaustin/dyno/logging"
+	"github.com/sirupsen/logrus"
 )
 
 type testEmbeddedItem struct {
@@ -30,13 +28,8 @@ func createTestSession() *dyno.Session {
 	log.SetLevel(logrus.DebugLevel)
 
 	// create the session
-	awsSess, err := session.NewSessionWithOptions(session.Options{
-		Config: aws.Config{
-			Region: dyno.StringPtr("us-east-1"),
-		},
-		Profile:           "mt2_dev",
-		SharedConfigState: session.SharedConfigEnable,
-	})
+	awsSess, err := session.NewSession()
+
 	if err != nil {
 		panic(err)
 	}

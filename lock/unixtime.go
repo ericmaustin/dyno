@@ -3,8 +3,8 @@ package lock
 import (
 	"encoding/json"
 	"fmt"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/ericmaustin/dyno"
 	"reflect"
 	"strconv"
 	"time"

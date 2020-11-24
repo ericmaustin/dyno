@@ -1,9 +1,9 @@
 package operation
 
 import (
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/encoding"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/ericmaustin/dyno"
+	"github.com/ericmaustin/dyno/encoding"
 	"math"
 	"sync"
 )
@@ -282,7 +282,7 @@ type batchWriteState struct {
 	mu      sync.RWMutex
 }
 
-func (s *batchWriteState) SetError(err error) {
+func (s *batchWriteState) setError(err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.err = err
@@ -324,7 +324,7 @@ func doBatchWriteRequest(req *dyno.Request,
 		out, err := req.BatchWriteItem(input)
 
 		if err != nil {
-			state.SetError(err)
+			state.setError(err)
 			return
 		}
 

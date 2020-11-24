@@ -1,15 +1,17 @@
 package operation
 
 import (
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git"
-	"git-codecommit.us-east-1.amazonaws.com/v1/repos/dyno.git/encoding"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/ericmaustin/dyno"
+	"github.com/ericmaustin/dyno/encoding"
 )
 
 type TableBillingMode string
 
 const (
-	TableBillingModeOnDemand    = TableBillingMode("PAY_PER_REQUEST")
+	// TableBillingModeOnDemand is used as the billing mode when using PAY PER REQUEST or ON DEMAND billing
+	TableBillingModeOnDemand = TableBillingMode("PAY_PER_REQUEST")
+	// TableBillingModeProvisioned is used as the billing mode when Provisioned billing is used
 	TableBillingModeProvisioned = TableBillingMode("PROVISIONED")
 )
 
@@ -18,7 +20,7 @@ type CreateTableBuilder struct {
 	input *dynamodb.CreateTableInput
 }
 
-// NewCreateTableBuildecr creates a new CreateTableBuilder
+// NewCreateTableBuilder creates a new CreateTableBuilder
 func NewCreateTableBuilder(input *dynamodb.CreateTableInput) *CreateTableBuilder {
 	b := &CreateTableBuilder{}
 	if input != nil {
