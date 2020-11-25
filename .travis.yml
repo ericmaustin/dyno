@@ -10,7 +10,7 @@ script:
 - go test -v -covermode=count -coverprofile=coverage.out
 after_script:
 - curl -d "repo=github.com/ericmaustin/dyno" https://goreportcard.com/checks
-- $GOPATH/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken
+- $GOPATH/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
 env:
   global:
   - AWS_REGION=us-east-1
