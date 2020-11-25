@@ -2,7 +2,6 @@ package lock
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
 	awsSession "github.com/aws/aws-sdk-go/aws/session"
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/logging"
@@ -26,11 +25,7 @@ func TestLock(t *testing.T) {
 	log.SetLevel(logrus.DebugLevel)
 	// create the session
 	// create the session
-	awsSess, err := awsSession.NewSessionWithOptions(awsSession.Options{
-		Config: aws.Config{
-			LogLevel: aws.LogLevel(aws.LogDebug),
-		},
-	})
+	awsSess, err := awsSession.NewSession()
 	assert.NoError(t, err)
 
 	/* get a session */
