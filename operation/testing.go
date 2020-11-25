@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"github.com/aws/aws-sdk-go/aws"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -28,7 +29,11 @@ func createTestSession() *dyno.Session {
 	log.SetLevel(logrus.DebugLevel)
 
 	// create the session
-	awsSess, err := session.NewSession()
+	awsSess, err := session.NewSessionWithOptions(session.Options{
+		Config: aws.Config{
+			LogLevel: aws.LogLevel(aws.LogDebug),
+		},
+	})
 
 	if err != nil {
 		panic(err)
