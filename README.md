@@ -1,6 +1,6 @@
 DYNO
 ====
-
+[![Build Status](https://travis-ci.com/ericmaustin/dyno.svg?branch=master)](https://travis-ci.com/ericmaustin/dyno)
 [![Coverage Status](https://coveralls.io/repos/github/ericmaustin/dyno/badge.svg?branch=master)](https://coveralls.io/github/ericmaustin/dyno?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ericmaustin/dyno)](https://goreportcard.com/report/github.com/ericmaustin/dyno)
 

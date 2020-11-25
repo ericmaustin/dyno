@@ -5,7 +5,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/encoding"
-	"sync"
 )
 
 // GetResult is returned by the GetOperation Execution in a channel when operation completes
@@ -93,7 +92,6 @@ type GetOperation struct {
 	*Base
 	input     *dynamodb.GetItemInput
 	handler   ItemHandler
-	handlerMu *sync.Mutex
 }
 
 // Get creates a new GetOperation with optional input and ItemHandler
@@ -114,17 +112,6 @@ func (g *GetOperation) SetHandler(handler ItemHandler) *GetOperation {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.handler = handler
-	return g
-}
-
-// SetHandlerMutex sets the optional handler mutex that will be locked before handler is called
-func (g *GetOperation) SetHandlerMutex(mu *sync.Mutex) *GetOperation {
-	if !g.IsPending() {
-		panic(&InvalidState{})
-	}
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.handlerMu = mu
 	return g
 }
 
@@ -157,12 +144,7 @@ func (g *GetOperation) Execute(req *dyno.Request) (out *GetResult) {
 
 	// apply the handler
 	if g.handler != nil {
-		if g.handlerMu != nil {
-			g.handlerMu.Lock()
-			defer g.handlerMu.Unlock()
-		}
 		out.err = g.handler(out.output.Item)
-		g.handlerMu.Unlock()
 	}
 	return
 }

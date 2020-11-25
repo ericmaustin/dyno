@@ -822,16 +822,10 @@ func (t *Table) Publish(req *dyno.Request, timeout *time.Duration) <-chan *opera
 		defer func() {
 			close(doneCh)
 		}()
-		out := t.CreateTableBuilder().Operation().Execute(req)
-		if out.Error() != nil && dyno.IsAwsErrorCode(out.Error(), dynamodb.ErrCodeResourceInUseException) {
-			out.SetError(nil)
-			return
+		out := t.CreateTableBuilder().Operation().SetWait(true).Execute(req)
+		if out.Error() == nil {
+			t.UpdateWithDescription(out.Output().TableDescription)
 		}
-		tblDesc, tblDescError := operation.WaitForTableReady(req, t.name, timeout)
-		if tblDescError != nil {
-			panic(tblDescError)
-		}
-		t.UpdateWithDescription(tblDesc.Table)
 		doneCh <- out
 	}()
 	return doneCh

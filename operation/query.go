@@ -6,6 +6,7 @@ import (
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/condition"
 	"github.com/ericmaustin/dyno/encoding"
+	"sync"
 )
 
 // QueryResult is returned by the GetOperation Execution in a channel when operation completes
@@ -188,8 +189,9 @@ func CreateQueryInput(tableName string,
 // QueryOperation runs query operations and handles their res
 type QueryOperation struct {
 	*Base
-	input   *dynamodb.QueryInput
-	handler ItemSliceHandler
+	input     *dynamodb.QueryInput
+	handler   ItemSliceHandler
+	handlerMu *sync.Mutex
 }
 
 // Input returns a ptr to the Input Input
@@ -228,6 +230,17 @@ func (q *QueryOperation) SetHandler(handler ItemSliceHandler) *QueryOperation {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.handler = handler
+	return q
+}
+
+// SetHandlerMutex sets the optional handler mutex that will be locked before handler is called
+func (q *QueryOperation) SetHandlerMutex(mu *sync.Mutex) *QueryOperation {
+	if !q.IsPending() {
+		panic(&InvalidState{})
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.handlerMu = mu
 	return q
 }
 
@@ -276,6 +289,10 @@ func (q *QueryOperation) Execute(req *dyno.Request) (out *QueryResult) {
 	q.setRunning()
 	defer q.setDone(out)
 
+	if q.handlerMu == nil && q.handler != nil {
+		q.handlerMu = &sync.Mutex{}
+	}
+
 	out.output = make([]*dynamodb.QueryOutput, 0)
 
 	var output *dynamodb.QueryOutput
@@ -294,7 +311,9 @@ func (q *QueryOperation) Execute(req *dyno.Request) (out *QueryResult) {
 
 		// if we have items and a handler, run the handler
 		if len(output.Items) > 0 && q.handler != nil {
+			q.handlerMu.Lock()
 			out.err = q.handler(output.Items)
+			q.handlerMu.Unlock()
 			if out.err != nil {
 				return
 			}

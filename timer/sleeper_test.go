@@ -11,18 +11,17 @@ import (
 
 func TestSleeper(t *testing.T) {
 
-	sleepFor := time.Second
+	sleepFor := time.Millisecond
 	now := time.Now()
-	sleeper := NewSleeper(sleepFor)
+	sleeper := NewSleeper(sleepFor).
+		WithTimeout(time.Millisecond * 3)
 
-	<-sleeper.Sleep()
-	<-sleeper.Sleep()
 	<-sleeper.Sleep()
 	<-sleeper.Sleep()
 	<-sleeper.Sleep()
 
 	totalDuration := time.Since(now)
-	assert.GreaterOrEqual(t, totalDuration.Nanoseconds(), (sleepFor * 5).Nanoseconds())
+	assert.GreaterOrEqual(t, totalDuration.Nanoseconds(), (sleepFor * 3).Nanoseconds())
 
 	err := <-sleeper.Sleep()
 
@@ -37,9 +36,10 @@ func TestSleeper(t *testing.T) {
 
 func TestExponentialSleeperSleeper(t *testing.T) {
 
-	sleepFor := time.Second
+	sleepFor := time.Millisecond
 	now := time.Now()
-	sleeper := NewExponentialSleeper(sleepFor)
+	sleeper := NewExponentialSleeper(sleepFor).
+		WithTimeout(time.Millisecond * 8)
 	sleepStart := now
 	<-sleeper.Sleep()
 	assert.GreaterOrEqual(t, time.Since(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 0))).Nanoseconds())
@@ -49,14 +49,6 @@ func TestExponentialSleeperSleeper(t *testing.T) {
 	sleepStart = time.Now()
 	<-sleeper.Sleep()
 	assert.GreaterOrEqual(t, time.Since(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 2))).Nanoseconds())
-	sleepStart = time.Now()
-	<-sleeper.Sleep()
-	assert.GreaterOrEqual(t, time.Since(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 3))).Nanoseconds())
-	sleepStart = time.Now()
-	<-sleeper.Sleep()
-	assert.GreaterOrEqual(t, time.Since(sleepStart).Nanoseconds(), (sleepFor * time.Duration(math.Pow(2, 4))).Nanoseconds())
-	totalDuration := time.Since(now)
-	assert.GreaterOrEqual(t, totalDuration.Nanoseconds(), (sleepFor * 31).Nanoseconds()) // should be > 31 seconds
 
 	err := <-sleeper.Sleep()
 

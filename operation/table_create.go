@@ -213,6 +213,14 @@ func (c *CreateTableOperation) Execute(req *dyno.Request) (out *CreateTableResul
 	defer c.setDone(out)
 	out.output, out.err = req.CreateTable(c.input)
 	if c.wait {
+		if out.err != nil && dyno.IsAwsErrorCode(out.Error(), dynamodb.ErrCodeResourceInUseException) {
+			tblDescOut, tblDescErr := DescribeTable(*c.input.TableName).Execute(req).OutputError()
+			if tblDescErr != nil {
+				out.err = tblDescErr
+			} else {
+				out.output = &dynamodb.CreateTableOutput{TableDescription: tblDescOut.Table}
+			}
+		}
 		_, out.err = WaitForTableReady(req, *c.input.TableName, nil)
 	}
 	return
