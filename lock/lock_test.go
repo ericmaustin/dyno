@@ -36,7 +36,7 @@ func TestLock(t *testing.T) {
 	// set up the table
 	tbl := table.NewTable("__tmp_lock_test", table.NewKey(table.NewPartitionStringKey("id"), nil))
 
-	pubRes := <-tbl.Publish(sess.RequestWithTimeout(time.Minute), dyno.DurationPtr(time.Minute))
+	pubRes := <-tbl.Publish(sess.RequestWithTimeout(time.Minute))
 	sess.Log().Infof("pubRes: %v", pubRes)
 	pubOut, err := pubRes.OutputError()
 	assert.NoError(t, err)

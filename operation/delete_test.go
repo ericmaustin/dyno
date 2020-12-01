@@ -31,7 +31,7 @@ func (d *DeleteTestSuite) TestDelete() {
 
 	// scan for records with no conditions
 	deleteInput := NewDeleteBuilder(nil).
-		SetTable(testTableName).
+		SetTable(getTestTableName()).
 		SetKey(key).
 		Input()
 

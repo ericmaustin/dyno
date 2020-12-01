@@ -52,11 +52,6 @@ func (b *CreateTableBuilder) SetProvisionedThroughput(rcu, wcu int64) *CreateTab
 
 // AddAttributeDefinition adds an attribute definition to the builder
 func (b *CreateTableBuilder) AddAttributeDefinition(attribute *dynamodb.AttributeDefinition) {
-	for _, def := range b.input.AttributeDefinitions {
-		if def.AttributeName != attribute.AttributeName {
-			return
-		}
-	}
 	b.input.AttributeDefinitions = append(b.input.AttributeDefinitions, attribute)
 }
 
@@ -220,6 +215,8 @@ func (c *CreateTableOperation) Execute(req *dyno.Request) (out *CreateTableResul
 			} else {
 				out.output = &dynamodb.CreateTableOutput{TableDescription: tblDescOut.Table}
 			}
+		} else if out.err != nil {
+			return
 		}
 		_, out.err = WaitForTableReady(req, *c.input.TableName, nil)
 	}

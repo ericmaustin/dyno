@@ -25,7 +25,7 @@ func (s *ScanTestSuite) TearDownSuite() {
 func (s *ScanTestSuite) TestScanOperation() {
 	// scan for records with no conditions
 	scanInput := NewScanBuilder(nil).
-		SetTable(testTableName).
+		SetTable(getTestTableName()).
 		SetSelect(ScanSelectAllAttributes).
 		Input()
 
@@ -45,7 +45,7 @@ func (s *ScanTestSuite) TestScanOperationWithFilter() {
 
 	// scan for records with no conditions
 	scanOutput, err := NewScanBuilder(nil).
-		SetTable(testTableName).
+		SetTable(getTestTableName()).
 		SetSelect(ScanSelectAllAttributes).
 		AddFilter(condition.Equal("id", "A")).
 		Operation().
@@ -60,7 +60,7 @@ func (s *ScanTestSuite) TestScanOperationWithFilter() {
 	target = make([]*testItem, 0)
 
 	scanInput := NewScanBuilder(nil).
-		SetTable(testTableName).
+		SetTable(getTestTableName()).
 		SetSelect(ScanSelectAllAttributes).
 		AddFilter(condition.GreaterThanEqual("SubID", 1)).
 		Input()

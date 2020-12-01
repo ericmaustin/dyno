@@ -31,7 +31,7 @@ func (s *GetTestSuite) TestBatchGet() {
 	target := &testItem{}
 
 	getOperation := NewGetBuilder(nil).
-		SetTable(testTableName).
+		SetTable(getTestTableName()).
 		SetKey(map[string]string{
 			"id": "A",
 		}).Operation()

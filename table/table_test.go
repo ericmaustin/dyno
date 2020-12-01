@@ -2,6 +2,7 @@ package table
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -24,8 +25,8 @@ type CRUDTableTest struct {
 }
 
 type testEmbeddedItem struct {
-	SubID    int
-	SubField string
+	SubID    int    `dyno:"sub_id"`
+	SubField string `dyno:"sub_field"`
 }
 
 type testItemKey struct {
@@ -38,7 +39,23 @@ type testItem struct {
 	Embedded  *testEmbeddedItem `dyno:",*"`
 }
 
-const testTableName = "__table_testing"
+var testTableName = ""
+
+func getTestTableName() string {
+	if len(testTableName) < 1 {
+		charset := "abcdefghijklmnopqrstuvwxyz" +
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+			"0123456789_"
+
+		// random string
+		b := make([]byte, 50)
+		for i := range b {
+			b[i] = charset[rand.Intn(len(charset))]
+		}
+		testTableName = "__go_test__" + string(b)
+	}
+	return testTableName
+}
 
 func createTestSession() *dyno.Session {
 	log := logging.New()
@@ -59,9 +76,10 @@ func createTestSession() *dyno.Session {
 }
 
 func createTestTable(sess *dyno.Session) *Table {
-	tbl := NewTable(testTableName, NewKey(NewPartitionStringKey("id"), nil)).
+	tbl := NewTable(getTestTableName(),
+		NewKey(NewPartitionStringKey("id"), NewSortNumberKey("sub_id"))).
 		SetOnDemand(true)
-	err := (<-tbl.Publish(sess.Request(), nil)).Error()
+	err := (<-tbl.Publish(sess.Request())).Error()
 	if err != nil {
 		panic(err)
 	}
@@ -112,8 +130,15 @@ func putTestRecords(sess *dyno.Session) []*testItem {
 		},
 	}
 
-	batchWriteInput := operation.NewBatchWriteBuilder(nil).AddPuts(testTableName, testRecords).Input()
-	err := operation.BatchWrite(batchWriteInput).SetConcurrency(5).Execute(sess.Request()).Error()
+	batchWriteInput := operation.NewBatchWriteBuilder(nil).
+		AddPuts(getTestTableName(), testRecords).
+		Input()
+
+	err := operation.BatchWrite(batchWriteInput).
+		SetConcurrency(5).
+		Execute(sess.Request()).
+		Error()
+
 	if err != nil {
 		panic(err)
 	}

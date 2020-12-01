@@ -29,7 +29,7 @@ func (s *GetBatchTestSuite) TearDownSuite() {
 func (s *GetBatchTestSuite) TestBatchGet() {
 	// scan for records with no conditions
 	batchGet := NewBatchGetBuilder(nil).
-		AddKeys(testTableName, s.keys).
+		AddKeys(getTestTableName(), s.keys).
 		Operation()
 
 	target := make([]*testItem, 0)

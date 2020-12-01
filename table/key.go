@@ -9,6 +9,7 @@ import (
 	"github.com/ericmaustin/dyno/condition"
 )
 
+// KeyBase is the base struct used for all key types
 type KeyBase struct {
 	name                string
 	attributeType       string
@@ -29,6 +30,7 @@ func newKey(name, attributeType string) *KeyBase {
 	}
 }
 
+// PartitionKey represents a partition key in a dynamodb table
 type PartitionKey struct {
 	*KeyBase
 }
@@ -81,25 +83,27 @@ func NewSortKey(name string, attributeType string) *SortKey {
 	return &SortKey{newKey(name, attributeType)}
 }
 
+// NewSortStringKey returns a new sort key with a String attribute
 func NewSortStringKey(name string) *SortKey {
 	return NewSortKey(name, AttributeString)
 }
 
+// NewSortNumberKey returns a new sort key with a Number attribute
 func NewSortNumberKey(name string) *SortKey {
 	return NewSortKey(name, AttributeNumber)
 }
 
+// NewSortNumberKey returns a new sort key with a Binary attribute
 func NewSortBinaryKey(name string) *SortKey {
 	return NewSortKey(name, AttributeBinary)
 }
 
-/*
-Condition returns a dynamodbKey Builder object for this key definition
-*/
+// Condition returns a dynamodbKey Builder object for this key definition
 func (sk *SortKey) Condition(operator interface{}, values ...interface{}) (expression.KeyConditionBuilder, error) {
 	return GetKeyCondition(sk.KeyBase, operator, values...)
 }
 
+// NotEquals returns a KeyConditionBuilder with a NotEquals condition
 func (sk *SortKey) NotEquals(value interface{}) *expression.KeyConditionBuilder {
 	cnd, err := GetKeyCondition(sk.KeyBase, condition.OperatorNotEquals, value)
 	if err != nil {
@@ -108,6 +112,7 @@ func (sk *SortKey) NotEquals(value interface{}) *expression.KeyConditionBuilder 
 	return &cnd
 }
 
+// GreaterThan returns a KeyConditionBuilder with a GreaterThan condition
 func (sk *SortKey) GreaterThan(value interface{}) *expression.KeyConditionBuilder {
 	cnd, err := GetKeyCondition(sk.KeyBase, condition.OperatorGreaterThan, value)
 	if err != nil {
@@ -116,6 +121,7 @@ func (sk *SortKey) GreaterThan(value interface{}) *expression.KeyConditionBuilde
 	return &cnd
 }
 
+// GreaterThanEquals returns a KeyConditionBuilder with a GreaterThanEquals condition
 func (sk *SortKey) GreaterThanEquals(value interface{}) *expression.KeyConditionBuilder {
 	cnd, err := GetKeyCondition(sk.KeyBase, condition.OperatorGreaterThanEqual, value)
 	if err != nil {
@@ -124,6 +130,7 @@ func (sk *SortKey) GreaterThanEquals(value interface{}) *expression.KeyCondition
 	return &cnd
 }
 
+// LessThan returns a KeyConditionBuilder with a LessThan condition
 func (sk *SortKey) LessThan(value interface{}) *expression.KeyConditionBuilder {
 	cnd, err := GetKeyCondition(sk.KeyBase, condition.OperatorLessThan, value)
 	if err != nil {
@@ -132,6 +139,7 @@ func (sk *SortKey) LessThan(value interface{}) *expression.KeyConditionBuilder {
 	return &cnd
 }
 
+// Between returns a KeyConditionBuilder with a LessThanEquals condition
 func (sk *SortKey) LessThanEquals(value interface{}) *expression.KeyConditionBuilder {
 	cnd, err := GetKeyCondition(sk.KeyBase, condition.OperatorLessThanEqual, value)
 	if err != nil {
@@ -140,6 +148,7 @@ func (sk *SortKey) LessThanEquals(value interface{}) *expression.KeyConditionBui
 	return &cnd
 }
 
+// Between returns a KeyConditionBuilder with a between condition
 func (sk *SortKey) Between(lower, upper interface{}) *expression.KeyConditionBuilder {
 	cnd, err := GetKeyCondition(sk.KeyBase, condition.OperatorBetween, lower, upper)
 	if err != nil {
@@ -153,6 +162,7 @@ type Key struct {
 	partitionKey *PartitionKey
 	sortKey      *SortKey
 	schema       []*dynamodb.KeySchemaElement
+	attributes   []*dynamodb.AttributeDefinition
 }
 
 // NewKey
@@ -161,7 +171,7 @@ func NewKey(pk *PartitionKey, sk *SortKey) *Key {
 		partitionKey: pk,
 		sortKey:      sk,
 	}
-	k.setSchema()
+	k.buildSchemaAndAttributeDefinitions()
 	return k
 }
 
@@ -178,22 +188,26 @@ func (k *Key) SortKey() *SortKey {
 // SetSortKey sets the sortKey key and rebuilds the key schema
 func (k *Key) SetSortKey(key *SortKey) *Key {
 	k.sortKey = key
-	k.setSchema()
+	k.buildSchemaAndAttributeDefinitions()
 	return k
 }
 
 // SetPartitionKey sets the partitionKey key and rebuilds the key schema
 func (k *Key) SetPartitionKey(key *PartitionKey) *Key {
 	k.partitionKey = key
-	k.setSchema()
+	k.buildSchemaAndAttributeDefinitions()
 	return k
 }
 
-func (k *Key) setSchema() {
+func (k *Key) buildSchemaAndAttributeDefinitions() {
 
-	var keySchema []*dynamodb.KeySchemaElement
+	var (
+		attributes []*dynamodb.AttributeDefinition
+		keySchema  []*dynamodb.KeySchemaElement
+	)
 
 	if k.partitionKey != nil {
+		attributes = append(attributes, k.partitionKey.attributeDefinition)
 		keySchema = append(keySchema, &dynamodb.KeySchemaElement{
 			AttributeName: dyno.StringPtr(k.partitionKey.name),
 			KeyType:       dyno.StringPtr("HASH"),
@@ -201,6 +215,7 @@ func (k *Key) setSchema() {
 	}
 
 	if k.sortKey != nil {
+		attributes = append(attributes, k.sortKey.attributeDefinition)
 		keySchema = append(keySchema, &dynamodb.KeySchemaElement{
 			AttributeName: dyno.StringPtr(k.sortKey.name),
 			KeyType:       dyno.StringPtr("RANGE"),
@@ -208,6 +223,7 @@ func (k *Key) setSchema() {
 	}
 
 	k.schema = keySchema
+	k.attributes = attributes
 }
 
 // String implements the string interface for the table key

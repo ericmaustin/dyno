@@ -29,7 +29,7 @@ func (q *QueryTestSuite) TestScanOperation() {
 
 	// scan for records with no conditions
 	scanOutput, err := NewQueryBuilder(nil).
-		SetTable(testTableName).
+		SetTable(getTestTableName()).
 		AddKeyCondition(condition.KeyEqual("id", "A")).
 		Operation().                               // get the operation
 		SetHandler(ItemSliceUnmarshaler(&target)). // set the handler to unmarshal the target

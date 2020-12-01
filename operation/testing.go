@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -21,7 +22,23 @@ type testItem struct {
 	Embedded  *testEmbeddedItem `dyno:",*"`
 }
 
-const testTableName = "__operation_testing"
+var testTableName = ""
+
+func getTestTableName() string {
+	if len(testTableName) < 1 {
+		charset := "abcdefghijklmnopqrstuvwxyz" +
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+			"0123456789_"
+
+		// random string
+		b := make([]byte, 50)
+		for i := range b {
+			b[i] = charset[rand.Intn(len(charset))]
+		}
+		testTableName = "__go_test__" + string(b)
+	}
+	return testTableName
+}
 
 func createTestSession() *dyno.Session {
 	log := logging.New()
@@ -44,7 +61,7 @@ func createTestSession() *dyno.Session {
 func createTestTable(sess *dyno.Session) {
 	// set up the table
 	tblInput := &dynamodb.CreateTableInput{
-		TableName:   dyno.StringPtr(testTableName),
+		TableName:   dyno.StringPtr(getTestTableName()),
 		BillingMode: dyno.StringPtr("PAY_PER_REQUEST"),
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
@@ -67,7 +84,7 @@ func createTestTable(sess *dyno.Session) {
 }
 
 func destroytestTable(sess *dyno.Session) {
-	err := DeleteTable(testTableName).
+	err := DeleteTable(getTestTableName()).
 		Execute(sess.Request()).
 		Error()
 
@@ -76,7 +93,7 @@ func destroytestTable(sess *dyno.Session) {
 	}
 
 	// wait for table to be deleted
-	err = WaitForTableDeletion(sess.Request(), testTableName, nil)
+	err = WaitForTableDeletion(sess.Request(), getTestTableName(), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -136,7 +153,7 @@ func putTestRecords(sess *dyno.Session) []*testItem {
 		},
 	}
 
-	batchWriteInput := NewBatchWriteBuilder(nil).AddPuts(testTableName, testRecords).Input()
+	batchWriteInput := NewBatchWriteBuilder(nil).AddPuts(getTestTableName(), testRecords).Input()
 	err := BatchWrite(batchWriteInput).SetConcurrency(5).Execute(sess.Request()).Error()
 	if err != nil {
 		panic(err)

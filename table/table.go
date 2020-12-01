@@ -27,10 +27,7 @@ const (
 	AttributeString = "S"
 )
 
-const (
-	LogFieldExecutionTime = "execution_Time"
-	LogFieldTableName     = "table"
-)
+const LogFieldTableName = "table"
 
 // TimeSpanMapper represents a dynamodb table
 type Table struct {
@@ -351,11 +348,9 @@ func (t *Table) CreateTableBuilder() *operation.CreateTableBuilder {
 	// if we have a key then create attribute definitions for all the keys
 	if t.key != nil {
 		builder.SetKeySchema(t.key.schema)
-		builder.AddAttributeDefinition(t.key.partitionKey.attributeDefinition)
-		if t.key.sortKey != nil {
-			builder.AddAttributeDefinition(t.key.sortKey.attributeDefinition)
+		for _, attr := range t.key.attributes {
+			builder.AddAttributeDefinition(attr)
 		}
-
 	}
 
 	// if we have lsis then add the lsis the the input
@@ -621,6 +616,7 @@ func (t *Table) HasIndex(idxName string) bool {
 	return false
 }
 
+// UniqueKeyCondition returns a ConditionBuilder that represents a unique key condition
 func (t *Table) UniqueKeyCondition() *expression.ConditionBuilder {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -816,7 +812,7 @@ func (t *Table) Backup(req *dyno.Request, backupName string, timeout *time.Durat
 
 // Publish creates this table in dynamodb
 // returns a channel that will return a PublishResult when table is ready
-func (t *Table) Publish(req *dyno.Request, timeout *time.Duration) <-chan *operation.CreateTableResult {
+func (t *Table) Publish(req *dyno.Request) <-chan *operation.CreateTableResult {
 	doneCh := make(chan *operation.CreateTableResult)
 	go func() {
 		defer func() {
@@ -831,36 +827,28 @@ func (t *Table) Publish(req *dyno.Request, timeout *time.Duration) <-chan *opera
 	return doneCh
 }
 
-type DeleteResult struct {
-	DeleteTableOutput *dynamodb.DeleteTableOutput
-	Err               error
-}
-
-func (d *DeleteResult) OutputError() (*dynamodb.DeleteTableOutput, error) {
-	return d.DeleteTableOutput, d.Err
-}
-
 // Delete deletes this table in dynamodb
 // returns a channel that will return a DeleteResult when table is ready
-func (t *Table) Delete(req *dyno.Request, timeout *time.Duration) <-chan *DeleteResult {
-	doneCh := make(chan *DeleteResult)
+func (t *Table) Delete(req *dyno.Request, timeout *time.Duration) <-chan *operation.DeleteTableResult {
+	doneCh := make(chan *operation.DeleteTableResult)
 	go func() {
 		t.mu.Lock()
-		result := &DeleteResult{}
+		var out *operation.DeleteTableResult
 		defer func() {
 			t.mu.Unlock()
-			doneCh <- result
+			doneCh <- out
 			close(doneCh)
 		}()
-		out, err := operation.DeleteTable(t.name).
-			Execute(req).
-			OutputError()
-		if err != nil {
-			result.Err = err
+		out = operation.DeleteTable(t.name).Execute(req)
+		if out.Error() != nil {
 			return
 		}
-		result.DeleteTableOutput = out
-		result.Err = operation.WaitForTableDeletion(req, *out.TableDescription.TableName, timeout)
+		// wait for the table to be deleted
+		waitErr := operation.WaitForTableDeletion(req, *out.Output().TableDescription.TableName, timeout)
+		if waitErr != nil {
+			out.SetError(waitErr)
+			return
+		}
 		// clear the description
 		t.description = nil
 	}()
