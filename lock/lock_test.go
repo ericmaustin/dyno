@@ -9,6 +9,7 @@ import (
 	"github.com/ericmaustin/dyno/table"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"math/rand"
 	"testing"
 	"time"
 )
@@ -16,6 +17,25 @@ import (
 type testItem struct {
 	ID        string `dyno:"id"`
 	TestField string `dyno:"test_field"`
+}
+
+var testTableName = ""
+
+func getTestTableName() string {
+	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
+	if len(testTableName) < 1 {
+		charset := "abcdefghijklmnopqrstuvwxyz" +
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+			"0123456789_"
+
+		// random string
+		b := make([]byte, 50)
+		for i := range b {
+			b[i] = charset[seededRand.Intn(len(charset))]
+		}
+		testTableName = "__dyno_test_locks__" + string(b)
+	}
+	return testTableName
 }
 
 // TestLock tests locking functionality
@@ -34,7 +54,7 @@ func TestLock(t *testing.T) {
 		SetLogger(log)
 
 	// set up the table
-	tbl := table.NewTable("__tmp_lock_test", table.NewKey(table.NewPartitionStringKey("id"), nil))
+	tbl := table.NewTable(getTestTableName(), table.NewKey(table.NewPartitionStringKey("id"), nil))
 
 	pubRes := <-tbl.Publish(sess.RequestWithTimeout(time.Minute))
 	sess.Log().Infof("pubRes: %v", pubRes)
@@ -64,7 +84,7 @@ func TestLock(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	sess.Log().Debugf("BatchPut cache execution time = %v\n", batchWriteOutput)
+	sess.Log().Debugf("BatchPut cache execution time = %v", batchWriteOutput)
 
 	queryInput := operation.NewQueryBuilder(nil).
 		SetTable(tbl.Name()).

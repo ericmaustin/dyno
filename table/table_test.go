@@ -42,6 +42,7 @@ type testItem struct {
 var testTableName = ""
 
 func getTestTableName() string {
+	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
 	if len(testTableName) < 1 {
 		charset := "abcdefghijklmnopqrstuvwxyz" +
 			"ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
@@ -50,9 +51,9 @@ func getTestTableName() string {
 		// random string
 		b := make([]byte, 50)
 		for i := range b {
-			b[i] = charset[rand.Intn(len(charset))]
+			b[i] = charset[seededRand.Intn(len(charset))]
 		}
-		testTableName = "__go_test__" + string(b)
+		testTableName = "__dyno_test_tables__" + string(b)
 	}
 	return testTableName
 }
