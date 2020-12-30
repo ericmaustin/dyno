@@ -2,10 +2,10 @@ package dyno
 
 import (
 	"context"
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/sirupsen/logrus"
+	"github.com/ericmaustin/dyno/log"
+	"github.com/google/uuid"
 	"regexp"
 	"sync"
 	"time"
@@ -16,11 +16,10 @@ var (
 	defaultMaxTimeout = time.Duration(5) * time.Minute
 )
 
-/*
-Session represents a single dyno session that includes an aws session
-*/
+// Session represents a single dyno session that includes an aws session
 type Session struct {
-	log        *logrus.Entry
+	instanceID string
+	log        log.Logrus
 	client     *dynamodb.DynamoDB
 	mu         *sync.RWMutex
 	awsSession *session.Session
@@ -29,9 +28,12 @@ type Session struct {
 }
 
 // Log returns the log for this session
-func (s *Session) Log() *logrus.Entry {
+func (s *Session) Log() log.Logrus {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	if s.log == nil {
+		s.log = log.New().WithField("session_id", s.instanceID)
+	}
 	return s.log
 }
 
@@ -69,12 +71,10 @@ func (s *Session) SetContext(ctx context.Context) *Session {
 }
 
 // SetLogger sets the logger for the session
-func (s *Session) SetLogger(logger *logrus.Logger) *Session {
+func (s *Session) SetLogger(logger log.Logrus) *Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.log = logger.WithFields(logrus.Fields{
-		"dyno_session": fmt.Sprintf("%p", s),
-	})
+	s.log = logger.WithField("session_id", s.instanceID)
 	return s
 }
 
@@ -96,6 +96,7 @@ func (s *Session) SetMaxTimeout(timeout time.Duration) *Session {
 // New generates a new session with provided aws session
 func New(awsSession *session.Session) *Session {
 	return &Session{
+		instanceID: uuid.New().String(),
 		awsSession: awsSession,
 		mu:         &sync.RWMutex{},
 		maxTimeout: defaultMaxTimeout,
@@ -106,6 +107,7 @@ func New(awsSession *session.Session) *Session {
 // NewWithContext generates a new session with provided aws session and a context
 func NewWithContext(ctx context.Context, awsSession *session.Session) *Session {
 	return &Session{
+		instanceID: uuid.New().String(),
 		awsSession: awsSession,
 		mu:         &sync.RWMutex{},
 		maxTimeout: defaultMaxTimeout,
@@ -124,35 +126,12 @@ func FilterName(input string) string {
 
 // Request creates a new request with a the given context
 func (s *Session) Request() *Request {
-	ctx, cancel := context.WithCancel(context.Background())
-	return &Request{
-		mu:      &sync.RWMutex{},
-		Session: s,
-		ctx:     ctx,
-		cancel:  cancel,
-	}
-}
-
-// RequestWithContext creates a new session with a the given context
-func (s *Session) RequestWithContext(ctx context.Context) *Request {
-	ctx, cancel := context.WithCancel(ctx)
-	return &Request{
-		mu:      &sync.RWMutex{},
-		Session: s,
-		ctx:     ctx,
-		cancel:  cancel,
-	}
+	ctx, cancel := context.WithCancel(s.ctx)
+	return newRequest(ctx, cancel, s)
 }
 
 // RequestWithTimeout creates a new session with the given timeout attached to the context
 func (s *Session) RequestWithTimeout(timeout time.Duration) *Request {
-	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-
-	return &Request{
-		mu:      &sync.RWMutex{},
-		Session: s,
-		ctx:     ctx,
-		cancel:  cancel,
-	}
+	ctx, cancel := context.WithTimeout(s.ctx, timeout)
+	return newRequest(ctx, cancel, s)
 }

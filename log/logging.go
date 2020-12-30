@@ -1,49 +1,74 @@
 /*
 logging is an extension to github.com/sirupsen/logrus that includes a cloudwatch logs logger
  */
-package logging
+package log
 
 import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"io"
 	"sync"
 	"time"
 )
 
 const (
-	DEBUG   = log.DebugLevel
-	INFO    = log.InfoLevel
-	WARNING = log.WarnLevel
-	ERROR   = log.ErrorLevel
-	FATAL   = log.FatalLevel
-	PANIC   = log.PanicLevel
+	TRACE   = logrus.TraceLevel
+	DEBUG   = logrus.DebugLevel
+	INFO    = logrus.InfoLevel
+	WARNING = logrus.WarnLevel
+	ERROR   = logrus.ErrorLevel
+	FATAL   = logrus.FatalLevel
+	PANIC   = logrus.PanicLevel
 )
+
+// StandardLogger is used in place of a standard logger instance to ensure compatibility with any logger
+type StandardLogger interface {
+	Debug(...interface{})
+	Info(...interface{})
+	Warn(...interface{})
+	Error(...interface{})
+	Fatal(...interface{})
+	Panic(...interface{})
+	Debugf(string, ...interface{})
+	Infof(string, ...interface{})
+	Warnf(string, ...interface{})
+	Errorf(string, ...interface{})
+	Fatalf(string, ...interface{})
+	Panicf(string, ...interface{})
+}
+
+// Logrus allows passing of a logger or entry
+type Logrus interface {
+	StandardLogger
+	WithFields(fields logrus.Fields) *logrus.Entry
+	WithField(key string, value interface{}) *logrus.Entry
+}
 
 /*
 Writer represents a single Logger handler that implements the logrus hook interface
 */
 type Writer struct {
 	Writer    io.Writer `validate:"required"`
-	LogLevels []log.Level
-	Format    log.Formatter
+	LogLevels []logrus.Level
+	Format    logrus.Formatter
 }
 
-func (w *Writer) Levels() []log.Level {
+// Levels returns the log levels for this Writer. If none were set, the default levels are passed
+// which includes all levels
+func (w *Writer) Levels() []logrus.Level {
 	if w.LogLevels == nil || len(w.LogLevels) == 0 {
-		// default to all
-		return []log.Level{DEBUG, INFO, WARNING, ERROR, FATAL, PANIC}
+		w.LogLevels = []logrus.Level{TRACE, DEBUG, INFO, WARNING, ERROR, FATAL, PANIC}
 	}
 	return w.LogLevels
 }
 
 // Fire will format the text and then write to the writer
-func (w *Writer) Fire(entry *log.Entry) error {
+func (w *Writer) Fire(entry *logrus.Entry) error {
 	if w.Format == nil {
-		w.Format = &log.TextFormatter{
+		w.Format = &logrus.TextFormatter{
 			FullTimestamp: true,
 		}
 	}
@@ -57,7 +82,7 @@ func (w *Writer) Fire(entry *log.Entry) error {
 }
 
 // Add Levels adds levels to this handler
-func (w *Writer) AddLevels(levels ...log.Level) *Writer {
+func (w *Writer) AddLevels(levels ...logrus.Level) *Writer {
 	if w.LogLevels == nil {
 		w.LogLevels = levels
 	} else {
@@ -67,7 +92,7 @@ func (w *Writer) AddLevels(levels ...log.Level) *Writer {
 }
 
 // NewWriter returns a new handler with the required writer and log level
-func NewWriter(writer io.Writer, levels ...log.Level) *Writer {
+func NewWriter(writer io.Writer, levels ...logrus.Level) *Writer {
 	return &Writer{
 		Writer:    writer,
 		LogLevels: levels,
@@ -75,15 +100,15 @@ func NewWriter(writer io.Writer, levels ...log.Level) *Writer {
 }
 
 // SetFormat sets the logging handler's formatter as a string
-func (w *Writer) SetFormat(format log.Formatter) *Writer {
+func (w *Writer) SetFormat(format logrus.Formatter) *Writer {
 	w.Format = format
 	return w
 }
 
 // New returns a new logrus logger and adds all the hooks
-func New(hooks ...log.Hook) (logger *log.Logger) {
+func New(hooks ...logrus.Hook) (logger *logrus.Logger) {
 
-	logger = log.New()
+	logger = logrus.New()
 	logger.SetReportCaller(true)
 
 	// add all the hooks, if any as hooks to this log
@@ -93,6 +118,7 @@ func New(hooks ...log.Hook) (logger *log.Logger) {
 	return
 }
 
+// CloudWatchLogWriter used as a writer for putting events into cloudwatch logs
 type CloudWatchLogWriter struct {
 	GroupName  *string
 	StreamName *string
@@ -103,6 +129,8 @@ type CloudWatchLogWriter struct {
 	mu         *sync.Mutex
 }
 
+// NewCloudWatchLogWriter creates a new CloudWatchLogWriter with given aws session, group name
+// and stream name
 func NewCloudWatchLogWriter(sess *session.Session, groupName, streamName string) *CloudWatchLogWriter {
 	return &CloudWatchLogWriter{
 		GroupName:  &groupName,
@@ -112,11 +140,13 @@ func NewCloudWatchLogWriter(sess *session.Session, groupName, streamName string)
 	}
 }
 
+// SetKMSKeyID sets the KMS key Id for this CloudWatchLogWriter
 func (c *CloudWatchLogWriter) SetKMSKeyID(kmsKey string) *CloudWatchLogWriter {
 	c.KMSKeyId = &kmsKey
 	return c
 }
 
+// AddTags adds tags to the cloudwatch group
 func (c *CloudWatchLogWriter) AddTags(tags map[string]string) *CloudWatchLogWriter {
 	if c.GroupTags == nil {
 		c.GroupTags = map[string]*string{}

@@ -10,6 +10,8 @@ import (
 	"github.com/ericmaustin/dyno/table"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+
+	//"github.com/sirupsen/logrus"
 	"sync"
 	"time"
 )
@@ -45,11 +47,10 @@ type (
 		LockHeartbeatFrequency time.Duration // the lock heartbeat frequency. We will update the lock expiration with every heartbeat
 		LeaseDuration          time.Duration // the lease duration or how much time we will lease the lock for. This must be greater than or equal to heartbeat freq.
 		currentLeaseExpires    time.Time     // the expiration time of the current lease
-		// stopHeartBeatChan      chan bool
-		stopHeartBeatAckChan chan *stopHeartBeatAck
-		Context              context.Context    // context of the lock, should be released on cancel
-		cancel               context.CancelFunc // cancel func that will release the lock
-		mu                   sync.Mutex
+		stopHeartBeatAckChan   chan *stopHeartBeatAck
+		Context                context.Context    // context of the lock, should be released on cancel
+		cancel                 context.CancelFunc // cancel func that will release the lock
+		mu                     sync.Mutex
 	}
 )
 
@@ -63,24 +64,12 @@ func (dl *Lock) Acquire() (err error) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	timer := time.NewTimer(dl.LockTimeout)
 
-	log := dl.Session.Log().WithFields(logrus.Fields{
-		"table": dl.Table.Name(),
-	})
+	log := dl.Session.Log().WithField("table", dl.Table.Name())
 
 	defer func() {
 		ticker.Stop()
 		timer.Stop()
 	}()
-
-	// make a Projection string slice with capacity = number of lock fields + number of key fields
-	// Projection := make([]string, 0, len(dl.TimeSpanMapper.Lockfields)+len(dl.key))
-	// nameCnt := 0
-
-	// add lock fields to Projection slice
-	// for _, c := range dl.TimeSpanMapper.Lockfields {
-	// 	Projection[nameCnt] = c.name
-	// 	nameCnt++
-	// }
 
 	timeNow := time.Now()
 	// create a new sessionID this is the ID that we will check for when we upsert
@@ -184,7 +173,7 @@ func (dl *Lock) MustRelease() {
 // StartHeartbeat starts a go routine that will update the lease no the lock even ``freq``
 func (dl *Lock) StartHeartbeat() {
 
-	log := dl.Session.Log().WithFields(logrus.Fields{
+	log := dl.Session.Log().WithFields(map[string]interface{}{
 		"table":   dl.Table.Name,
 		"lock_id": *dl.SessionID,
 	})
@@ -248,7 +237,7 @@ func (dl *Lock) renew() {
 	dl.mu.Lock()
 	defer dl.mu.Unlock()
 
-	log := dl.Session.Log().WithFields(logrus.Fields{
+	log := dl.Session.Log().WithFields(map[string]interface{}{
 		"table":   dl.Table.Name,
 		"lock_id": *dl.SessionID,
 	})
@@ -427,7 +416,7 @@ func Acquire(tbl *table.Table, item interface{}, sess *dyno.Session, opts ...Opt
 	return lock, nil
 }
 
-// Acquire acquires a lock or panics
+// MustAcquire acquires a lock or panics
 func MustAcquire(tbl *table.Table, item interface{}, sess *dyno.Session, opts ...Opt) *Lock {
 	lock, err := Acquire(tbl, item, sess, opts...)
 	if err != nil {

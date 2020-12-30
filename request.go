@@ -5,6 +5,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno/timer"
+	"github.com/google/uuid"
 	"sync"
 	"time"
 )
@@ -65,9 +66,23 @@ const initialSleepTime = time.Millisecond * 50
 // Request is a Session that has a context and a cancel function
 type Request struct {
 	*Session
-	ctx    context.Context
-	cancel context.CancelFunc
-	mu     *sync.RWMutex
+	requestID string
+	ctx       context.Context
+	cancel    context.CancelFunc
+	mu        *sync.RWMutex
+}
+
+// newRequest creates a new request
+func newRequest(ctx context.Context, cancel context.CancelFunc, s *Session) *Request {
+	r := &Request{
+		mu:      &sync.RWMutex{},
+		Session: s,
+		requestID: uuid.New().String(),
+		ctx:     ctx,
+		cancel:  cancel,
+	}
+	r.SetLogger(s.Log().WithField("request_id", r.requestID))
+	return r
 }
 
 // Cancel the request

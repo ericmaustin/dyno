@@ -11,7 +11,6 @@ import (
 	"github.com/ericmaustin/dyno/condition"
 	"github.com/ericmaustin/dyno/encoding"
 	"github.com/ericmaustin/dyno/operation"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -120,8 +119,8 @@ func (t *Table) IsLoaded() bool {
 	return t.description != nil
 }
 
-func (t *Table) LogFields() logrus.Fields {
-	return logrus.Fields{
+func (t *Table) LogFields() map[string]interface{} {
+	return map[string]interface{}{
 		LogFieldTableName: t.Name,
 		"table_ptr":       fmt.Sprintf("%p", t),
 		"table_arn":       t.arn,

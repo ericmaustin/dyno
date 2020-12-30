@@ -4,7 +4,7 @@ import (
 	"fmt"
 	awsSession "github.com/aws/aws-sdk-go/aws/session"
 	"github.com/ericmaustin/dyno"
-	"github.com/ericmaustin/dyno/logging"
+	"github.com/ericmaustin/dyno/log"
 	"github.com/ericmaustin/dyno/operation"
 	"github.com/ericmaustin/dyno/table"
 	"github.com/sirupsen/logrus"
@@ -41,8 +41,8 @@ func getTestTableName() string {
 // TestLock tests locking functionality
 func TestLock(t *testing.T) {
 
-	log := logging.New()
-	log.SetLevel(logrus.DebugLevel)
+	logger := log.New()
+	logger.SetLevel(logrus.DebugLevel)
 	// create the session
 	// create the session
 	awsSess, err := awsSession.NewSession()
@@ -51,7 +51,7 @@ func TestLock(t *testing.T) {
 	/* get a session */
 	sess := dyno.New(awsSess).
 		SetMaxTimeout(time.Minute).
-		SetLogger(log)
+		SetLogger(logger)
 
 	// set up the table
 	tbl := table.NewTable(getTestTableName(), table.NewKey(table.NewPartitionStringKey("id"), nil))

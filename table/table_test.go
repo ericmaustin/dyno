@@ -59,7 +59,7 @@ func getTestTableName() string {
 }
 
 func createTestSession() *dyno.Session {
-	log := logging.New()
+	log := log.New()
 	log.SetLevel(logrus.DebugLevel)
 
 	// create the session
