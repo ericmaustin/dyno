@@ -79,7 +79,7 @@ func (dl *Lock) Acquire() (err error) {
 
 	dyKey := dl.Table.ExtractKey(dl.Item)
 
-	updateInput := operation.NewUpdateItemBuilder(nil).
+	updateInput := operation.NewUpdateItemBuilder().
 		// Set the table name
 		SetTable(dl.Table.Name()).
 		// set the key
@@ -247,7 +247,7 @@ func (dl *Lock) renew() {
 	// extend the lease by now + lease duration
 	dl.currentLeaseExpires = time.Now().Add(dl.LeaseDuration)
 
-	updateInput := operation.NewUpdateItemBuilder(nil).
+	updateInput := operation.NewUpdateItemBuilder().
 		SetTable(dl.Table.Name()).
 		SetKey(dyKey).
 		SetReturnValues(operation.UpdatereturnUpdatedNew).
@@ -292,7 +292,7 @@ func (dl *Lock) clear() {
 
 	dyKey := dl.Table.ExtractKey(dl.Item)
 
-	updateInput := operation.NewUpdateItemBuilder(nil).
+	updateInput := operation.NewUpdateItemBuilder().
 		SetTable(dl.Table.Name()).
 		SetKey(dyKey).
 		SetReturnValues(operation.UpdatereturnUpdatedNew).
