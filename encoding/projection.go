@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 )
 
@@ -39,14 +40,38 @@ func NameBuilders(input interface{}) []expression.NameBuilder {
 	if input == nil {
 		return nil
 	}
-	if _, ok := input.([]expression.NameBuilder); ok {
-		return input.([]expression.NameBuilder)
-	}
-	strNames, err := FieldNames(input)
-	if err != nil {
-		panic(err)
-	}
+	var (
+		strNames []string
+		err error
+	)
 
+	switch inputTyped := input.(type) {
+	case string:
+		strNames = []string{inputTyped}
+	case *string:
+		strNames = []string{*inputTyped}
+	case fmt.Stringer:
+		strNames = []string{inputTyped.String()}
+	case []string:
+		for _, s := range inputTyped {
+			strNames = append(strNames, s)
+		}
+	case []*string:
+		for _, s := range inputTyped {
+			strNames = append(strNames, *s)
+		}
+	case []fmt.Stringer:
+		for _, s := range inputTyped {
+			strNames = append(strNames, s.String())
+		}
+	case []expression.NameBuilder:
+		return inputTyped
+	default:
+		strNames, err = FieldNames(input)
+		if err != nil {
+			panic(err)
+		}
+	}
 	if len(strNames) < 1 {
 		return nil
 	}

@@ -407,6 +407,12 @@ func reflectValueIsZero(v reflect.Value) bool {
 // FieldNames returns a string slice with the field names for the given input
 func FieldNames(input interface{}) (names []string, err error) {
 	names = make([]string, 0)
+	if inputStrSlice, ok := input.([]string); ok {
+		for _, n := range inputStrSlice {
+			names = append(names, n)
+			return
+		}
+	}
 	names, err = appendFieldNames(names, reflect.ValueOf(input))
 	return
 }

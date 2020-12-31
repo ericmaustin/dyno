@@ -171,3 +171,25 @@ func TestFieldNames(t *testing.T) {
 	assert.NoError(t, err)
 	fmt.Printf("%v\n", names)
 }
+
+func TestFieldNamesFromSlice(t *testing.T) {
+	names, err := FieldNames([]string{
+		"test1",
+		"test2",
+	})
+	assert.NoError(t, err)
+	fmt.Printf("%v\n", names)
+}
+
+func TestNameBuildersFromSingleString(t *testing.T) {
+	names := NameBuilders("test1")
+	fmt.Printf("%+v\n", names)
+}
+
+func TestNameBuildersFromStringSlice(t *testing.T) {
+	names := NameBuilders([]string{
+		"test1",
+		"test2",
+	})
+	fmt.Printf("%+v\n", names)
+}
