@@ -122,12 +122,12 @@ func (s *ScanBuilder) Build() *dynamodb.ScanInput {
 }
 
 // Operation returns a new ScanOperation with this builder's input
-func (s *ScanBuilder) Operation() *ScanOperation {
+func (s *ScanBuilder) BuildOperation() *ScanOperation {
 	return Scan(s.Build())
 }
 
-// CountOperation returns a new ScanCountOperation with this builder's input
-func (s *ScanBuilder) CountOperation() *ScanCountOperation {
+// BuildCountOperation returns a new ScanCountOperation with this builder's input
+func (s *ScanBuilder) BuildCountOperation() *ScanCountOperation {
 	return ScanCount(s.Build())
 }
 

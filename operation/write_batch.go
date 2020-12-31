@@ -135,7 +135,7 @@ func (b *BatchWriteBuilder) Build() *dynamodb.BatchWriteItemInput {
 }
 
 // Operation returns a new BatchWriteOperation with this builder's input
-func (b *BatchWriteBuilder) Operation() *BatchWriteOperation {
+func (b *BatchWriteBuilder) BuildOperation() *BatchWriteOperation {
 	return BatchWrite(b.Build())
 }
 

@@ -114,8 +114,8 @@ func (q *QueryBuilder) AddProjectionNames(names interface{}) *QueryBuilder {
 	return q
 }
 
-// Input builds the input input with included projection, key conditions, and filters
-func (q *QueryBuilder) Input() *dynamodb.QueryInput {
+// Build builds the input input with included projection, key conditions, and filters
+func (q *QueryBuilder) Build() *dynamodb.QueryInput {
 	if q.projection == nil && q.keyCnd == nil && q.filter == nil {
 		// no expression builder is needed
 		return q.input
@@ -147,9 +147,9 @@ func (q *QueryBuilder) Input() *dynamodb.QueryInput {
 	return q.input
 }
 
-// Operation
-func (q *QueryBuilder) Operation() *QueryOperation {
-	return Query(q.Input())
+// BuildOperation builds the input and returns a QueryOperation
+func (q *QueryBuilder) BuildOperation() *QueryOperation {
+	return Query(q.Build())
 }
 
 // QueryOperation runs query operations and handles their res

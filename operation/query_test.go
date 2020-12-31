@@ -31,7 +31,7 @@ func (q *QueryTestSuite) TestScanOperation() {
 	scanOutput, err := NewQueryBuilder().
 		SetTable(getTestTableName()).
 		AddKeyCondition(condition.KeyEqual("id", "A")).
-		Operation().                               // get the operation
+		BuildOperation(). // get the operation
 		SetHandler(SliceLoader(&target)). // set the handler to unmarshal the target
 		Execute(q.sess.Request()).
 		OutputError()

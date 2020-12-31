@@ -73,7 +73,7 @@ const (
 	ErrGsiNameAlreadyExists
 
 	//
-	// Operation Errors
+	// BuildOperation Errors
 	//
 
 	// ErrOperationNeverStarted raised when an operation never started

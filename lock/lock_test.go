@@ -89,7 +89,7 @@ func TestLock(t *testing.T) {
 	queryInput := operation.NewQueryBuilder(nil).
 		SetTable(tbl.Name()).
 		AddKeyEquals(tbl.PartitionKeyName(), items[0].ID).
-		Input()
+		Build()
 
 	resultItems := make([]*testItem, 0)
 

@@ -83,7 +83,7 @@ func (g *GetBuilder) Input() *dynamodb.GetItemInput {
 }
 
 // Operation returns a GetOperation using the buidler's input
-func (g *GetBuilder) Operation() *GetOperation {
+func (g *GetBuilder) BuildOperation() *GetOperation {
 	return Get(g.input)
 }
 

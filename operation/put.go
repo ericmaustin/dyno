@@ -109,7 +109,7 @@ func (p *PutBuilder) Build() *dynamodb.PutItemInput {
 }
 
 // Operation returns a PutOperation using this builder's input
-func (p *PutBuilder) Operation() *PutOperation {
+func (p *PutBuilder) BuildOperation() *PutOperation {
 	return Put(p.Build())
 }
 

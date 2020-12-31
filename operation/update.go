@@ -170,7 +170,7 @@ func (u *UpdateItemBuilder) Build() *dynamodb.UpdateItemInput {
 }
 
 // Operation returns a new UpdateOperation with this builder's input
-func (u *UpdateItemBuilder) Operation() *UpdateOperation {
+func (u *UpdateItemBuilder) BuildOperation() *UpdateOperation {
 	return Update(u.Build())
 }
 

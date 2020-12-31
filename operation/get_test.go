@@ -34,7 +34,7 @@ func (s *GetTestSuite) TestBatchGet() {
 		SetTable(getTestTableName()).
 		SetKey(map[string]string{
 			"id": "A",
-		}).Operation()
+		}).BuildOperation()
 
 	getOutput, err := getOperation.SetHandler(Loader(target)).
 		Execute(s.sess.Request()).

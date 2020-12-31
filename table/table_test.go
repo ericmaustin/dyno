@@ -169,7 +169,7 @@ func (s *CRUDTableTest) TearDownSuite() {
 func (s *CRUDTableTest) TestScanTable() {
 	target := make([]*testItem, 0)
 	out, err := s.table.ScanBuilder().
-		Operation().
+		BuildOperation().
 		SetHandler(operation.SliceLoader(&target)).
 		Execute(s.sess.Request()).
 		OutputError()

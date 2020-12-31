@@ -94,7 +94,7 @@ func (d *DeleteItemBuilder) Build() *dynamodb.DeleteItemInput {
 }
 
 // Operation returns a new DeleteOperation
-func (d *DeleteItemBuilder) Operation() *DeleteOperation {
+func (d *DeleteItemBuilder) BuildOperation() *DeleteOperation {
 	return Delete(d.Build())
 }
 

@@ -134,8 +134,8 @@ func (b *BatchGetBuilder) Build() *dynamodb.BatchGetItemInput {
 	return b.input
 }
 
-// Operation returns a new operation with this builder's input
-func (b *BatchGetBuilder) Operation() *BatchGetOperation {
+// BuildOperation returns a new operation with this builder's input
+func (b *BatchGetBuilder) BuildOperation() *BatchGetOperation {
 	return BatchGet(b.Build())
 }
 

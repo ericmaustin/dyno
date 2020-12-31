@@ -30,7 +30,7 @@ func (s *GetBatchTestSuite) TestBatchGet() {
 	// scan for records with no conditions
 	batchGet := NewBatchGetBuilder().
 		AddKeys(getTestTableName(), s.keys).
-		Operation()
+		BuildOperation()
 
 	target := make([]*testItem, 0)
 

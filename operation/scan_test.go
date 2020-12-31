@@ -48,7 +48,7 @@ func (s *ScanTestSuite) TestScanOperationWithFilter() {
 		SetTable(getTestTableName()).
 		SetSelect(ScanSelectAllAttributes).
 		AddFilter(condition.Equal("id", "A")).
-		Operation().
+		BuildOperation().
 		SetHandler(SliceLoader(&target)).
 		Execute(s.sess.Request()).
 		OutputError()
