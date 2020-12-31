@@ -14,7 +14,7 @@ const dynamoBatchGetItemLimit = 100
 
 // BatchGetResult is returned by GoExecute in a channel when operation completes
 type BatchGetResult struct {
-	ResultBase
+	resultBase
 	output []*dynamodb.BatchGetItemOutput
 }
 
@@ -42,21 +42,22 @@ type BatchGetBuilder struct {
 	input *dynamodb.BatchGetItemInput
 }
 
-// NewBatchGetBuilder creates a new BatchGetBuilder with an optional BatchGetItemInput
-func NewBatchGetBuilder(input *dynamodb.BatchGetItemInput) *BatchGetBuilder {
-	b := &BatchGetBuilder{}
-	if input != nil {
-		b.input = input
-	} else {
-		b.input = &dynamodb.BatchGetItemInput{}
+// NewBatchGetBuilder creates a new BatchGetBuilder
+func NewBatchGetBuilder() *BatchGetBuilder {
+	return &BatchGetBuilder{
+		input: &dynamodb.BatchGetItemInput{
+			RequestItems: make(map[string]*dynamodb.KeysAndAttributes),
+		},
 	}
-	if b.input.RequestItems == nil {
-		b.input.RequestItems = make(map[string]*dynamodb.KeysAndAttributes)
-	}
+}
+
+// SetInput sets the BatchGetBuilder's dynamodb.BatchGetItemInput explicitly
+func (b *BatchGetBuilder) SetInput(input *dynamodb.BatchGetItemInput) *BatchGetBuilder {
+	b.input = input
 	return b
 }
 
-// KeysAndAttributes used to create a dynamodb KeysAndAttributes struct easily
+	// KeysAndAttributes used to create a dynamodb KeysAndAttributes struct easily
 func KeysAndAttributes(itemKeys interface{}, projection interface{}, consistentRead bool) *dynamodb.KeysAndAttributes {
 	item := encoding.MustMarshalItems(itemKeys)
 	k := &dynamodb.KeysAndAttributes{
@@ -119,8 +120,8 @@ func (b *BatchGetBuilder) AddKeys(tableName string, keys interface{}) *BatchGetB
 	return b
 }
 
-// Input finalizes and returns the BatchGetItemInput
-func (b *BatchGetBuilder) Input() *dynamodb.BatchGetItemInput {
+// Build finalizes and returns the BatchGetItemInput
+func (b *BatchGetBuilder) Build() *dynamodb.BatchGetItemInput {
 	// remove all inputs that don't have any keys associated
 	for tableName, keys := range b.input.RequestItems {
 		if keys.Keys == nil || len(keys.Keys) < 1 {
@@ -135,12 +136,12 @@ func (b *BatchGetBuilder) Input() *dynamodb.BatchGetItemInput {
 
 // Operation returns a new operation with this builder's input
 func (b *BatchGetBuilder) Operation() *BatchGetOperation {
-	return BatchGet(b.Input())
+	return BatchGet(b.Build())
 }
 
 // BatchGetOperation calls the dynamodb batch get api endpoint
 type BatchGetOperation struct {
-	*Base
+	*baseOperation
 	input   *dynamodb.BatchGetItemInput
 	handler ItemSliceHandler
 	workers int
@@ -149,8 +150,8 @@ type BatchGetOperation struct {
 // BatchGet creates a new BatchGetOperation with optional BatchGetInput
 func BatchGet(input *dynamodb.BatchGetItemInput) *BatchGetOperation {
 	g := &BatchGetOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 	return g
 }

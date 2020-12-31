@@ -20,52 +20,52 @@ const (
 )
 
 type ScanBuilder struct {
-	scanInput  *dynamodb.ScanInput
+	input      *dynamodb.ScanInput
 	filter     *expression.ConditionBuilder
 	projection *expression.ProjectionBuilder
 }
 
-// NewScanBuilder creates a new scan builder with optional Scan input as the Base
-func NewScanBuilder(input *dynamodb.ScanInput) *ScanBuilder {
-	q := &ScanBuilder{}
-	if input != nil {
-		q.scanInput = input
-	} else {
-		q.scanInput = &dynamodb.ScanInput{}
+// NewScanBuilder creates a new scan builder with optional Scan input as the baseOperation
+func NewScanBuilder() *ScanBuilder {
+	q := &ScanBuilder{
+		input: &dynamodb.ScanInput{},
 	}
 	return q
 }
 
+// SetInput sets the ScanBuilder's dynamodb.ScanInput
+func (s *ScanBuilder) SetInput(input *dynamodb.ScanInput) *ScanBuilder {
+	s.input = input
+	return s
+}
+
 // SetTable sets the table for this input
-func (s *ScanBuilder) SetTable(tableName interface{}) *ScanBuilder {
-	s.scanInput.SetTableName(encoding.ToString(tableName))
+func (s *ScanBuilder) SetTable(tableName string) *ScanBuilder {
+	s.input.TableName = &tableName
 	return s
 }
 
 // SetIndex sets the index for this input
-func (s *ScanBuilder) SetIndex(index interface{}) *ScanBuilder {
-	if index == nil {
-		return s
-	}
-	s.scanInput.SetIndexName(encoding.ToString(index))
+func (s *ScanBuilder) SetIndex(index string) *ScanBuilder {
+	s.input.SetIndexName(index)
 	return s
 }
 
 // SetSelect sets the index for this input
 func (s *ScanBuilder) SetSelect(scanSelect ScanSelect) *ScanBuilder {
-	s.scanInput.SetSelect(string(scanSelect))
+	s.input.SetSelect(string(scanSelect))
 	return s
 }
 
 // SetConsistentRead sets the consistent read boolean value for this input
 func (s *ScanBuilder) SetConsistentRead(consistentRead bool) *ScanBuilder {
-	s.scanInput.SetConsistentRead(consistentRead)
+	s.input.SetConsistentRead(consistentRead)
 	return s
 }
 
 // SetLimit sets the limit for this input
 func (s *ScanBuilder) SetLimit(limit int64) *ScanBuilder {
-	s.scanInput.SetLimit(limit)
+	s.input.SetLimit(limit)
 	return s
 }
 
@@ -95,8 +95,8 @@ func (s *ScanBuilder) AddFilter(cnd expression.ConditionBuilder) *ScanBuilder {
 	return s
 }
 
-// Input builds the input input with included projection, key conditions, and filters
-func (s *ScanBuilder) Input() *dynamodb.ScanInput {
+// Build builds the input input with included projection, key conditions, and filters
+func (s *ScanBuilder) Build() *dynamodb.ScanInput {
 	if s.projection != nil || s.filter != nil {
 		// only use expression builder if we have a projection or a filter
 		builder := expression.NewBuilder()
@@ -113,47 +113,22 @@ func (s *ScanBuilder) Input() *dynamodb.ScanInput {
 		if err != nil {
 			panic(err)
 		}
-		s.scanInput.ExpressionAttributeNames = expr.Names()
-		s.scanInput.ExpressionAttributeValues = expr.Values()
-		s.scanInput.FilterExpression = expr.Filter()
-		s.scanInput.ProjectionExpression = expr.Projection()
+		s.input.ExpressionAttributeNames = expr.Names()
+		s.input.ExpressionAttributeValues = expr.Values()
+		s.input.FilterExpression = expr.Filter()
+		s.input.ProjectionExpression = expr.Projection()
 	}
-	return s.scanInput
+	return s.input
 }
 
 // Operation returns a new ScanOperation with this builder's input
 func (s *ScanBuilder) Operation() *ScanOperation {
-	return Scan(s.Input())
+	return Scan(s.Build())
 }
 
 // CountOperation returns a new ScanCountOperation with this builder's input
 func (s *ScanBuilder) CountOperation() *ScanCountOperation {
-	return ScanCount(s.Input())
-}
-
-// CreateScanInput creates a scan input for a given table name with optional filter, projectionNames, and index
-func CreateScanInput(tableName string,
-	filter *expression.ConditionBuilder,
-	projectionNames interface{},
-	index interface{}) *dynamodb.ScanInput {
-
-	input := &dynamodb.ScanInput{
-		TableName: &tableName,
-	}
-
-	sb := NewScanBuilder(input)
-
-	if filter != nil {
-		sb.AddFilter(*filter)
-	}
-	if projectionNames != nil {
-		sb.AddProjectionNames(projectionNames)
-	}
-	if index != nil {
-		sb.SetIndex(index)
-	}
-
-	return sb.Input()
+	return ScanCount(s.Build())
 }
 
 // CopyScanInput creates a copy of the ScanInput
@@ -234,7 +209,7 @@ func CopyScanInput(input *dynamodb.ScanInput) *dynamodb.ScanInput {
 
 // GetResult is returned by the ScanOperation Execution in a channel when operation completes
 type ScanResult struct {
-	ResultBase
+	resultBase
 	output []*dynamodb.ScanOutput
 }
 
@@ -255,7 +230,7 @@ func (s *ScanResult) OutputError() ([]*dynamodb.ScanOutput, error) {
 
 // ScanOperation handles scan Input operations
 type ScanOperation struct {
-	*Base
+	*baseOperation
 	input     *dynamodb.ScanInput
 	handler   ItemSliceHandler
 	handlerMu *sync.Mutex
@@ -264,8 +239,8 @@ type ScanOperation struct {
 // Scan creates a new scan operation with the given scan input and handler
 func Scan(input *dynamodb.ScanInput) *ScanOperation {
 	return &ScanOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 }
 
@@ -433,7 +408,7 @@ func (s *ScanOperation) Execute(req *dyno.Request) (out *ScanResult) {
 
 // GetResult is returned by the ScanOperation Execution in a channel when operation completes
 type ScanCountResult struct {
-	ResultBase
+	resultBase
 	output int64
 }
 
@@ -454,7 +429,7 @@ func (s *ScanCountResult) OutputError() (int64, error) {
 
 // ScanOperation is used to run a scan
 type ScanCountOperation struct {
-	*Base
+	*baseOperation
 	input     *dynamodb.ScanInput
 	handlerMu *sync.Mutex
 }
@@ -481,8 +456,8 @@ func (s *ScanCountOperation) SetInput(input *dynamodb.ScanInput) *ScanCountOpera
 // ScanCount creates a new ScanCountOperation with optional ScanInput
 func ScanCount(input *dynamodb.ScanInput) *ScanCountOperation {
 	return &ScanCountOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 
 // QueryResult is returned by the GetOperation Execution in a channel when operation completes
 type QueryResult struct {
-	ResultBase
+	resultBase
 	output []*dynamodb.QueryOutput
 }
 
@@ -38,29 +38,22 @@ type QueryBuilder struct {
 	projection *expression.ProjectionBuilder
 }
 
-// NewQueryBuilder creates a new input condition builder with optional Query input as the Base
-func NewQueryBuilder(input *dynamodb.QueryInput) *QueryBuilder {
-	q := &QueryBuilder{}
-	if input != nil {
-		q.input = input
-	} else {
-		q.input = &dynamodb.QueryInput{}
+// NewQueryBuilder creates a new input condition builder
+func NewQueryBuilder() *QueryBuilder {
+	return &QueryBuilder{
+		input: &dynamodb.QueryInput{},
 	}
-	return q
 }
 
 // SetTable sets the table for this input
-func (q *QueryBuilder) SetTable(tableName interface{}) *QueryBuilder {
-	q.input.SetTableName(encoding.ToString(tableName))
+func (q *QueryBuilder) SetTable(tableName string) *QueryBuilder {
+	q.input.TableName = &tableName
 	return q
 }
 
 // SetIndex sets the index for this input
-func (q *QueryBuilder) SetIndex(index interface{}) *QueryBuilder {
-	if index == nil {
-		return q
-	}
-	q.input.SetIndexName(encoding.ToString(index))
+func (q *QueryBuilder) SetIndex(index string) *QueryBuilder {
+	q.input.SetIndexName(index)
 	return q
 }
 
@@ -159,36 +152,9 @@ func (q *QueryBuilder) Operation() *QueryOperation {
 	return Query(q.Input())
 }
 
-// CreateQueryInput creates a query input with a given table name,
-// optional key condition builder,
-// optional filter,
-// optional projection,
-// and optional index
-func CreateQueryInput(tableName string,
-	keyCnd *expression.KeyConditionBuilder,
-	filter *expression.ConditionBuilder,
-	projection interface{},
-	index interface{}) *dynamodb.QueryInput {
-	q := &dynamodb.QueryInput{
-		TableName: &tableName,
-	}
-	qb := NewQueryBuilder(q)
-	qb.SetIndex(index)
-	if keyCnd != nil {
-		qb.AddKeyCondition(*keyCnd)
-	}
-	if filter != nil {
-		qb.AddFilter(*filter)
-	}
-	if projection != nil {
-		qb.AddProjectionNames(projection)
-	}
-	return qb.Input()
-}
-
 // QueryOperation runs query operations and handles their res
 type QueryOperation struct {
-	*Base
+	*baseOperation
 	input     *dynamodb.QueryInput
 	handler   ItemSliceHandler
 	handlerMu *sync.Mutex
@@ -216,8 +182,8 @@ func (q *QueryOperation) SetInput(input *dynamodb.QueryInput) *QueryOperation {
 // Query creates a new input object with the required session request and primary key
 func Query(input *dynamodb.QueryInput) *QueryOperation {
 	return &QueryOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 }
 

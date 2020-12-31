@@ -3,12 +3,11 @@ package operation
 import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno"
-	"github.com/ericmaustin/dyno/encoding"
 )
 
 // DeleteTableResult is returned as the result of a DeleteTableOperation
 type DeleteTableResult struct {
-	ResultBase
+	resultBase
 	output *dynamodb.DeleteTableOutput
 }
 
@@ -29,19 +28,18 @@ func (d *DeleteTableResult) OutputError() (*dynamodb.DeleteTableOutput, error) {
 
 // DeleteTableOperation represents a delete table operation
 type DeleteTableOperation struct {
-	*Base
+	*baseOperation
 	input *dynamodb.DeleteTableInput
 }
 
-// DeleteTable creates a new DeleteTableOperation with optional DeleteTableInput
-func DeleteTable(tableName interface{}) *DeleteTableOperation {
-	input := &dynamodb.DeleteTableInput{}
-	if tableName != nil {
-		input.SetTableName(encoding.ToString(tableName))
+// DeleteTable creates a new DeleteTableOperation for the given table name
+func DeleteTable(tableName string) *DeleteTableOperation {
+	input := &dynamodb.DeleteTableInput{
+		TableName: &tableName,
 	}
 	d := &DeleteTableOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 	return d
 }

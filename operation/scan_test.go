@@ -24,14 +24,14 @@ func (s *ScanTestSuite) TearDownSuite() {
 
 func (s *ScanTestSuite) TestScanOperation() {
 	// scan for records with no conditions
-	scanInput := NewScanBuilder(nil).
+	scanInput := NewScanBuilder().
 		SetTable(getTestTableName()).
 		SetSelect(ScanSelectAllAttributes).
-		Input()
+		Build()
 
 	target := make([]*testItem, 0)
 
-	scanOutput, err := Scan(scanInput).SetHandler(ItemSliceUnmarshaler(&target)).
+	scanOutput, err := Scan(scanInput).SetHandler(SliceLoader(&target)).
 		Execute(s.sess.Request()).
 		OutputError()
 
@@ -44,12 +44,12 @@ func (s *ScanTestSuite) TestScanOperationWithFilter() {
 	target := make([]*testItem, 0)
 
 	// scan for records with no conditions
-	scanOutput, err := NewScanBuilder(nil).
+	scanOutput, err := NewScanBuilder().
 		SetTable(getTestTableName()).
 		SetSelect(ScanSelectAllAttributes).
 		AddFilter(condition.Equal("id", "A")).
 		Operation().
-		SetHandler(ItemSliceUnmarshaler(&target)).
+		SetHandler(SliceLoader(&target)).
 		Execute(s.sess.Request()).
 		OutputError()
 
@@ -59,14 +59,14 @@ func (s *ScanTestSuite) TestScanOperationWithFilter() {
 
 	target = make([]*testItem, 0)
 
-	scanInput := NewScanBuilder(nil).
+	scanInput := NewScanBuilder().
 		SetTable(getTestTableName()).
 		SetSelect(ScanSelectAllAttributes).
 		AddFilter(condition.GreaterThanEqual("SubID", 1)).
-		Input()
+		Build()
 
 	scanOutput, err = Scan(scanInput).
-		SetHandler(ItemSliceUnmarshaler(&target)).
+		SetHandler(SliceLoader(&target)).
 		Execute(s.sess.Request()).
 		OutputError()
 

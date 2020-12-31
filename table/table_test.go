@@ -8,7 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/ericmaustin/dyno"
-	"github.com/ericmaustin/dyno/logging"
+	"github.com/ericmaustin/dyno/log"
 	"github.com/ericmaustin/dyno/operation"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
@@ -59,8 +59,8 @@ func getTestTableName() string {
 }
 
 func createTestSession() *dyno.Session {
-	log := log.New()
-	log.SetLevel(logrus.DebugLevel)
+	logging := log.New()
+	logging.SetLevel(logrus.DebugLevel)
 
 	// create the session
 	awsSess, err := session.NewSession()
@@ -71,7 +71,7 @@ func createTestSession() *dyno.Session {
 	/* get a session */
 	sess := dyno.New(awsSess).
 		SetMaxTimeout(time.Minute).
-		SetLogger(log)
+		SetLogger(logging)
 
 	return sess
 }
@@ -133,7 +133,7 @@ func putTestRecords(sess *dyno.Session) []*testItem {
 
 	batchWriteInput := operation.NewBatchWriteBuilder(nil).
 		AddPuts(getTestTableName(), testRecords).
-		Input()
+		Build()
 
 	err := operation.BatchWrite(batchWriteInput).
 		SetConcurrency(5).
@@ -170,7 +170,7 @@ func (s *CRUDTableTest) TestScanTable() {
 	target := make([]*testItem, 0)
 	out, err := s.table.ScanBuilder().
 		Operation().
-		SetHandler(operation.ItemSliceUnmarshaler(&target)).
+		SetHandler(operation.SliceLoader(&target)).
 		Execute(s.sess.Request()).
 		OutputError()
 	if err != nil {

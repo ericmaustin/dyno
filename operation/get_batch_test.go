@@ -28,13 +28,13 @@ func (s *GetBatchTestSuite) TearDownSuite() {
 
 func (s *GetBatchTestSuite) TestBatchGet() {
 	// scan for records with no conditions
-	batchGet := NewBatchGetBuilder(nil).
+	batchGet := NewBatchGetBuilder().
 		AddKeys(getTestTableName(), s.keys).
 		Operation()
 
 	target := make([]*testItem, 0)
 
-	batchGetOutput, err := batchGet.SetHandler(ItemSliceUnmarshaler(&target)).
+	batchGetOutput, err := batchGet.SetHandler(SliceLoader(&target)).
 		Execute(s.sess.Request()).
 		OutputError()
 

@@ -10,7 +10,7 @@ import (
 
 // DeleteResult is returned as the result of a DeleteOperation
 type DeleteResult struct {
-	ResultBase
+	resultBase
 	output *dynamodb.DeleteItemOutput
 }
 
@@ -31,20 +31,23 @@ func (d *DeleteResult) OutputError() (*dynamodb.DeleteItemOutput, error) {
 
 // DeleteItemBuilder builds DeleteItemInputs for use with the DeleteItemOperation
 type DeleteItemBuilder struct {
-	deleteInput *dynamodb.DeleteItemInput
-	cnd         *expression.ConditionBuilder
+	input *dynamodb.DeleteItemInput
+	cnd   *expression.ConditionBuilder
 }
 
-// NewDeleteBuilder creates a new DeleteItemBuilder with optional existing UpdateItemInput as the Base
-func NewDeleteBuilder(input *dynamodb.DeleteItemInput) *DeleteItemBuilder {
-	d := &DeleteItemBuilder{}
-	if input != nil {
-		d.deleteInput = input
-	} else {
-		d.deleteInput = &dynamodb.DeleteItemInput{}
+// NewDeleteBuilder creates a new DeleteItemBuilder with optional existing UpdateItemInput as the baseOperation
+func NewDeleteBuilder() *DeleteItemBuilder {
+	return &DeleteItemBuilder{
+		input: &dynamodb.DeleteItemInput{},
 	}
+}
+
+// SetInput sets the DeleteItemBuilder's dynamodb.DeleteItemInput
+func (d *DeleteItemBuilder) SetInput(input *dynamodb.DeleteItemInput) *DeleteItemBuilder {
+	d.input = input
 	return d
 }
+
 
 // SetKey sets the target key for the item to tbe deleted
 func (d *DeleteItemBuilder) SetKey(key interface{}) *DeleteItemBuilder {
@@ -52,7 +55,7 @@ func (d *DeleteItemBuilder) SetKey(key interface{}) *DeleteItemBuilder {
 	if err != nil {
 		panic(err)
 	}
-	d.deleteInput.SetKey(keyItem)
+	d.input.SetKey(keyItem)
 	return d
 }
 
@@ -70,59 +73,57 @@ func (d *DeleteItemBuilder) AddCondition(cnd expression.ConditionBuilder) *Delet
 }
 
 // SetTable sets the table name
-func (d *DeleteItemBuilder) SetTable(table interface{}) *DeleteItemBuilder {
-	d.deleteInput.SetTableName(encoding.ToString(table))
+func (d *DeleteItemBuilder) SetTable(table string) *DeleteItemBuilder {
+	d.input.SetTableName(table)
 	return d
 }
 
-// Input builds the update Input
-func (d *DeleteItemBuilder) Input() *dynamodb.DeleteItemInput {
+// Build builds the update Build
+func (d *DeleteItemBuilder) Build() *dynamodb.DeleteItemInput {
 	if d.cnd != nil {
 		expr := expression.NewBuilder().WithCondition(*d.cnd)
 		b, buildErr := expr.Build()
 		if buildErr != nil {
 			panic(buildErr)
 		}
-		d.deleteInput.ConditionExpression = b.Condition()
-		d.deleteInput.ExpressionAttributeNames = b.Names()
-		d.deleteInput.ExpressionAttributeValues = b.Values()
+		d.input.ConditionExpression = b.Condition()
+		d.input.ExpressionAttributeNames = b.Names()
+		d.input.ExpressionAttributeValues = b.Values()
 	}
-	return d.deleteInput
+	return d.input
 }
 
 // Operation returns a new DeleteOperation
 func (d *DeleteItemBuilder) Operation() *DeleteOperation {
-	return Delete(d.Input())
+	return Delete(d.Build())
 }
 
 // CreateDeleteInput creates a DeleteItemInput for the given table, key item and condition
 func CreateDeleteInput(tableName string,
 	keyItem interface{},
 	cnd *expression.ConditionBuilder) *dynamodb.DeleteItemInput {
-	input := &dynamodb.DeleteItemInput{
-		TableName: &tableName,
-	}
-	db := NewDeleteBuilder(input)
+	db := NewDeleteBuilder().
+		SetTable(tableName)
 	if keyItem != nil {
 		db.SetKey(keyItem)
 	}
 	if cnd != nil {
 		db.AddCondition(*cnd)
 	}
-	return db.Input()
+	return db.Build()
 }
 
 // DeleteOperation runs a deleteItem Input
 type DeleteOperation struct {
-	*Base
+	*baseOperation
 	input *dynamodb.DeleteItemInput
 }
 
 // Delete creates a new ``DeleteOperation`` object that will delete the given input when executed
 func Delete(input *dynamodb.DeleteItemInput) *DeleteOperation {
 	d := &DeleteOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 	return d
 }

@@ -154,7 +154,7 @@ func putTestRecords(sess *dyno.Session) []*testItem {
 		},
 	}
 
-	batchWriteInput := NewBatchWriteBuilder(nil).AddPuts(getTestTableName(), testRecords).Input()
+	batchWriteInput := NewBatchWriteBuilder().AddPuts(getTestTableName(), testRecords).Build()
 	err := BatchWrite(batchWriteInput).SetConcurrency(5).Execute(sess.Request()).Error()
 	if err != nil {
 		panic(err)

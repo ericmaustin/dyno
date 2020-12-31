@@ -98,7 +98,7 @@ func (dl *Lock) Acquire() (err error) {
 			condition.NotExists(ExpiresFieldName),
 			// MapLock Expiration must be < Now
 			condition.LessThan(ExpiresFieldName, UnixTime(timeNow)),
-			condition.Equal(ExpiresFieldName, UnixTime(time.Time{})))).Input()
+			condition.Equal(ExpiresFieldName, UnixTime(time.Time{})))).Build()
 
 	// loop until we acquire the lock or timeout is hit
 	for {
@@ -253,7 +253,7 @@ func (dl *Lock) renew() {
 		SetReturnValues(operation.UpdatereturnUpdatedNew).
 		Set(ExpiresFieldName, UnixTime(dl.currentLeaseExpires)).
 		AddCondition(condition.Equal(VersionFieldName, UUID(*dl.SessionID))).
-		Input()
+		Build()
 
 	req := dl.Session.RequestWithTimeout(time.Minute)
 
@@ -298,7 +298,7 @@ func (dl *Lock) clear() {
 		SetReturnValues(operation.UpdatereturnUpdatedNew).
 		Set(ExpiresFieldName, UnixTime(dl.currentLeaseExpires)).
 		AddCondition(condition.Equal(VersionFieldName, UUID(*dl.SessionID))).
-		Input()
+		Build()
 
 	_, err := dl.Session.RequestWithTimeout(time.Minute).UpdateItem(updateInput)
 

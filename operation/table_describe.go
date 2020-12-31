@@ -3,12 +3,11 @@ package operation
 import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno"
-	"github.com/ericmaustin/dyno/encoding"
 )
 
 // DescribeTableResult is returned as the result of a DescribeTableOperation
 type DescribeTableResult struct {
-	ResultBase
+	resultBase
 	output *dynamodb.DescribeTableOutput
 }
 
@@ -29,21 +28,15 @@ func (d *DescribeTableResult) OutputError() (*dynamodb.DescribeTableOutput, erro
 
 // DescribeTableOperation represents a describe table operation
 type DescribeTableOperation struct {
-	*Base
+	*baseOperation
 	input *dynamodb.DescribeTableInput
 }
 
-// DescribeTable creates a new DescribeTableInput with optional DescribeTableInput to be executed later
-func DescribeTable(tableName interface{}) *DescribeTableOperation {
+// DescribeTable creates a new DescribeTableInput with a given table name
+func DescribeTable(tableName string) *DescribeTableOperation {
 	d := &DescribeTableOperation{
-		Base: newBase(),
-	}
-
-	if tableName != nil {
-		tableNameStr := encoding.ToString(tableName)
-		d.input = &dynamodb.DescribeTableInput{TableName: &tableNameStr}
-	} else {
-		d.input = &dynamodb.DescribeTableInput{}
+		baseOperation: newBase(),
+		input: &dynamodb.DescribeTableInput{TableName: &tableName},
 	}
 
 	return d

@@ -9,7 +9,7 @@ import (
 
 // GetResult is returned by the GetOperation Execution in a channel when operation completes
 type GetResult struct {
-	ResultBase
+	resultBase
 	output *dynamodb.GetItemOutput
 }
 
@@ -34,27 +34,27 @@ type GetBuilder struct {
 }
 
 // NewGetBuilder returns a new GetBuilder
-func NewGetBuilder(input *dynamodb.GetItemInput) *GetBuilder {
-	g := &GetBuilder{}
-	if input != nil {
-		g.input = input
-	} else {
-		g.input = &dynamodb.GetItemInput{}
+func NewGetBuilder() *GetBuilder {
+	return &GetBuilder{
+		input: &dynamodb.GetItemInput{},
 	}
+}
+
+// SetInput sets the GetBuilder's dynamodb.GetItemInput
+func (g *GetBuilder) SetInput(input *dynamodb.GetItemInput) *GetBuilder {
+	g.input = input
 	return g
 }
 
 // SetTable sets the table for the get input
-func (g *GetBuilder) SetTable(table interface{}) *GetBuilder {
-	tableName := encoding.ToString(table)
-	g.input.TableName = &tableName
+func (g *GetBuilder) SetTable(table string) *GetBuilder {
+	g.input.TableName = &table
 	return g
 }
 
 // SetKey sets the key for the get input
 func (g *GetBuilder) SetKey(key interface{}) *GetBuilder {
-	keyItem := encoding.MustMarshalItem(key)
-	g.input.Key = keyItem
+	g.input.Key = encoding.MustMarshalItem(key)
 	return g
 }
 
@@ -89,7 +89,7 @@ func (g *GetBuilder) Operation() *GetOperation {
 
 // GetOperation used for running a get operation on dynamodb
 type GetOperation struct {
-	*Base
+	*baseOperation
 	input     *dynamodb.GetItemInput
 	handler   ItemHandler
 }
@@ -97,8 +97,8 @@ type GetOperation struct {
 // Get creates a new GetOperation with optional input and ItemHandler
 func Get(input *dynamodb.GetItemInput) *GetOperation {
 	g := &GetOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 	return g
 }

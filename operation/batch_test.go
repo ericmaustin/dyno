@@ -40,7 +40,7 @@ func (s *BatchTestSuite) TestBatchGet() {
 func (s *BatchTestSuite) getGets() []Operation {
 	out := make([]Operation, len(s.records))
 	for i, rec := range s.records {
-		getInput := NewGetBuilder(nil).
+		getInput := NewGetBuilder().
 			SetTable(getTestTableName()).
 			SetKey(map[string]string{
 				"id": rec.ID,

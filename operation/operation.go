@@ -54,29 +54,29 @@ type Result interface {
 	SetError(error)
 }
 
-// ResultBase is the base of all result structs in the operation module
-type ResultBase struct {
+// resultBase is the base of all result structs in the operation module
+type resultBase struct {
 	timing *Timing
 	err    error
 }
 
 // SetError sets the results error
-func (r *ResultBase) SetError(err error) {
+func (r *resultBase) SetError(err error) {
 	r.err = err
 }
 
 // Error returns the  Operation Result's  error
-func (r *ResultBase) Error() error {
+func (r *resultBase) Error() error {
 	return r.err
 }
 
 // Timing returns the Operation Result's timing
-func (r *ResultBase) Timing() *Timing {
+func (r *resultBase) Timing() *Timing {
 	return r.timing
 }
 
 // SetTiming sets the Operation Result's timing
-func (r *ResultBase) SetTiming(timing *Timing) {
+func (r *resultBase) SetTiming(timing *Timing) {
 	r.timing = timing
 }
 
@@ -105,8 +105,8 @@ func (t *Timing) TotalTime() time.Duration {
 	return t.finished.Sub(*t.created)
 }
 
-// Base used as the Base struct type for all operations
-type Base struct {
+// baseOperation used as the baseOperation struct type for all operations
+type baseOperation struct {
 	ctx    context.Context
 	done   context.CancelFunc
 	mu     sync.RWMutex
@@ -114,9 +114,9 @@ type Base struct {
 	timing *Timing
 }
 
-func newBase() *Base {
+func newBase() *baseOperation {
 	ctx, done := context.WithCancel(context.Background())
-	return &Base{
+	return &baseOperation{
 		ctx:    ctx,
 		done:   done,
 		mu:     sync.RWMutex{},
@@ -126,27 +126,27 @@ func newBase() *Base {
 }
 
 // IsPending returns true if operation is pending execution
-func (b *Base) IsPending() bool {
+func (b *baseOperation) IsPending() bool {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.status == StatusPending
 }
 
 // IsRunning returns true if operation is currently being executed
-func (b *Base) IsRunning() bool {
+func (b *baseOperation) IsRunning() bool {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.status == StatusRunning
 }
 
 // IsDone returns true if operation is done
-func (b *Base) IsDone() bool {
+func (b *baseOperation) IsDone() bool {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.status == StatusDone
 }
 
-func (b *Base) setRunning() {
+func (b *baseOperation) setRunning() {
 	if b.status == StatusRunning {
 		panic(&InvalidState{})
 	}
@@ -156,7 +156,7 @@ func (b *Base) setRunning() {
 	b.timing.start()
 }
 
-func (b *Base) setDone(result Result) {
+func (b *baseOperation) setDone(result Result) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.timing.done()
@@ -171,14 +171,14 @@ func (b *Base) setDone(result Result) {
 
 // RunningTime returns the execution duration of this operation
 // if operation is currently running, will return duration up to now
-func (b *Base) RunningTime() time.Duration {
+func (b *baseOperation) RunningTime() time.Duration {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.timing.RunningTime()
 }
 
 // Status returns the current status of the operation
-func (b *Base) Status() Status {
+func (b *baseOperation) Status() Status {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.status
@@ -186,7 +186,7 @@ func (b *Base) Status() Status {
 
 // Reset resets this operation
 // panics with an InvalidState error if operation is running
-func (b *Base) Reset() {
+func (b *baseOperation) Reset() {
 	if b.IsRunning() {
 		panic(&InvalidState{})
 	}

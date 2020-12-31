@@ -12,7 +12,7 @@ const dynamoBatchWriteLimit = 25
 
 // BatchWriteResult is returned as the result of a BatchWriteOperation
 type BatchWriteResult struct {
-	ResultBase
+	resultBase
 	output []*dynamodb.BatchWriteItemOutput
 }
 
@@ -37,17 +37,18 @@ type BatchWriteBuilder struct {
 }
 
 // NewBatchWriteBuilder creates a new BatchWriteBuilder
-func NewBatchWriteBuilder(input *dynamodb.BatchWriteItemInput) *BatchWriteBuilder {
-	b := &BatchWriteBuilder{}
-	if input != nil {
-		b.input = input
-	} else {
-		b.input = &dynamodb.BatchWriteItemInput{}
-	}
-	if b.input.RequestItems == nil {
-		b.input.RequestItems = make(map[string][]*dynamodb.WriteRequest)
+func NewBatchWriteBuilder() *BatchWriteBuilder {
+	b := &BatchWriteBuilder{
+		input: &dynamodb.BatchWriteItemInput{
+			RequestItems: make(map[string][]*dynamodb.WriteRequest),
+		},
 	}
 	return b
+}
+
+func (b *BatchWriteBuilder) SetInput(input *dynamodb.BatchWriteItemInput) *BatchWriteBuilder {
+	b.input = input
+	return  b
 }
 
 // AddWriteRequests adds one or more WriteRequests for a given table to the input
@@ -75,9 +76,9 @@ func (b *BatchWriteBuilder) AddPut(table, item interface{}) *BatchWriteBuilder {
 }
 
 // AddPuts adds multiple put requests from a given input that should be a slice of structs or maps
-func (b *BatchWriteBuilder) AddPuts(table, items interface{}) *BatchWriteBuilder {
+func (b *BatchWriteBuilder) AddPuts(table, itemSlice interface{}) *BatchWriteBuilder {
 	tableName := encoding.ToString(table)
-	itemMaps, err := encoding.MarshalItems(items)
+	itemMaps, err := encoding.MarshalItems(itemSlice)
 	if err != nil {
 		panic(err)
 	}
@@ -109,9 +110,9 @@ func (b *BatchWriteBuilder) AddDelete(table, key interface{}) *BatchWriteBuilder
 }
 
 // AddPuts adds multiple delete requests from a given input that should be a slice of structs or maps
-func (b *BatchWriteBuilder) AddDeletes(table, keys interface{}) *BatchWriteBuilder {
+func (b *BatchWriteBuilder) AddDeletes(table, keySlice interface{}) *BatchWriteBuilder {
 	tableName := encoding.ToString(table)
-	keyItems, err := encoding.MarshalItems(keys)
+	keyItems, err := encoding.MarshalItems(keySlice)
 	if err != nil {
 		panic(err)
 	}
@@ -126,22 +127,22 @@ func (b *BatchWriteBuilder) AddDeletes(table, keys interface{}) *BatchWriteBuild
 	return b
 }
 
-// Input returns the input.
+// Build returns the input.
 // while build doesn't actually build anything here, the name is kept as it matches other builder semantics
-func (b *BatchWriteBuilder) Input() *dynamodb.BatchWriteItemInput {
+func (b *BatchWriteBuilder) Build() *dynamodb.BatchWriteItemInput {
 	// return the already built input
 	return b.input
 }
 
 // Operation returns a new BatchWriteOperation with this builder's input
 func (b *BatchWriteBuilder) Operation() *BatchWriteOperation {
-	return BatchWrite(b.Input())
+	return BatchWrite(b.Build())
 }
 
 // BatchWriteOperation is used to write a slice of records to a table
 // if workers is 0 then there is no limit to how many go routines are spawned
 type BatchWriteOperation struct {
-	*Base
+	*baseOperation
 	input       *dynamodb.BatchWriteItemInput
 	concurrency int
 }
@@ -149,8 +150,8 @@ type BatchWriteOperation struct {
 // BatchWrite creates a new BatchWriteOperation with optional BatchWriteItemInput
 func BatchWrite(input *dynamodb.BatchWriteItemInput) *BatchWriteOperation {
 	bw := &BatchWriteOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 	return bw
 }

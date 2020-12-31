@@ -28,11 +28,11 @@ func (q *QueryTestSuite) TestScanOperation() {
 	target := make([]*testItem, 0)
 
 	// scan for records with no conditions
-	scanOutput, err := NewQueryBuilder(nil).
+	scanOutput, err := NewQueryBuilder().
 		SetTable(getTestTableName()).
 		AddKeyCondition(condition.KeyEqual("id", "A")).
 		Operation().                               // get the operation
-		SetHandler(ItemSliceUnmarshaler(&target)). // set the handler to unmarshal the target
+		SetHandler(SliceLoader(&target)). // set the handler to unmarshal the target
 		Execute(q.sess.Request()).
 		OutputError()
 

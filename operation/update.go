@@ -29,7 +29,7 @@ const (
 
 // UpdateResult is returned as the result of a UpdateOperation
 type UpdateResult struct {
-	ResultBase
+	resultBase
 	output *dynamodb.UpdateItemOutput
 }
 
@@ -50,24 +50,26 @@ func (u *UpdateResult) OutputError() (*dynamodb.UpdateItemOutput, error) {
 
 // UpdateItemBuilder is used to build a dynamodb UpdateItemInput
 type UpdateItemBuilder struct {
-	updateInput   *dynamodb.UpdateItemInput
+	input         *dynamodb.UpdateItemInput
 	updateBuilder expression.UpdateBuilder
 	cnd           *expression.ConditionBuilder
 }
 
-// NewUpdateItemBuilder creates a new UpdateItemBuilder with optional existing UpdateItemInput as the Base
-func NewUpdateItemBuilder(input *dynamodb.UpdateItemInput) *UpdateItemBuilder {
-	u := &UpdateItemBuilder{}
-	if input != nil {
-		u.updateInput = input
-	} else {
-		u.updateInput = &dynamodb.UpdateItemInput{}
+// NewUpdateItemBuilder creates a new UpdateItemBuilder with optional existing UpdateItemInput as the baseOperation
+func NewUpdateItemBuilder() *UpdateItemBuilder {
+	return &UpdateItemBuilder{
+		input: &dynamodb.UpdateItemInput{},
 	}
+}
+
+// SetInput sets the UpdateItemBuilder's dynamodb.UpdateItemInput
+func (u *UpdateItemBuilder) SetInput(input *dynamodb.UpdateItemInput) *UpdateItemBuilder {
+	u.input = input
 	return u
 }
 
 // Add adds an Add operation on this update with the given field name and value
-func (u *UpdateItemBuilder) Add(field interface{}, value interface{}) *UpdateItemBuilder {
+func (u *UpdateItemBuilder) Add(field, value interface{}) *UpdateItemBuilder {
 	u.updateBuilder = u.updateBuilder.Add(expression.Name(encoding.ToString(field)), expression.Value(value))
 	return u
 }
@@ -82,7 +84,7 @@ func (u *UpdateItemBuilder) AddItem(item interface{}) *UpdateItemBuilder {
 }
 
 // Delete adds a Delete operation on this update with the given field name and value
-func (u *UpdateItemBuilder) Delete(field string, value interface{}) *UpdateItemBuilder {
+func (u *UpdateItemBuilder) Delete(field, value interface{}) *UpdateItemBuilder {
 	u.updateBuilder = u.updateBuilder.Delete(expression.Name(encoding.ToString(field)), expression.Value(value))
 	return u
 }
@@ -134,24 +136,24 @@ func (u *UpdateItemBuilder) AddCondition(cnd expression.ConditionBuilder) *Updat
 
 // SetKey sets the key for this update
 func (u *UpdateItemBuilder) SetKey(item interface{}) *UpdateItemBuilder {
-	u.updateInput.SetKey(encoding.MustMarshalItem(item))
+	u.input.SetKey(encoding.MustMarshalItem(item))
 	return u
 }
 
 // SetTable sets the table name
 func (u *UpdateItemBuilder) SetTable(table interface{}) *UpdateItemBuilder {
-	u.updateInput.SetTableName(encoding.ToString(table))
+	u.input.SetTableName(encoding.ToString(table))
 	return u
 }
 
 // SetReturnValues sets the returnValues
 func (u *UpdateItemBuilder) SetReturnValues(returnValues UpdateReturnValues) *UpdateItemBuilder {
-	u.updateInput.SetReturnValues(string(returnValues))
+	u.input.SetReturnValues(string(returnValues))
 	return u
 }
 
-// Input builds the update input
-func (u *UpdateItemBuilder) Input() *dynamodb.UpdateItemInput {
+// Build builds the update input
+func (u *UpdateItemBuilder) Build() *dynamodb.UpdateItemInput {
 	expr := expression.NewBuilder().WithUpdate(u.updateBuilder)
 	if u.cnd != nil {
 		expr.WithCondition(*u.cnd)
@@ -160,31 +162,31 @@ func (u *UpdateItemBuilder) Input() *dynamodb.UpdateItemInput {
 	if buildErr != nil {
 		panic(buildErr)
 	}
-	u.updateInput.ConditionExpression = b.Condition()
-	u.updateInput.ExpressionAttributeNames = b.Names()
-	u.updateInput.ExpressionAttributeValues = b.Values()
-	u.updateInput.UpdateExpression = b.Update()
-	return u.updateInput
+	u.input.ConditionExpression = b.Condition()
+	u.input.ExpressionAttributeNames = b.Names()
+	u.input.ExpressionAttributeValues = b.Values()
+	u.input.UpdateExpression = b.Update()
+	return u.input
 }
 
 // Operation returns a new UpdateOperation with this builder's input
 func (u *UpdateItemBuilder) Operation() *UpdateOperation {
-	return Update(u.Input())
+	return Update(u.Build())
 }
 
 /*
 UpdateOperation used as Input for UpdateOperation
 */
 type UpdateOperation struct {
-	*Base
+	*baseOperation
 	input *dynamodb.UpdateItemInput
 }
 
 // Update returns a a new UpdateOperation with optional update item input
 func Update(input *dynamodb.UpdateItemInput) *UpdateOperation {
 	return &UpdateOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 }
 

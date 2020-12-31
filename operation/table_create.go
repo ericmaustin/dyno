@@ -21,16 +21,19 @@ type CreateTableBuilder struct {
 }
 
 // NewCreateTableBuilder creates a new CreateTableBuilder
-func NewCreateTableBuilder(input *dynamodb.CreateTableInput) *CreateTableBuilder {
-	b := &CreateTableBuilder{}
-	if input != nil {
-		b.input = input
-	} else {
-		b.input = &dynamodb.CreateTableInput{}
+func NewCreateTableBuilder() *CreateTableBuilder {
+	b := &CreateTableBuilder{
+		input: &dynamodb.CreateTableInput{},
 	}
 	if b.input.AttributeDefinitions == nil {
 		b.input.AttributeDefinitions = []*dynamodb.AttributeDefinition{}
 	}
+	return b
+}
+
+// SetInput sets the CreateTableBuilder's dynamodb.CreateTableInput
+func (b *CreateTableBuilder) SetInput(input *dynamodb.CreateTableInput) *CreateTableBuilder {
+	b.input = input
 	return b
 }
 
@@ -113,8 +116,8 @@ func (b *CreateTableBuilder) AddTagsFromMap(tags map[string]string) *CreateTable
 	return b
 }
 
-// Input builds the CreateTableInput
-func (b *CreateTableBuilder) Input() *dynamodb.CreateTableInput {
+// Build builds the CreateTableInput
+func (b *CreateTableBuilder) Build() *dynamodb.CreateTableInput {
 	if b.input.ProvisionedThroughput != nil {
 		b.input.SetBillingMode(string(TableBillingModeProvisioned))
 	} else {
@@ -132,12 +135,12 @@ func (b *CreateTableBuilder) Input() *dynamodb.CreateTableInput {
 
 // Operation returns the CreateTableOperation using the builder's input
 func (b *CreateTableBuilder) Operation() *CreateTableOperation {
-	return CreateTable(b.Input())
+	return CreateTable(b.Build())
 }
 
 // CreateTableResult returned by CreateTableOperation
 type CreateTableResult struct {
-	ResultBase
+	resultBase
 	output *dynamodb.CreateTableOutput
 }
 
@@ -157,7 +160,7 @@ func (c *CreateTableResult) OutputError() (*dynamodb.CreateTableOutput, error) {
 }
 
 type CreateTableOperation struct {
-	*Base
+	*baseOperation
 	wait  bool
 	input *dynamodb.CreateTableInput
 }
@@ -165,8 +168,8 @@ type CreateTableOperation struct {
 // CreateTable creates a new CreateTableOperation with optional CreateTableInput input
 func CreateTable(input *dynamodb.CreateTableInput) *CreateTableOperation {
 	c := &CreateTableOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 	return c
 }

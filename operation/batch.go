@@ -17,7 +17,7 @@ const (
 
 // BatchResult is the result of the batch request
 type BatchResult struct {
-	ResultBase
+	resultBase
 	output *BatchCounts
 }
 
@@ -45,7 +45,7 @@ type BatchCounts struct {
 
 // Batch is a batch request
 type Batch struct {
-	*Base
+	*baseOperation
 	operations []Operation
 	workers    int
 	timeout    time.Duration
@@ -58,9 +58,9 @@ func NewBatch(operations []Operation) *Batch {
 		operations = make([]Operation, 0)
 	}
 	return &Batch{
-		Base:       newBase(),
-		operations: operations,
-		mu:         &sync.RWMutex{},
+		baseOperation: newBase(),
+		operations:    operations,
+		mu:            &sync.RWMutex{},
 	}
 }
 
@@ -71,7 +71,7 @@ func NewBatchWithContext(ctx context.Context, operations []Operation) *Batch {
 	}
 	ctx, done := context.WithCancel(ctx)
 	return &Batch{
-		Base: &Base{
+		baseOperation: &baseOperation{
 			ctx:    ctx,
 			done:   done,
 			mu:     sync.RWMutex{},

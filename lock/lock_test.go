@@ -76,7 +76,7 @@ func TestLock(t *testing.T) {
 
 	writeBatchInput := operation.NewBatchWriteBuilder(nil).
 		AddPuts(tbl.Name(), items).
-		Input()
+		Build()
 
 	batchWriteOutput, err := operation.BatchWrite(writeBatchInput).
 		Execute(sess.RequestWithTimeout(time.Minute)).
@@ -94,7 +94,7 @@ func TestLock(t *testing.T) {
 	resultItems := make([]*testItem, 0)
 
 	queryOut, err := operation.Query(queryInput).
-		SetHandler(operation.ItemSliceUnmarshaler(&resultItems)).
+		SetHandler(operation.SliceLoader(&resultItems)).
 		Execute(sess.RequestWithTimeout(time.Minute)).
 		OutputError()
 

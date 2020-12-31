@@ -14,6 +14,8 @@ const (
 	tableStatusCreating = "CREATING"
 	// StatusDeleting set as table status when table is being deleted
 	tableStatusDeleting = "DELETING"
+	// tableStatusDeleted set as table status when table has been deleted
+	tableStatusDeleted = "DELETED"
 	// StatisActive set as table status when table is active
 	tableStatisActive = "ACTIVE"
 	// StatusUpdating set as table status when table is being updated
@@ -203,10 +205,10 @@ func WaitForBackupCompletion(req *dyno.Request, backupArn string, timeout *time.
 			}
 		} else {
 			switch strings.ToUpper(*out.BackupDescription.BackupDetails.BackupStatus) {
-			case "ACTIVE":
+			case tableStatisActive:
 				// backup completed
 				return
-			case "DELETED":
+			case tableStatusDeleted:
 				// backup invalid
 				err = &dyno.Error{
 					Code:    dyno.ErrBackupInInvalidState,

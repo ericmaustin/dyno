@@ -30,13 +30,13 @@ func (s *GetTestSuite) TestBatchGet() {
 
 	target := &testItem{}
 
-	getOperation := NewGetBuilder(nil).
+	getOperation := NewGetBuilder().
 		SetTable(getTestTableName()).
 		SetKey(map[string]string{
 			"id": "A",
 		}).Operation()
 
-	getOutput, err := getOperation.SetHandler(ItemUnmarshaler(target)).
+	getOutput, err := getOperation.SetHandler(Loader(target)).
 		Execute(s.sess.Request()).
 		OutputError()
 

@@ -30,10 +30,10 @@ func (d *DeleteTestSuite) TestDelete() {
 	}
 
 	// scan for records with no conditions
-	deleteInput := NewDeleteBuilder(nil).
+	deleteInput := NewDeleteBuilder().
 		SetTable(getTestTableName()).
 		SetKey(key).
-		Input()
+		Build()
 
 	fmt.Printf("delete input\n%+v\n", deleteInput)
 

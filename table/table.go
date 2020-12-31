@@ -328,7 +328,7 @@ func (t *Table) CreateTableBuilder() *operation.CreateTableBuilder {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
-	builder := operation.NewCreateTableBuilder(nil).
+	builder := operation.NewCreateTableBuilder().
 		SetName(t.name)
 
 	if !t.onDemand {
@@ -729,59 +729,6 @@ func (t *Table) CreateBatchKeysAndAttributes(items interface{}, consistentRead b
 	return
 }
 
-// CreatePutItemInput builds a ``dynamodb.PutItemInput`` object for use with Dynamodb api from a given document
-func (t *Table) CreatePutItemInput(input interface{}, cnd *expression.ConditionBuilder) *dynamodb.PutItemInput {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-	return operation.CreatePutInput(t.name, input, cnd)
-}
-
-// CreateQuery creates a query for this table
-func (t *Table) CreateQuery(pk interface{},
-	sortCnd *expression.KeyConditionBuilder,
-	filter *expression.ConditionBuilder,
-	projection interface{},
-	index interface{}) (*dynamodb.QueryInput, error) {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	indexStr := encoding.ToString(index)
-
-	if !t.HasIndex(indexStr) {
-		return nil, &dyno.Error{
-			Code:    dyno.ErrTableMissingIndex,
-			Message: fmt.Sprintf("no key index named '%s' exists on table '%s'", indexStr, t.name),
-		}
-	}
-
-	keyCnd := condition.KeyEqual(t.PartitionKeyName(), pk)
-	if sortCnd != nil {
-		keyCnd = condition.KeyAnd(keyCnd, *sortCnd)
-	}
-	return operation.CreateQueryInput(t.name, &keyCnd, filter, projection, index), nil
-}
-
-// CreateQuery creates a scan input for this table
-func (t *Table) CreateScanInput(filter *expression.ConditionBuilder,
-	projection interface{},
-	index interface{}) (*dynamodb.ScanInput, error) {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	if index != nil {
-		indexStr := encoding.ToString(index)
-
-		if !t.HasIndex(indexStr) {
-			return nil, &dyno.Error{
-				Code:    dyno.ErrTableMissingIndex,
-				Message: fmt.Sprintf("no key index named '%s' exists on table '%s'", indexStr, t.name),
-			}
-		}
-	}
-
-	return operation.CreateScanInput(t.name, filter, projection, index), nil
-}
-
 type BackupResult struct {
 	DescribeBackupOutput *dynamodb.DescribeBackupOutput
 	Err                  error
@@ -856,7 +803,7 @@ func (t *Table) Delete(req *dyno.Request, timeout *time.Duration) <-chan *operat
 
 // BatchWriteBuilder creates a BatchWriteBuilder for this table with given puts and deletes
 func (t *Table) BatchWriteBuilder(puts interface{}, deletes interface{}) *operation.BatchWriteBuilder {
-	bw := operation.NewBatchWriteBuilder(nil)
+	bw := operation.NewBatchWriteBuilder()
 	if puts != nil {
 		bw.AddPuts(t.Name(), puts)
 	}
@@ -868,9 +815,7 @@ func (t *Table) BatchWriteBuilder(puts interface{}, deletes interface{}) *operat
 
 // GetItemBuilder creates a GetBuilder for this table with optional item
 func (t *Table) GetItemBuilder(item interface{}) *operation.GetBuilder {
-	b := operation.NewGetBuilder(&dynamodb.GetItemInput{
-		TableName: dyno.StringPtr(t.Name()),
-	})
+	b := operation.NewGetBuilder().SetTable(t.Name())
 	if item != nil {
 		keyItem := t.ExtractKey(item)
 		b.SetKey(keyItem)
@@ -880,9 +825,7 @@ func (t *Table) GetItemBuilder(item interface{}) *operation.GetBuilder {
 
 // DeleteItemBuilder creates a DeleteItemBuilder for this table with optional item
 func (t *Table) DeleteItemBuilder(item interface{}) *operation.DeleteItemBuilder {
-	b := operation.NewDeleteBuilder(&dynamodb.DeleteItemInput{
-		TableName: dyno.StringPtr(t.Name()),
-	})
+	b := operation.NewDeleteBuilder().SetTable(t.Name())
 	if item != nil {
 		keyItem := t.ExtractKey(item)
 		b.SetKey(keyItem)
@@ -892,33 +835,40 @@ func (t *Table) DeleteItemBuilder(item interface{}) *operation.DeleteItemBuilder
 
 // UpdateItemBuilder creates an UpdateItemBuilder for this table with given item
 func (t *Table) UpdateItemBuilder() *operation.UpdateItemBuilder {
-	return operation.NewUpdateItemBuilder(&dynamodb.UpdateItemInput{
-		TableName: dyno.StringPtr(t.Name()),
-	})
+	return operation.NewUpdateItemBuilder().SetTable(t.Name())
 }
 
 // ScanBuilder creates an ScanBuilder for this table
 func (t *Table) ScanBuilder() *operation.ScanBuilder {
-	return operation.NewScanBuilder(&dynamodb.ScanInput{
-		TableName: dyno.StringPtr(t.Name()),
-	})
+	return operation.NewScanBuilder().SetTable(t.Name())
+}
+
+// ScanIndexBuilder creates an ScanBuilder for this table with given index name
+// returns index not found error if index doesnt exist
+func (t *Table) ScanIndexBuilder(idx string) (*operation.ScanBuilder, error) {
+	if !t.HasIndex(idx) {
+		return nil, fmt.Errorf("%s is not a valid index on table %s", idx, t.Name())
+	}
+	return operation.NewScanBuilder().SetTable(t.Name()).SetIndex(idx), nil
 }
 
 // QueryBuilder creates an QueryBuilder for this table
 func (t *Table) QueryBuilder() *operation.QueryBuilder {
-	return operation.NewQueryBuilder(&dynamodb.QueryInput{
-		TableName: dyno.StringPtr(t.Name()),
-	})
+	return operation.NewQueryBuilder().SetTable(t.Name())
+}
+
+// QueryIndexBuilder creates an QueryBuilder for this table with given index name
+// returns index not found error if index doesnt exist
+func (t *Table) QueryIndexBuilder(idx string) (*operation.QueryBuilder, error) {
+	if !t.HasIndex(idx) {
+		return nil, fmt.Errorf("%s is not a valid index on table %s", idx, t.Name())
+	}
+	return operation.NewQueryBuilder().SetTable(t.Name()).SetIndex(idx), nil
 }
 
 // PutItemBuilder creates an PutBuilder for this table with optional item
 func (t *Table) PutItemBuilder(item interface{}) *operation.PutBuilder {
-	b := operation.NewPutBuilder(&dynamodb.PutItemInput{
-		TableName: dyno.StringPtr(t.Name()),
-	})
-	if item != nil {
-		am := encoding.MustMarshalItem(item)
-		b.Item(am)
-	}
-	return b
+	return operation.NewPutBuilder().
+		SetTable(t.Name()).
+		SetItem(item)
 }

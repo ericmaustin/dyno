@@ -3,12 +3,11 @@ package operation
 import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno"
-	"github.com/ericmaustin/dyno/encoding"
 )
 
 // BackupTableResult is the result of a BackUp table operation
 type BackupTableResult struct {
-	ResultBase
+	resultBase
 	output *dynamodb.CreateBackupOutput
 }
 
@@ -28,22 +27,19 @@ func (b *BackupTableResult) OutputError() (*dynamodb.CreateBackupOutput, error) 
 }
 
 type BackupTableOperation struct {
-	*Base
+	*baseOperation
 	input *dynamodb.CreateBackupInput
 }
 
 // BackupTable creates a new BackupTableOperation with optional BackupTableInput
-func BackupTable(tableName, backupName interface{}) *BackupTableOperation {
-	input := &dynamodb.CreateBackupInput{}
-	if tableName != nil {
-		input.SetTableName(encoding.ToString(tableName))
-	}
-	if backupName != nil {
-		input.SetBackupName(encoding.ToString(backupName))
+func BackupTable(tableName, backupName string) *BackupTableOperation {
+	input := &dynamodb.CreateBackupInput{
+		TableName: &tableName,
+		BackupName: &backupName,
 	}
 	b := &BackupTableOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 	return b
 }

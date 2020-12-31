@@ -7,7 +7,7 @@ import (
 
 // DeleteResult is returned by GoExecute in a channel when operation completes
 type DescribeBackupResult struct {
-	ResultBase
+	resultBase
 	output *dynamodb.DescribeBackupOutput
 }
 
@@ -28,15 +28,15 @@ func (d *DescribeBackupResult) OutputError() (*dynamodb.DescribeBackupOutput, er
 
 // DescribeBackupOperation represents an operation that performs a DescribeBackup operation
 type DescribeBackupOperation struct {
-	*Base
+	*baseOperation
 	input *dynamodb.DescribeBackupInput
 }
 
 // DescribeBackup creates a new DescribeBackupOperation with optional DescribeBackupInput to be executed later
 func DescribeBackup(arn string) *DescribeBackupOperation {
 	d := &DescribeBackupOperation{
-		Base:  newBase(),
-		input: &dynamodb.DescribeBackupInput{},
+		baseOperation: newBase(),
+		input:         &dynamodb.DescribeBackupInput{},
 	}
 
 	if len(arn) > 0 {

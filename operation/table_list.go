@@ -3,12 +3,11 @@ package operation
 import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno"
-	"github.com/ericmaustin/dyno/encoding"
 )
 
 // ListTableResult is returned as the result of a ListTableOperation
 type ListTableResult struct {
-	ResultBase
+	resultBase
 	names []string
 }
 
@@ -33,19 +32,21 @@ type ListTableBuilder struct {
 }
 
 // NewListTableBuilder creates a new ListTableBuilder
-func NewListTableBuilder(input *dynamodb.ListTablesInput) *ListTableBuilder {
-	b := &ListTableBuilder{
-		input: input,
+func NewListTableBuilder() *ListTableBuilder {
+	return &ListTableBuilder{
+		input: &dynamodb.ListTablesInput{},
 	}
-	if input == nil {
-		b.input = &dynamodb.ListTablesInput{}
-	}
+}
+
+// SetInput sets the ListTableBuilder's dynamodb.ListTablesInput
+func (b *ListTableBuilder) SetInput(input *dynamodb.ListTablesInput) *ListTableBuilder {
+	b.input = input
 	return b
 }
 
 // SetStartTable sets the inputs ExclusiveStartTableName
-func (b *ListTableBuilder) SetStartTable(tableName interface{}) *ListTableBuilder {
-	b.input.SetExclusiveStartTableName(encoding.ToString(tableName))
+func (b *ListTableBuilder) SetStartTable(tableName string) *ListTableBuilder {
+	b.input.SetExclusiveStartTableName(tableName)
 	return b
 }
 
@@ -55,27 +56,27 @@ func (b *ListTableBuilder) SetLimit(limit int64) *ListTableBuilder {
 	return b
 }
 
-// Input returns the input
-func (b *ListTableBuilder) Input() *dynamodb.ListTablesInput {
+// Build returns the input
+func (b *ListTableBuilder) Build() *dynamodb.ListTablesInput {
 	return b.input
 }
 
 // Operation returns a new ListTableOperation using this builder's input
 func (b *ListTableBuilder) Operation() *ListTableOperation {
-	return ListTables(b.Input())
+	return ListTables(b.Build())
 }
 
 // ListTableOperation represents a single ListTables operation
 type ListTableOperation struct {
-	*Base
+	*baseOperation
 	input *dynamodb.ListTablesInput
 }
 
 // ListTables creates a new ListTableOperation with optional ListTablesInput
 func ListTables(input *dynamodb.ListTablesInput) *ListTableOperation {
 	l := &ListTableOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 	if l.input == nil {
 		l.input = &dynamodb.ListTablesInput{}

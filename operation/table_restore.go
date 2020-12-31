@@ -3,12 +3,11 @@ package operation
 import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno"
-	"github.com/ericmaustin/dyno/encoding"
 )
 
 // RestoreTableResult is returned as the result of a RestoreTableOperation
 type RestoreTableResult struct {
-	ResultBase
+	resultBase
 	output *dynamodb.RestoreTableFromBackupOutput
 }
 
@@ -29,22 +28,19 @@ func (r *RestoreTableResult) OutputError() (*dynamodb.RestoreTableFromBackupOutp
 
 // RestoreTableOperation represents a restore table operation
 type RestoreTableOperation struct {
-	*Base
+	*baseOperation
 	input *dynamodb.RestoreTableFromBackupInput
 }
 
 // RestoreTable creates a new RestoreTableOperation with optional RestoreTableFromBackupInput
-func RestoreTable(backupArn, tableName interface{}) *RestoreTableOperation {
-	input := &dynamodb.RestoreTableFromBackupInput{}
-	if backupArn != nil {
-		input.SetBackupArn(encoding.ToString(backupArn))
-	}
-	if tableName != nil {
-		input.SetTargetTableName(encoding.ToString(tableName))
+func RestoreTable(backupArn, tableName string) *RestoreTableOperation {
+	input := &dynamodb.RestoreTableFromBackupInput{
+		BackupArn: &backupArn,
+		TargetTableName: &tableName,
 	}
 	b := &RestoreTableOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 	return b
 }

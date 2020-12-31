@@ -17,7 +17,7 @@ const (
 
 // PutResult is the result of a PutOperation
 type PutResult struct {
-	ResultBase
+	resultBase
 	output *dynamodb.PutItemOutput
 }
 
@@ -45,24 +45,22 @@ type PutBuilder struct {
 	cnd   *expression.ConditionBuilder
 }
 
-// NewPutBuilder creates a new PutBuilder with optional PutItemInput as the base
-func NewPutBuilder(input *dynamodb.PutItemInput) *PutBuilder {
-	p := &PutBuilder{}
-	if input != nil {
-		p.input = input
-	} else {
-		p.input = &dynamodb.PutItemInput{}
+// NewPutBuilder creates a new PutBuilder
+func NewPutBuilder() *PutBuilder {
+	return &PutBuilder{
+		input: &dynamodb.PutItemInput{},
 	}
+}
+
+// SetInput sets the PutBuilder's dynamodb.PutItemInput explicitly
+func (p *PutBuilder) SetInput(input *dynamodb.PutItemInput) *PutBuilder {
+	p.input = input
 	return p
 }
 
-// Item sets the item that will be used to build the put input
-func (p *PutBuilder) Item(item interface{}) *PutBuilder {
-	dynamoItem, err := encoding.MarshalItem(item)
-	if err != nil {
-		panic(err)
-	}
-	p.input.Item = dynamoItem
+// SetItem sets the item that will be used to build the put input
+func (p *PutBuilder) SetItem(item interface{}) *PutBuilder {
+	p.input.Item = encoding.MustMarshalItem(item)
 	return p
 }
 
@@ -80,9 +78,8 @@ func (p *PutBuilder) AddCondition(cnd expression.ConditionBuilder) *PutBuilder {
 }
 
 // SetTable sets the table name
-func (p *PutBuilder) SetTable(table interface{}) *PutBuilder {
-	tbl := encoding.ToString(table)
-	p.input.TableName = &tbl
+func (p *PutBuilder) SetTable(table string) *PutBuilder {
+	p.input.TableName = &table
 	return p
 }
 
@@ -92,8 +89,8 @@ func (p *PutBuilder) SetReturnValues(returnValues PutReturnValues) *PutBuilder {
 	return p
 }
 
-// Input builds the put input
-func (p *PutBuilder) Input() *dynamodb.PutItemInput {
+// Build builds the put input
+func (p *PutBuilder) Build() *dynamodb.PutItemInput {
 	if p.input.ReturnValues == nil {
 		p.input.SetReturnValues(string(PutReturnNone))
 	}
@@ -113,33 +110,20 @@ func (p *PutBuilder) Input() *dynamodb.PutItemInput {
 
 // Operation returns a PutOperation using this builder's input
 func (p *PutBuilder) Operation() *PutOperation {
-	return Put(p.Input())
-}
-
-// CreatePutInput builds a ``dynamodb.PutItemInput`` object for use with Dynamodb api from a given table, input, and condition
-func CreatePutInput(tableName string, input interface{}, cnd *expression.ConditionBuilder) *dynamodb.PutItemInput {
-	putBuilder := NewPutBuilder(&dynamodb.PutItemInput{
-		TableName: &tableName,
-	}).
-		Item(input).
-		SetTable(tableName)
-	if cnd != nil {
-		putBuilder.AddCondition(*cnd)
-	}
-	return putBuilder.Input()
+	return Put(p.Build())
 }
 
 // PutOperation used as input for PutOperation
 type PutOperation struct {
-	*Base
+	*baseOperation
 	input *dynamodb.PutItemInput
 }
 
 // put creates a New PutOperation with optional PutInput
 func Put(input *dynamodb.PutItemInput) *PutOperation {
 	p := &PutOperation{
-		Base:  newBase(),
-		input: input,
+		baseOperation: newBase(),
+		input:         input,
 	}
 	return p
 }
