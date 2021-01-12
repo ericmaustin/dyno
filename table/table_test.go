@@ -131,7 +131,7 @@ func putTestRecords(sess *dyno.Session) []*testItem {
 		},
 	}
 
-	batchWriteInput := operation.NewBatchWriteBuilder(nil).
+	batchWriteInput := operation.NewBatchWriteBuilder().
 		AddPuts(getTestTableName(), testRecords).
 		Build()
 

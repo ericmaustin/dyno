@@ -74,7 +74,7 @@ func TestLock(t *testing.T) {
 		},
 	}
 
-	writeBatchInput := operation.NewBatchWriteBuilder(nil).
+	writeBatchInput := operation.NewBatchWriteBuilder().
 		AddPuts(tbl.Name(), items).
 		Build()
 
@@ -86,7 +86,7 @@ func TestLock(t *testing.T) {
 
 	sess.Log().Debugf("BatchPut cache execution time = %v", batchWriteOutput)
 
-	queryInput := operation.NewQueryBuilder(nil).
+	queryInput := operation.NewQueryBuilder().
 		SetTable(tbl.Name()).
 		AddKeyEquals(tbl.PartitionKeyName(), items[0].ID).
 		Build()
