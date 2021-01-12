@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/encoding"
@@ -55,6 +56,18 @@ func (b *CreateTableBuilder) SetProvisionedThroughput(rcu, wcu int64) *CreateTab
 
 // AddAttributeDefinition adds an attribute definition to the builder
 func (b *CreateTableBuilder) AddAttributeDefinition(attribute *dynamodb.AttributeDefinition) {
+	for _, attr := range b.input.AttributeDefinitions {
+		// don't add duplicate attribute names
+		if *attr.AttributeName == *attribute.AttributeName {
+			if *attr.AttributeType == *attribute.AttributeType {
+				return
+			} else {
+				panic(fmt.Errorf("cannot add duplicate attribute with mismatched type."+
+					"attrubuteName = %s, attributeTypes = %s, %s",
+					*attr.AttributeName, *attr.AttributeType, *attribute.AttributeType))
+			}
+		}
+	}
 	b.input.AttributeDefinitions = append(b.input.AttributeDefinitions, attribute)
 }
 
