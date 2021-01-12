@@ -30,7 +30,14 @@ func parseTag(tagStr string) *fieldConfig {
 	if strings.Contains(tagStr, ",") {
 		parts := strings.Split(tagStr, ",")
 		if len(parts[0]) > 0 {
-			conf.Name = parts[0]
+			switch parts[0] {
+			case "*":
+				conf.Embed = true
+			case "-":
+				conf.Skip = true
+			default:
+				conf.Name = parts[0]
+			}
 		}
 		for i := 1; i < len(parts); i++ {
 			if len(parts[i]) > 0 {

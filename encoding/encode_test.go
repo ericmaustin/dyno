@@ -23,16 +23,16 @@ type testStruct struct {
 	IntPtrOmitNil      *int    `dyno:",omitnil"`
 	IntPtrOmitZero     *int    `dyno:",omitzero"`
 	SubStruct          testSubStruct
-	SubStructPtr       *testSubStruct `dyno:",*"`
+	SubStructPtr       *testSubStruct `dyno:"*"`
 	SubStructOmitEmpty *testSubStruct `dyno:",omitempty"`
 	SubStructOmitNil   *testSubStruct `dyno:",omitnil"`
-	SubStructAppend    *testSubStruct `dyno:",*,append=append"`
-	SubStructPrepend   *testSubStruct `dyno:",*,prepend=prepend"`
+	SubStructAppend    *testSubStruct `dyno:"*,append=append"`
+	SubStructPrepend   *testSubStruct `dyno:"*,prepend=prepend"`
 	SubStructJson      *testSubStruct `dyno:",json"`
 	SubStringSkip      *testSubStruct `dyno:",-"`
 	StringMap          map[string]string
 	StringMapJson      map[string]string `dyno:",json"`
-	EmbeddedMap        map[string]string `dyno:",*,prepend=prepend_"`
+	EmbeddedMap        map[string]string `dyno:"*,prepend=prepend_"`
 }
 
 func getTestStruct() *testStruct {

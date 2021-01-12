@@ -28,7 +28,7 @@ func (s *BatchTestSuite) TearDownSuite() {
 func (s *BatchTestSuite) TestBatchGet() {
 
 	batch := NewBatch(s.getGets()).
-		SetWorkerCount(5)
+		SetWorkerCount(3)
 
 	out := batch.Execute(s.sess.Request())
 

@@ -181,7 +181,7 @@ func (b *Batch) Execute(req *dyno.Request) (out *BatchResult) {
 			b.done()
 			out.err = dyno.Error{
 				Code:    dyno.ErrBatchOperationTimedOut,
-				Message: "batch execution timed putItemOutput",
+				Message: "batch execution timed out",
 			}
 		case <-b.ctx.Done():
 			out.err = dyno.Error{
