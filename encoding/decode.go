@@ -158,41 +158,6 @@ func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.
 	return nil
 }
 
-// unmarshalItemToMap rv must be a map and must have index keys set that match the avMap
-func unmarshalItemToMap(item map[string]*dynamodb.AttributeValue, rv reflect.Value) error {
-	rv = indirect(rv, false)
-	if rv.Kind() != reflect.Map {
-		return &dyno.Error{
-			Code:    dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("input map is not a map, it is a %v", rv.Kind()),
-		}
-	}
-	if item == nil {
-		return nil
-	}
-
-	if rv.IsNil() {
-		newMap := reflect.MakeMapWithSize(rv.Type(), 0)
-		rv.Set(newMap)
-	}
-
-	if rv.Type().Key().Kind() != reflect.String {
-		return &dyno.Error{
-			Code:    dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("map keys are not a string, map keys are %v", rv.Type().Key().Kind()),
-		}
-	}
-
-	for fn, av := range item {
-		target := reflect.New(rv.Type().Elem())
-		if err := unmarshalItem(av, target, false); err != nil {
-			return err
-		}
-		rv.SetMapIndex(reflect.ValueOf(fn), target.Elem())
-	}
-	return nil
-}
-
 // unmarshalItemToEmbededMap rv must be a map and must have index keys set that match the avMap
 func unmarshalItemToEmbededMap(item map[string]*dynamodb.AttributeValue, rv reflect.Value, prepend, append string) error {
 
@@ -250,34 +215,9 @@ func unmarshalItem(item *dynamodb.AttributeValue, rv reflect.Value, fromJson boo
 		return nil
 	}
 
-	switch rv.Kind() {
-	case reflect.Struct:
-		if item.M == nil || len(item.M) < 1 {
-			// nothing to do, possibly wrong value type?
-			return nil
-		}
-		if err := unmarshalItemToStruct(item.M, target, "", ""); err != nil {
-			return err
-		}
-		// set the value
-		rv.Set(indirect(target, false))
-	case reflect.Map:
-		if item.M == nil || len(item.M) < 1 {
-			// nothing to do, possibly wrong value type?
-			return nil
-		}
-		if err := unmarshalItemToMap(item.M, target); err != nil {
-			return err
-		}
-		// set the value
-		rv.Set(indirect(target, false))
-	default:
-		// unmarshal as normal
-		//targetIface := target.Interface()
-		if err := dynamodbattribute.Unmarshal(item, target.Interface()); err != nil {
-			return err
-		}
-		rv.Set(indirect(target, false))
+	if err := dynamodbattribute.Unmarshal(item, target.Interface()); err != nil {
+		return err
 	}
+	rv.Set(indirect(target, false))
 	return nil
 }

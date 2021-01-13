@@ -3,6 +3,7 @@ package encoding
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -45,9 +46,12 @@ func TestUnmarshalRecord(t *testing.T) {
 }
 
 func TestUnmarshalRecords(t *testing.T) {
+	tm := time.Now()
+
 	records, err := MarshalItems([]*testStruct{
 		{
 			String:           "A",
+			Time:             tm,
 			Int:              1,
 			IntNamed:         10,
 			StringPtrOmitNil: nil,
@@ -61,6 +65,7 @@ func TestUnmarshalRecords(t *testing.T) {
 		{
 			String:           "B",
 			Int:              2,
+			Time:             tm,
 			IntNamed:         20,
 			StringOmitZero:   "",
 			IntOmitZero:      0,
@@ -77,10 +82,12 @@ func TestUnmarshalRecords(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, records, 2)
 
-	fmt.Printf("%+v", records[0])
+	fmt.Printf("%+v\n", records[0])
 
 	target := make([]*testStruct, 0)
 
 	err = UnmarshalItems(records, &target)
 	assert.NoError(t, err)
+	fmt.Printf("%s", target[0].Time)
+	assert.True(t, tm.Equal(target[0].Time))
 }
