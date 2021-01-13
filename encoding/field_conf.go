@@ -46,6 +46,12 @@ func parseTag(tagStr string) *fieldConfig {
 		}
 	} else {
 		conf.Name = tagStr
+		switch conf.Name {
+		case "*":
+			conf.Embed = true
+		case "-":
+			conf.Skip = true
+		}
 	}
 	if !conf.Embed && (len(conf.Append) > 0 || len(conf.Prepend) > 0) {
 		panic(fmt.Errorf("append and prepend cannot be used if field is not embedded"))

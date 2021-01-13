@@ -18,7 +18,7 @@ type testStruct struct {
 	String             string
 	Int                int
 	Time               time.Time
-	TimeZero           time.Time `dyno:",omitzero"`
+	TimeZero           time.Time `dyno:",omitempty"`
 	IntNamed           int       `dyno:"named_int"`
 	StringOmitZero     string    `dyno:",omitzero"`
 	IntOmitZero        int       `dyno:",omitzero"`
@@ -32,7 +32,7 @@ type testStruct struct {
 	SubStructAppend    *testSubStruct `dyno:"*,append=append"`
 	SubStructPrepend   *testSubStruct `dyno:"*,prepend=prepend"`
 	SubStructJson      *testSubStruct `dyno:",json"`
-	SubStringSkip      *testSubStruct `dyno:",-"`
+	SubStringSkip      *testSubStruct `dyno:"-"`
 	StringMap          map[string]string
 	StringMapJson      map[string]string `dyno:",json"`
 	EmbeddedMap        map[string]string `dyno:"*,prepend=prepend_"`
