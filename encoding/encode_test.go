@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+	"time"
 )
 
 type testSubStruct struct {
@@ -16,12 +17,14 @@ type testSubStruct struct {
 type testStruct struct {
 	String             string
 	Int                int
-	IntNamed           int     `dyno:"named_int"`
-	StringOmitZero     string  `dyno:",omitzero"`
-	IntOmitZero        int     `dyno:",omitzero"`
-	StringPtrOmitNil   *string `dyno:",omitnil"`
-	IntPtrOmitNil      *int    `dyno:",omitnil"`
-	IntPtrOmitZero     *int    `dyno:",omitzero"`
+	Time               time.Time
+	TimeZero           time.Time `dyno:",omitzero"`
+	IntNamed           int       `dyno:"named_int"`
+	StringOmitZero     string    `dyno:",omitzero"`
+	IntOmitZero        int       `dyno:",omitzero"`
+	StringPtrOmitNil   *string   `dyno:",omitnil"`
+	IntPtrOmitNil      *int      `dyno:",omitnil"`
+	IntPtrOmitZero     *int      `dyno:",omitzero"`
 	SubStruct          testSubStruct
 	SubStructPtr       *testSubStruct `dyno:"*"`
 	SubStructOmitEmpty *testSubStruct `dyno:",omitempty"`
@@ -47,6 +50,8 @@ func getTestStruct() *testStruct {
 		StringPtrOmitNil: nil,
 		IntPtrOmitNil:    &_int, // should not be omitted
 		IntPtrOmitZero:   &_int, // should be omitted
+		Time:             time.Now(),
+		TimeZero:         time.Time{},
 		SubStruct: testSubStruct{
 			SubString: "testSubStruct struct string",
 			SubInt:    100,
@@ -113,6 +118,8 @@ func TestStructToAttributeValueMap(t *testing.T) {
 	_, ok = av["StringPtrOmitNil"]
 	assert.False(t, ok)
 	_, ok = av["IntPtrOmitZero"]
+	assert.False(t, ok)
+	_, ok = av["TimeZero"]
 	assert.False(t, ok)
 
 	assert.Equal(t, *av["prependSubInt"].N, fmt.Sprintf("%d", s.SubStructPrepend.SubInt))

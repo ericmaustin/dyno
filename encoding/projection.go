@@ -42,7 +42,7 @@ func NameBuilders(input interface{}) []expression.NameBuilder {
 	}
 	var (
 		strNames []string
-		err error
+		err      error
 	)
 
 	switch inputTyped := input.(type) {

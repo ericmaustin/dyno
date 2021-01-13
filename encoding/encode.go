@@ -159,42 +159,9 @@ func mapToIfaceMap(rv reflect.Value, prepend, append string) (map[string]interfa
 	return iFaceMap, nil
 }
 
-func marshalStructValue(rv reflect.Value, omitZero bool) (*dynamodb.AttributeValue, error) {
-	// if struct, then process struct with addStructToRecord
-	av := &dynamodb.AttributeValue{}
-	if rv.Type() == reflect.TypeOf(av) {
-		// already a attribute value
-		return rv.Interface().(*dynamodb.AttributeValue), nil
-	}
-	avMap := map[string]*dynamodb.AttributeValue{}
-	err := addStructToRecord(rv, avMap, "", "")
-	if err != nil {
-		return nil, err
-	}
-	if len(avMap) < 1 && (omitZero) {
-		return nil, nil
-	}
-	av.SetM(avMap)
-	return av, nil
-}
-
 func marshalAv(rv reflect.Value, omitZero, omitNil, toJson bool) (*dynamodb.AttributeValue, error) {
 
-	// OmitZero always applies OmitNil
-	if omitZero {
-		omitNil = true
-	}
-
-	isNil := reflectValueIsNil(rv)
-	isZero := reflectValueIsZero(rv)
-
-	if omitNil && isNil {
-		// Skip nil values
-		return nil, nil
-	}
-
-	if omitZero && isZero {
-		// Skip empty values
+	if shouldOmit(rv, omitZero, omitNil) {
 		return nil, nil
 	}
 
@@ -211,31 +178,7 @@ func marshalAv(rv reflect.Value, omitZero, omitNil, toJson bool) (*dynamodb.Attr
 		return av, nil
 	}
 
-	switch rv.Kind() {
-	case reflect.Struct:
-		return marshalStructValue(rv, omitZero)
-	case reflect.Map:
-		return marshalMapValue(rv)
-	}
-	if rv.Kind() == reflect.Struct {
-		return marshalStructValue(rv, omitZero)
-	}
-
 	return dynamodbattribute.Marshal(rv.Interface())
-}
-
-func marshalMapValue(rv reflect.Value) (*dynamodb.AttributeValue, error) {
-	av := &dynamodb.AttributeValue{
-		M: map[string]*dynamodb.AttributeValue{},
-	}
-	iFaceMap, err := mapToIfaceMap(rv, "", "")
-	if err != nil {
-		return nil, err
-	}
-	if err := addMapToAv(iFaceMap, av.M); err != nil {
-		return nil, err
-	}
-	return av, nil
 }
 
 func addStructToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValue, prepend, append string) error {
@@ -309,7 +252,7 @@ func shouldOmit(rv reflect.Value, omitZero, omitNil bool) bool {
 	if omitZero {
 		omitNil = true
 	}
-	return (omitNil && reflectValueIsNil(rv)) || (omitZero && reflect.DeepEqual(rv.Interface(), reflect.Zero(rv.Type()).Interface()))
+	return (omitNil && reflectValueIsNil(rv)) || (omitZero && reflectValueIsZero(rv))
 }
 
 func fieldName(name, fieldName, prepend, append string) string {
