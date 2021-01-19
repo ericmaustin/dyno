@@ -7,213 +7,109 @@ import (
 	"time"
 )
 
-type BatchStatus string
 
-const (
-	BatchRunning = BatchStatus("RUNNING")
-	BatchPending = BatchStatus("PENDING")
-	BatchDone    = BatchStatus("DONE")
-)
-
-// BatchResult is the result of the batch request
-type BatchResult struct {
-	resultBase
-	output *BatchCounts
-}
-
-// OutputInterface returns the BatchCounts from the BatchResult as an interface
-func (b *BatchResult) OutputInterface() interface{} {
-	return b.output
-}
-
-// Output returns the BatchCounts from the BatchResult
-func (b *BatchResult) Output() *BatchCounts {
-	return b.output
-}
-
-// OutputError returns the BatchCountse and the error from the BatchResult for convenience
-func (b *BatchResult) OutputError() (*BatchCounts, error) {
-	return b.output, b.err
-}
-
-type BatchCounts struct {
-	Pending int
-	Running int
-	Success int
-	Errors  int
+// NewBatch creates a new parallel execution batch
+func NewBatch(ctx context.Context, maxRoutines int) *Batch {
+	if maxRoutines == 0 {
+		maxRoutines = 1
+	}
+	thisCtx, cancel := context.WithCancel(ctx)
+	return &Batch{
+		ctx:  thisCtx,
+		done: cancel,
+		wg:   &sync.WaitGroup{},
+		mu:   &sync.RWMutex{},
+		sem:  make(chan struct{}, maxRoutines),
+	}
 }
 
 // Batch is a batch request
 type Batch struct {
-	*baseOperation
-	operations []Operation
-	workers    int
-	timeout    time.Duration
-	mu         *sync.RWMutex
+	ctx       context.Context
+	done      context.CancelFunc
+	wg        *sync.WaitGroup
+	mu        *sync.RWMutex
+	ops       []Operation
+	sem       chan struct{}
+	err       error
+	running   bool
+	opTimeout time.Duration
 }
 
-// NewBatchWithContext a batch from a slice of operations with a given context
-func NewBatch(ctx context.Context, operations []Operation) *Batch {
-	if operations == nil {
-		operations = make([]Operation, 0)
-	}
-	ctx, done := context.WithCancel(ctx)
-	return &Batch{
-		baseOperation: &baseOperation{
-			ctx:    ctx,
-			done:   done,
-			mu:     sync.RWMutex{},
-			status: StatusPending,
-			timing: newTiming(),
-		},
-		operations: operations,
-		mu:         &sync.RWMutex{},
-	}
+// IsRunning checks if the batch is currently running
+func (b *Batch) IsRunning() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.running
 }
 
-// Counts returns counts of all pending, running, and completed tasks in that order
-func (b *Batch) Counts() *BatchCounts {
-	counts := &BatchCounts{}
-	for _, op := range b.operations {
-		switch op.Status() {
-		case StatusDone:
-			counts.Success += 1
-		case StatusRunning:
-			counts.Running += 1
-		case StatusError:
-			counts.Errors += 1
-		default:
-			counts.Pending += 1
-		}
-	}
-	return counts
-}
-
-// Cancel the request
-func (b *Batch) Cancel() {
-	b.done()
-}
-
-// Wait for all operations to finish
-func (b *Batch) Wait() {
-	<-b.ctx.Done()
-}
-
-// SetTimeout sets the timeout for the batch operation
-func (b *Batch) SetTimeout(timeout time.Duration) {
+func (b *Batch) setRunning(isRunning bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.timeout = timeout
+	b.running = isRunning
 }
 
-// SetWorkerCount sets the number of workers
-func (b *Batch) SetWorkerCount(concurrency int) *Batch {
+// SetOperationTimeout sets the timeout for each operation
+func (b *Batch) SetOperationTimeout(duration time.Duration) *Batch {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.workers = concurrency
+	b.opTimeout = duration
 	return b
 }
 
-// AddOperation adds an operation to the batch
-func (b *Batch) AddOperation(op Operation) *Batch {
+// Error gets the error from the batch
+func (b *Batch) Error() error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.err
+}
+
+func (b *Batch) setError(err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.operations = append(b.operations, op)
+	b.err = err
+}
+
+// AddOperations adds one or more operations to the batch
+func (b *Batch) AddOperations(ops ...Operation) *Batch {
+	b.wg.Add(len(ops))
+	b.ops = append(b.ops, ops...)
 	return b
 }
 
-// Execute executes batch operations
-func (b *Batch) Execute(req *dyno.Request) (out *BatchResult) {
-	out = &BatchResult{}
-	b.setRunning()
-	defer func() {
-		b.setDone(out)
-		out.output = b.Counts()
-	}()
-
-	// workers = num operations if not set
-	if b.workers <= 0 || len(b.operations) < b.workers {
-		b.workers = len(b.operations)
-	}
-
-	operations := make(chan Operation)
-	resCh := make(chan Result)
-	tasks := len(b.operations)
-
-	go b.workEmitter(operations)
-
-	for i := 0; i < b.workers; i++ {
-		go b.worker(req, operations, resCh)
-	}
-
-	var timerCh <-chan time.Time
-
-	if b.timeout > 0 {
-		exeTimer := time.NewTimer(b.timeout)
-		timerCh = exeTimer.C
-	} else {
-		timerCh = make(chan time.Time)
-	}
-
-	cnt := 0
-	for {
+// Execute runs the batch operation with the given request
+func (b *Batch) Execute(sess *dyno.Session) error {
+	b.setRunning(true)
+	for _, op := range b.ops {
 		select {
-		case res := <-resCh:
-			cnt += 1
-			if res != nil && res.Error() != nil {
-				b.done() // stop all routines and return the error
-				out.err = res.Error()
-				return
-			}
-		case <-timerCh:
-			b.done()
-			out.err = dyno.Error{
-				Code:    dyno.ErrBatchOperationTimedOut,
-				Message: "batch execution timed out",
-			}
 		case <-b.ctx.Done():
-			out.err = dyno.Error{
-				Code:    dyno.ErrBatchOutputContextCancelled,
-				Message: "batch execution context was cancelled",
-			}
-		case <-req.Context().Done():
-			b.done()
-			out.err = dyno.Error{
-				Code:    dyno.ErrRequestExecutionContextCancelled,
-				Message: "batch execution request context was cancelled",
-			}
+			b.setRunning(false)
+			return b.Error()
 		default:
-			// keep looping
+			// pass
 		}
-		if cnt >= tasks {
-			// all tasks done
-			break
-		}
+		b.sem <- struct{}{}
+		go func(op Operation) {
+			var (
+				req *dyno.Request
+				err error
+			)
+			defer func() {
+				b.wg.Done()
+				<-b.sem
+			}()
+			if b.opTimeout > 0 {
+				req = sess.RequestWithTimeout(b.opTimeout)
+			} else {
+				req = sess.Request()
+			}
+			err = op.ExecuteInBatch(req).Error()
+			if err != nil {
+				b.setError(err)
+				b.ctx.Done()
+			}
+		}(op)
 	}
-	return
-}
-
-// workEmitter emits work to the workers
-func (b *Batch) workEmitter(operations chan<- Operation) {
-	for _, req := range b.operations {
-		select {
-		case operations <- req:
-			// do nothing
-		case <-b.ctx.Done():
-			// return early if we've cancelled the req
-			return
-		}
-	}
-}
-
-// worker runs
-func (b *Batch) worker(req *dyno.Request, operations <-chan Operation, resCh chan<- Result) {
-	for {
-		select {
-		case op := <-operations:
-			resCh <- op.ExecuteInBatch(req)
-		case <-b.ctx.Done():
-			return
-		}
-	}
+	b.wg.Wait()
+	return b.Error()
 }

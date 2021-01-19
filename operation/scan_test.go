@@ -76,7 +76,7 @@ func (s *ScanTestSuite) TestScanOperationWithFilter() {
 
 }
 
-// In order for 'go test' to runner this suite, we need to create
+// In order for 'go test' to Execute this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestScanTestSuite(t *testing.T) {
 	suite.Run(t, new(ScanTestSuite))

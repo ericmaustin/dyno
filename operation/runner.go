@@ -9,11 +9,11 @@ import (
 type NotRunningError struct{}
 
 func (n *NotRunningError) Error() string {
-	return "the runner is not running"
+	return "the Execute is not running"
 }
 
-// NewRunner creates a new parallel execution runner with a given number of maxRoutines
-// the runner go routine dispatcher is started immediately
+// NewRunner creates a new parallel execution Execute with a given number of maxRoutines
+// the Execute go routine dispatcher is started immediately
 func NewRunner(ctx context.Context, sess *dyno.Session, maxRoutines int) *Runner {
 	if maxRoutines == 0 {
 		maxRoutines = 1
@@ -74,8 +74,8 @@ func (r *Runner) setError(err error) {
 	r.err = err
 }
 
-// Stop stops the runner
-// Stop should always be called to turn off the runner when the runner is no longer needed
+// Stop stops the Execute
+// Stop should always be called to turn off the Execute when the Execute is no longer needed
 func (r *Runner) Stop() *Runner {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -87,7 +87,7 @@ func (r *Runner) Stop() *Runner {
 	return r
 }
 
-// Run sends operations to the runner
+// Run sends operations to the Execute
 // blocks until the buffer is clear
 // panics on channel being closed if Stop() is called before Run()
 func (r *Runner) Run(ops ...Operation) error {
@@ -130,7 +130,7 @@ func (r *Runner) runner() {
 	}
 }
 
-// Wait waits for the runner to finish
+// Wait waits for the Execute to finish
 func (r *Runner) Wait() *Runner {
 	r.wg.Wait()
 	return r

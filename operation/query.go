@@ -248,7 +248,7 @@ func (q *QueryOperation) Execute(req *dyno.Request) (out *QueryResult) {
 
 	// start a for loop that keeps scanning as we page through returned ProjectionColumns
 	for {
-		// runner the input
+		// Execute the input
 		output, out.err = req.Query(q.input)
 
 		if out.err != nil {
@@ -258,7 +258,7 @@ func (q *QueryOperation) Execute(req *dyno.Request) (out *QueryResult) {
 		// append the res
 		out.output = append(out.output, output)
 
-		// if we have items and a handler, runner the handler
+		// if we have items and a handler, Execute the handler
 		if len(output.Items) > 0 && q.handler != nil {
 			out.err = q.handler(output.Items)
 			if out.err != nil {

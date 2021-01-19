@@ -42,7 +42,7 @@ func (q *QueryTestSuite) TestScanOperation() {
 	q.Equal("A", target[0].ID)
 }
 
-// In order for 'go test' to runner this suite, we need to create
+// In order for 'go test' to Execute this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestQueryTestSuite(t *testing.T) {
 	suite.Run(t, new(QueryTestSuite))

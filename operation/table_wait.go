@@ -28,7 +28,7 @@ const (
 	tableStatusInaccessibleEncryptionCrednetials = "INACCESSIBLE_ENCRYPTION_CREDENTIALS"
 )
 
-// WaitForTableReady waits for a table to become available to accept requests until either the provided timeout
+// WaitForTableReady waits for a table to become available to accept requests until either the provided opTimeout
 // is reached or the request times out
 func WaitForTableReady(req *dyno.Request, tableName string, timeout *time.Duration) (out *dynamodb.DescribeTableOutput, err error) {
 
@@ -124,7 +124,7 @@ func WaitForTableArchive(req *dyno.Request, tableName string, timeout *time.Dura
 	} // end of for loop
 }
 
-// WaitForTableDeletion waits for a given table until either the provided timeout is met or the request times out
+// WaitForTableDeletion waits for a given table until either the provided opTimeout is met or the request times out
 func WaitForTableDeletion(req *dyno.Request, tableName string, timeout *time.Duration) (err error) {
 
 	sleeper := timer.NewSleeper(time.Millisecond * 100).

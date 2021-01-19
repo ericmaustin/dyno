@@ -52,8 +52,7 @@ func (e *execution) do(execFunc ExecutionFunction) error {
 	err := execFunc(e.ctx)
 	retry := e.checkError(err)
 	if retry {
-		err := <-e.sleeper.Sleep()
-		if err != nil {
+		if err = <-e.sleeper.Sleep(); err != nil {
 			return err
 		}
 		return execFunc(e.ctx)

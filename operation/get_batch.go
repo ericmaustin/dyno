@@ -206,7 +206,7 @@ func (bg *BatchGetOperation) Execute(req *dyno.Request) (out *BatchGetResult) {
 	defer bg.setDone(out)
 
 	if bg.workers == 0 {
-		// automatically set the workers to number of processes needed to runner all at once
+		// automatically set the workers to number of processes needed to Execute all at once
 		cnt := 0
 		for _, keysAndAttributes := range bg.input.RequestItems {
 			cnt += len(keysAndAttributes.Keys)

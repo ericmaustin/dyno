@@ -286,7 +286,7 @@ func (s *ScanOperation) SetLimit(limit int64) *ScanOperation {
 }
 
 // SetSegments sets the total number of segments for the scan operation
-// this will change the number of scan workers that will runner to complete the scan
+// this will change the number of scan workers that will Execute to complete the scan
 func (s *ScanOperation) SetSegments(totalSegments int64) *ScanOperation {
 	if !s.IsPending() {
 		panic(&InvalidState{})
@@ -380,7 +380,7 @@ func (s *ScanOperation) Execute(req *dyno.Request) (out *ScanResult) {
 			break
 		}
 		wg.Add(1)
-		// runner the segment
+		// Execute the segment
 		go scanSegment(req, segment, state, &wg, s.handler)
 	}
 
@@ -412,7 +412,7 @@ func (s *ScanCountResult) OutputError() (int64, error) {
 	return s.output, s.err
 }
 
-// ScanOperation is used to runner a scan
+// ScanOperation is used to Execute a scan
 type ScanCountOperation struct {
 	*baseOperation
 	input     *dynamodb.ScanInput
@@ -446,7 +446,7 @@ func ScanCount(input *dynamodb.ScanInput) *ScanCountOperation {
 }
 
 // SetSegments sets the total number of segments for the scan operation
-// this will change the number of scan workers that will runner to complete the scan
+// this will change the number of scan workers that will Execute to complete the scan
 func (s *ScanCountOperation) SetSegments(totalSegments int64) *ScanCountOperation {
 	if !s.IsPending() {
 		panic(&InvalidState{})
@@ -507,7 +507,7 @@ func (s *ScanCountOperation) Execute(req *dyno.Request) (out *ScanCountResult) {
 			break
 		}
 		wg.Add(1)
-		// runner the segment
+		// Execute the segment
 		go scanSegment(req, segment, state, &wg, nil)
 	}
 
@@ -526,7 +526,7 @@ func scanSegment(req *dyno.Request,
 	defer wg.Done()
 	// start a for loop that keeps scanning as we page through returned ProjectionColumns
 	for {
-		// runner the input
+		// Execute the input
 		output, err := req.Scan(segment)
 		if err != nil {
 			state.setError(err)
@@ -535,7 +535,7 @@ func scanSegment(req *dyno.Request,
 
 		state.addOutput(output)
 
-		// if we have items and a handler, runner the handler
+		// if we have items and a handler, Execute the handler
 		if len(output.Items) > 0 && handler != nil {
 			err = handler(output.Items)
 			if err != nil {
