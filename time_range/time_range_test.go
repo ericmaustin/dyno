@@ -24,11 +24,11 @@ func TestTimeRange(t *testing.T) {
 	assert.True(t, trPrev.Start == tr.Start)
 
 	trNoRound := NewTimeRangeFromStart(now, time.Hour, false)
-	fmt.Printf("TimeRange: start = %v\tEnd = %v\n\tPeriodStart = %v",
+	fmt.Printf("TimeRange: start = %v\tEnd = %v\n\tPeriodStart = %v\n",
 		trNoRound.Start, trNoRound.End, trNoRound.PeriodStart)
 
 	ts, err := NewTimeSeriesBetween(now,
-		now.Add(time.Duration(time.Hour*time.Duration(1000))),
+		now.Add(time.Hour*1000),
 		time.Hour, false, false)
 
 	assert.NoError(t, err)

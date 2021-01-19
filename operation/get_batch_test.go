@@ -2,6 +2,7 @@ package operation
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/ericmaustin/dyno"
@@ -33,8 +34,9 @@ func (s *GetBatchTestSuite) TestBatchGet() {
 		BuildOperation()
 
 	target := make([]*testItem, 0)
+	mu := &sync.Mutex{}
 
-	batchGetOutput, err := batchGet.SetHandler(SliceLoader(&target)).
+	batchGetOutput, err := batchGet.SetHandler(LoadSlice(&target, mu)).
 		Execute(s.sess.Request()).
 		OutputError()
 
@@ -44,7 +46,7 @@ func (s *GetBatchTestSuite) TestBatchGet() {
 	fmt.Printf("%+v\n", batchGetOutput)
 }
 
-// In order for 'go test' to run this suite, we need to create
+// In order for 'go test' to runner this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestGetBatchTestSuite(t *testing.T) {
 	suite.Run(t, new(GetBatchTestSuite))

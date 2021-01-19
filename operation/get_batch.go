@@ -206,7 +206,7 @@ func (bg *BatchGetOperation) Execute(req *dyno.Request) (out *BatchGetResult) {
 	defer bg.setDone(out)
 
 	if bg.workers == 0 {
-		// automatically set the workers to number of processes needed to run all at once
+		// automatically set the workers to number of processes needed to runner all at once
 		cnt := 0
 		for _, keysAndAttributes := range bg.input.RequestItems {
 			cnt += len(keysAndAttributes.Keys)
@@ -314,7 +314,7 @@ func (bg *BatchGetOperation) doBatchGetRequest(req *dyno.Request,
 		for tableName := range input.RequestItems {
 			if _, ok := out.Responses[tableName]; ok {
 				if bg.handler != nil {
-					if err := bg.handler(out.Responses[tableName]); err != nil {
+					if err = bg.handler(out.Responses[tableName]); err != nil {
 						state.SetError(err)
 						return
 					}

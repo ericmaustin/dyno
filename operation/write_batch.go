@@ -200,7 +200,7 @@ func (bw *BatchWriteOperation) Execute(req *dyno.Request) (out *BatchWriteResult
 	defer bw.setDone(out)
 
 	if bw.concurrency == 0 {
-		// automatically set the workers to number of processes needed to run all at once
+		// automatically set the workers to number of processes needed to runner all at once
 		bw.concurrency = int(math.Ceil(float64(len(bw.input.RequestItems)) / dynamoBatchWriteLimit))
 	}
 

@@ -31,7 +31,7 @@ func (s *ScanTestSuite) TestScanOperation() {
 
 	target := make([]*testItem, 0)
 
-	scanOutput, err := Scan(scanInput).SetHandler(SliceLoader(&target)).
+	scanOutput, err := Scan(scanInput).SetHandler(LoadSlice(&target, nil)).
 		Execute(s.sess.Request()).
 		OutputError()
 
@@ -49,7 +49,7 @@ func (s *ScanTestSuite) TestScanOperationWithFilter() {
 		SetSelect(ScanSelectAllAttributes).
 		AddFilter(condition.Equal("id", "A")).
 		BuildOperation().
-		SetHandler(SliceLoader(&target)).
+		SetHandler(LoadSlice(&target, nil)).
 		Execute(s.sess.Request()).
 		OutputError()
 
@@ -66,7 +66,7 @@ func (s *ScanTestSuite) TestScanOperationWithFilter() {
 		Build()
 
 	scanOutput, err = Scan(scanInput).
-		SetHandler(SliceLoader(&target)).
+		SetHandler(LoadSlice(&target, nil)).
 		Execute(s.sess.Request()).
 		OutputError()
 
@@ -76,7 +76,7 @@ func (s *ScanTestSuite) TestScanOperationWithFilter() {
 
 }
 
-// In order for 'go test' to run this suite, we need to create
+// In order for 'go test' to runner this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestScanTestSuite(t *testing.T) {
 	suite.Run(t, new(ScanTestSuite))

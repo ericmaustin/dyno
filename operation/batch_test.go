@@ -1,10 +1,12 @@
 package operation
 
 import (
+	"context"
 	"fmt"
 	"github.com/ericmaustin/dyno"
 	"github.com/stretchr/testify/suite"
 	"testing"
+	"time"
 )
 
 type BatchTestSuite struct {
@@ -26,15 +28,29 @@ func (s *BatchTestSuite) TearDownSuite() {
 }
 
 func (s *BatchTestSuite) TestBatchGet() {
-
-	batch := NewBatch(s.getGets()).
+	batch := NewBatch(context.Background(), s.getGets()).
 		SetWorkerCount(3)
 
+	timerStart := time.Now()
 	out := batch.Execute(s.sess.Request())
+	fmt.Printf("3 workers total time: %s\n", time.Since(timerStart))
 
 	s.NoError(out.Error())
 	s.Equal(5, out.Output().Success)
-	fmt.Printf("%+v", out.Output())
+	fmt.Printf("%+v\n", out.Output())
+}
+
+func (s *BatchTestSuite) TestBatchGetOneWorker() {
+	batch := NewBatch(context.Background(), s.getGets()).
+		SetWorkerCount(1)
+
+	timerStart := time.Now()
+	out := batch.Execute(s.sess.Request())
+	fmt.Printf("1 worker total time: %s\n", time.Since(timerStart))
+
+	s.NoError(out.Error())
+	s.Equal(5, out.Output().Success)
+	fmt.Printf("%+v\n", out.Output())
 }
 
 func (s *BatchTestSuite) getGets() []Operation {
@@ -50,7 +66,7 @@ func (s *BatchTestSuite) getGets() []Operation {
 	return out
 }
 
-// In order for 'go test' to run this suite, we need to create
+// In order for 'go test' to runner this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestBatchTestSuite(t *testing.T) {
 	suite.Run(t, new(BatchTestSuite))

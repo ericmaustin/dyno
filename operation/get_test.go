@@ -36,7 +36,7 @@ func (s *GetTestSuite) TestBatchGet() {
 			"id": "A",
 		}).BuildOperation()
 
-	getOutput, err := getOperation.SetHandler(Loader(target)).
+	getOutput, err := getOperation.SetHandler(LoadOne(target)).
 		Execute(s.sess.Request()).
 		OutputError()
 
@@ -47,7 +47,7 @@ func (s *GetTestSuite) TestBatchGet() {
 	fmt.Printf("%+v\n", target)
 }
 
-// In order for 'go test' to run this suite, we need to create
+// In order for 'go test' to runner this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestGetTestSuite(t *testing.T) {
 	suite.Run(t, new(GetTestSuite))

@@ -233,7 +233,6 @@ type ScanOperation struct {
 	*baseOperation
 	input     *dynamodb.ScanInput
 	handler   ItemSliceHandler
-	handlerMu *sync.Mutex
 }
 
 // Scan creates a new scan operation with the given scan input and handler
@@ -275,17 +274,6 @@ func (s *ScanOperation) SetHandler(handler ItemSliceHandler) *ScanOperation {
 	return s
 }
 
-// SetHandlerMutex sets the optional handler mutex that will be locked before handler is called
-func (s *ScanOperation) SetHandlerMutex(mu *sync.Mutex) *ScanOperation {
-	if !s.IsPending() {
-		panic(&InvalidState{})
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.handlerMu = mu
-	return s
-}
-
 // SetLimit sets the scan limit
 func (s *ScanOperation) SetLimit(limit int64) *ScanOperation {
 	if !s.IsPending() {
@@ -298,7 +286,7 @@ func (s *ScanOperation) SetLimit(limit int64) *ScanOperation {
 }
 
 // SetSegments sets the total number of segments for the scan operation
-// this will change the number of scan workers that will run to complete the scan
+// this will change the number of scan workers that will runner to complete the scan
 func (s *ScanOperation) SetSegments(totalSegments int64) *ScanOperation {
 	if !s.IsPending() {
 		panic(&InvalidState{})
@@ -376,9 +364,6 @@ func (s *ScanOperation) Execute(req *dyno.Request) (out *ScanResult) {
 	// stop execution timing when done
 	defer s.setDone(out)
 
-	if s.handlerMu == nil {
-		s.handlerMu = &sync.Mutex{}
-	}
 	// always clear the segment value as this will be set when we split the input based on total segments
 	s.input.Segment = nil
 
@@ -395,8 +380,8 @@ func (s *ScanOperation) Execute(req *dyno.Request) (out *ScanResult) {
 			break
 		}
 		wg.Add(1)
-		// run the segment
-		go scanSegment(req, segment, state, &wg, s.handler, s.handlerMu)
+		// runner the segment
+		go scanSegment(req, segment, state, &wg, s.handler)
 	}
 
 	wg.Wait()
@@ -427,11 +412,10 @@ func (s *ScanCountResult) OutputError() (int64, error) {
 	return s.output, s.err
 }
 
-// ScanOperation is used to run a scan
+// ScanOperation is used to runner a scan
 type ScanCountOperation struct {
 	*baseOperation
 	input     *dynamodb.ScanInput
-	handlerMu *sync.Mutex
 }
 
 // Input returns a ptr to the scan Input
@@ -462,7 +446,7 @@ func ScanCount(input *dynamodb.ScanInput) *ScanCountOperation {
 }
 
 // SetSegments sets the total number of segments for the scan operation
-// this will change the number of scan workers that will run to complete the scan
+// this will change the number of scan workers that will runner to complete the scan
 func (s *ScanCountOperation) SetSegments(totalSegments int64) *ScanCountOperation {
 	if !s.IsPending() {
 		panic(&InvalidState{})
@@ -505,10 +489,6 @@ func (s *ScanCountOperation) Execute(req *dyno.Request) (out *ScanCountResult) {
 	s.setRunning()
 	defer s.setDone(out)
 
-	if s.handlerMu == nil {
-		s.handlerMu = &sync.Mutex{}
-	}
-
 	// always clear the segment value as this will be set when we split the input based on total segments
 	s.input.Segment = nil
 	// always set the operation to count
@@ -527,8 +507,8 @@ func (s *ScanCountOperation) Execute(req *dyno.Request) (out *ScanCountResult) {
 			break
 		}
 		wg.Add(1)
-		// run the segment
-		go scanSegment(req, segment, state, &wg, nil, s.handlerMu)
+		// runner the segment
+		go scanSegment(req, segment, state, &wg, nil)
 	}
 
 	wg.Wait()
@@ -542,12 +522,11 @@ func scanSegment(req *dyno.Request,
 	segment *dynamodb.ScanInput,
 	state *scanState,
 	wg *sync.WaitGroup,
-	handler ItemSliceHandler,
-	handlerMu *sync.Mutex) {
+	handler ItemSliceHandler) {
 	defer wg.Done()
 	// start a for loop that keeps scanning as we page through returned ProjectionColumns
 	for {
-		// run the input
+		// runner the input
 		output, err := req.Scan(segment)
 		if err != nil {
 			state.setError(err)
@@ -556,11 +535,9 @@ func scanSegment(req *dyno.Request,
 
 		state.addOutput(output)
 
-		// if we have items and a handler, run the handler
+		// if we have items and a handler, runner the handler
 		if len(output.Items) > 0 && handler != nil {
-			handlerMu.Lock()
 			err = handler(output.Items)
-			handlerMu.Unlock()
 			if err != nil {
 				state.setError(err)
 				return

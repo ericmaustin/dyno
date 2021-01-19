@@ -52,20 +52,8 @@ type Batch struct {
 	mu         *sync.RWMutex
 }
 
-// NewBatch Creates a batch from a slice of operations
-func NewBatch(operations []Operation) *Batch {
-	if operations == nil {
-		operations = make([]Operation, 0)
-	}
-	return &Batch{
-		baseOperation: newBase(),
-		operations:    operations,
-		mu:            &sync.RWMutex{},
-	}
-}
-
 // NewBatchWithContext a batch from a slice of operations with a given context
-func NewBatchWithContext(ctx context.Context, operations []Operation) *Batch {
+func NewBatch(ctx context.Context, operations []Operation) *Batch {
 	if operations == nil {
 		operations = make([]Operation, 0)
 	}
@@ -144,7 +132,7 @@ func (b *Batch) Execute(req *dyno.Request) (out *BatchResult) {
 	}()
 
 	// workers = num operations if not set
-	if b.workers <= 0 {
+	if b.workers <= 0 || len(b.operations) < b.workers {
 		b.workers = len(b.operations)
 	}
 

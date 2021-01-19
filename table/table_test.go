@@ -170,7 +170,7 @@ func (s *CRUDTableTest) TestScanTable() {
 	target := make([]*testItem, 0)
 	out, err := s.table.ScanBuilder().
 		BuildOperation().
-		SetHandler(operation.SliceLoader(&target)).
+		SetHandler(operation.LoadSlice(&target)).
 		Execute(s.sess.Request()).
 		OutputError()
 	if err != nil {

@@ -32,7 +32,7 @@ func (q *QueryTestSuite) TestScanOperation() {
 		SetTable(getTestTableName()).
 		AddKeyCondition(condition.KeyEqual("id", "A")).
 		BuildOperation(). // get the operation
-		SetHandler(SliceLoader(&target)). // set the handler to unmarshal the target
+		SetHandler(LoadSlice(&target, nil)). // set the handler to unmarshal the target
 		Execute(q.sess.Request()).
 		OutputError()
 
@@ -42,7 +42,7 @@ func (q *QueryTestSuite) TestScanOperation() {
 	q.Equal("A", target[0].ID)
 }
 
-// In order for 'go test' to run this suite, we need to create
+// In order for 'go test' to runner this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestQueryTestSuite(t *testing.T) {
 	suite.Run(t, new(QueryTestSuite))
