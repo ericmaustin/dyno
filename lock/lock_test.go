@@ -94,7 +94,7 @@ func TestLock(t *testing.T) {
 	resultItems := make([]*testItem, 0)
 
 	queryOut, err := operation.Query(queryInput).
-		SetHandler(operation.LoadSlice(&resultItems)).
+		SetHandler(operation.LoadSlice(&resultItems, nil)).
 		Execute(sess.RequestWithTimeout(time.Minute)).
 		OutputError()
 
