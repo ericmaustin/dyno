@@ -23,19 +23,21 @@ type poolOperation struct {
 type PoolResult struct {
 	res Result
 	out <-chan Result
+	sig chan struct{}
 	mu *sync.Mutex
 }
 
 // Out returns the output of the result as soon as the task completes
 func (p *PoolResult) Out() Result {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	<-p.sig
 	return p.res
 }
 
 func (p *PoolResult) wait() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	defer func(){
+		p.sig <- struct{}{}
+		close(p.sig)
+	}()
 	r, ok := <- p.out
 	if !ok {
 		return
@@ -133,6 +135,7 @@ func (p *Pool) Do(op Operation, req *dyno.Request) (*PoolResult, error) {
 	resCh := make(chan Result)
 	res := &PoolResult{
 		out: resCh,
+		sig: make(chan struct{}, 1),
 		mu: &sync.Mutex{},
 	}
 	go res.wait() // PoolResult begins waiting for a result from the worker pool
