@@ -6,6 +6,12 @@ import (
 	"sync"
 )
 
+type PoolNotRunningError struct {}
+
+func (e *PoolNotRunningError) Error() string {
+	return "Pool is not running"
+}
+
 // poolOperation is a single pool operation used internally
 type poolOperation struct {
 	op    Operation
@@ -122,7 +128,7 @@ func (p *Pool) Stop() {
 // Do adds the operation to the pool and returns a PoolResult
 func (p *Pool) Do(op Operation, req *dyno.Request) (*PoolResult, error) {
 	if !p.IsRunning() {
-		return nil, &NotRunningError{}
+		return nil, &PoolNotRunningError{}
 	}
 	resCh := make(chan Result)
 	res := &PoolResult{
@@ -138,6 +144,16 @@ func (p *Pool) Do(op Operation, req *dyno.Request) (*PoolResult, error) {
 	return res, nil
 }
 
+
+// MustDo wraps Do and panics on error
+func (p *Pool) MustDo(op Operation, req *dyno.Request) *PoolResult {
+	res, err := p.Do(op, req)
+	if err != nil {
+		panic(err)
+	}
+	return res
+}
+
 // Start the pool and all workers
 func (p *Pool) Start() {
 	// set as running
@@ -148,7 +164,6 @@ func (p *Pool) Start() {
 		go p.worker()
 	}
 }
-
 
 // worker represents a operation execution worker
 func (p *Pool) worker() {
