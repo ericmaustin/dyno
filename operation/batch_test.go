@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/ericmaustin/dyno"
 	"github.com/stretchr/testify/suite"
-	"sync"
 	"testing"
 	"time"
 )
@@ -29,35 +28,45 @@ func (s *BatchTestSuite) TearDownSuite() {
 }
 
 func (s *BatchTestSuite) TestBatchGet() {
-	inputs, target := s.getGets()
-	batch := NewBatch(context.Background(), 3).
-		AddOperations(inputs...)
+	batch := NewBatch(context.Background(), s.getGets()).
+		SetWorkerCount(3)
 
 	timerStart := time.Now()
-	err := batch.Execute(s.sess)
+	out := batch.Execute(s.sess)
 	fmt.Printf("3 workers total time: %s\n", time.Since(timerStart))
 
-	s.NoError(err)
-	s.Equal(len(s.records), len(*target))
-	fmt.Printf("%+v\n", s.records)
+	s.NoError(out.Error())
+	s.Equal(5, out.Output().Success)
+	fmt.Printf("%+v\n", out.Output())
 }
 
-func (s *BatchTestSuite) getGets() ([]Operation, *[]*testItem) {
+func (s *BatchTestSuite) TestBatchGetOneWorker() {
+	batch := NewBatch(context.Background(), s.getGets()).
+		SetWorkerCount(1)
+
+	timerStart := time.Now()
+	out := batch.Execute(s.sess)
+	fmt.Printf("1 worker total time: %s\n", time.Since(timerStart))
+
+	s.NoError(out.Error())
+	s.Equal(5, out.Output().Success)
+	fmt.Printf("%+v\n", out.Output())
+}
+
+func (s *BatchTestSuite) getGets() []Operation {
 	out := make([]Operation, len(s.records))
-	mu := &sync.Mutex{}
-	var target []*testItem
 	for i, rec := range s.records {
 		getInput := NewGetBuilder().
 			SetTable(getTestTableName()).
 			SetKey(map[string]string{
 				"id": rec.ID,
 			}).Input()
-		out[i] = Get(getInput).SetHandler(LoadOneIntoSlice(&target, mu))
+		out[i] = Get(getInput)
 	}
-	return out, &target
+	return out
 }
 
-// In order for 'go test' to Execute this suite, we need to create
+// In order for 'go test' to runner this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestBatchTestSuite(t *testing.T) {
 	suite.Run(t, new(BatchTestSuite))
