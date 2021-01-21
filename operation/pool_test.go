@@ -50,7 +50,7 @@ func (s *PoolTestSuite) TestBatchGet() {
 	}
 
 	for _, out := range outs {
-		err := out.Out().Error()
+		err := out.Error()
 		s.NoError(err)
 	}
 

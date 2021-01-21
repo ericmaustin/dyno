@@ -12,6 +12,12 @@ func (e *PoolNotRunningError) Error() string {
 	return "Pool is not running"
 }
 
+type PoolOperationDidNotRun struct {}
+
+func (e *PoolOperationDidNotRun) Error() string {
+	return "Pool operation did not run"
+}
+
 // poolOperation is a single pool operation used internally
 type poolOperation struct {
 	op    Operation
@@ -27,10 +33,22 @@ type PoolResult struct {
 	mu *sync.Mutex
 }
 
-// Out returns the output of the result as soon as the task completes
-func (p *PoolResult) Out() Result {
+// Error get the error from the output
+func (p *PoolResult) Error() error {
 	<-p.sig
-	return p.res
+	if p.res == nil {
+		return &PoolOperationDidNotRun{}
+	}
+	return p.res.Error()
+}
+
+// OutputError get the output and the error from the output
+func (p *PoolResult) OutputError() (interface{}, error) {
+	<-p.sig
+	if p.res == nil {
+		return nil, &PoolOperationDidNotRun{}
+	}
+	return p.res.OutputInterface(), p.res.Error()
 }
 
 func (p *PoolResult) wait() {
@@ -43,7 +61,6 @@ func (p *PoolResult) wait() {
 		return
 	}
 	p.res = r
-	return
 }
 
 // NewPool creates a new pool with a given context and number of workers as an int
@@ -136,7 +153,7 @@ func (p *Pool) Do(op Operation, req *dyno.Request) (*PoolResult, error) {
 	res := &PoolResult{
 		out: resCh,
 		sig: make(chan struct{}, 1),
-		mu: &sync.Mutex{},
+		mu:  &sync.Mutex{},
 	}
 	go res.wait() // PoolResult begins waiting for a result from the worker pool
 	p.input <- &poolOperation{

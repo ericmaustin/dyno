@@ -104,7 +104,7 @@ func (dl *Lock) Acquire() (err error) {
 	for {
 		select {
 		case <-timer.C:
-			log.Debugf("lock failed to acquire. Lock Timed Out")
+			log.Debugf("lock failed to acquire. Lock Timed Result")
 			return &dyno.Error{Code: dyno.ErrLockTimeout}
 		case <-ticker.C:
 
