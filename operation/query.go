@@ -68,6 +68,18 @@ func (q *QueryBuilder) SetLimit(limit int64) *QueryBuilder {
 	return q
 }
 
+// SetAscOrder sets the query to return in ascending order
+func (q *QueryBuilder) SetAscOrder() *QueryBuilder {
+	q.input.ScanIndexForward = dyno.BoolPtr(true)
+	return q
+}
+
+// SetDescOrder sets the query to return in descending order
+func (q *QueryBuilder) SetDescOrder() *QueryBuilder {
+	q.input.ScanIndexForward = dyno.BoolPtr(false)
+	return q
+}
+
 // AddKeyCondition adds a key condition to this update
 // adding multiple conditions by calling this multiple times will join the conditions with
 // an AND
