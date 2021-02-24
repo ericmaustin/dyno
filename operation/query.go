@@ -117,10 +117,10 @@ func (q *QueryBuilder) AddProjectionNames(names interface{}) *QueryBuilder {
 	nameBuilders := encoding.NameBuilders(names)
 	if q.projection == nil {
 		proj := expression.ProjectionBuilder{}
-		proj.AddNames(nameBuilders...)
+		proj = proj.AddNames(nameBuilders...)
 		q.projection = &proj
 	} else {
-		q.projection.AddNames(nameBuilders...)
+		*q.projection = q.projection.AddNames(nameBuilders...)
 	}
 	return q
 }

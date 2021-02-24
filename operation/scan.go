@@ -74,10 +74,10 @@ func (s *ScanBuilder) AddProjectionNames(names interface{}) *ScanBuilder {
 	nameBuilders := encoding.NameBuilders(names)
 	if s.projection == nil {
 		proj := expression.ProjectionBuilder{}
-		proj.AddNames(nameBuilders...)
+		proj = proj.AddNames(nameBuilders...)
 		s.projection = &proj
 	} else {
-		s.projection.AddNames(nameBuilders...)
+		*s.projection = s.projection.AddNames(nameBuilders...)
 	}
 	return s
 }
