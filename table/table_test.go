@@ -78,8 +78,8 @@ func createTestSession() *dyno.Session {
 
 func createTestTable(sess *dyno.Session) *Table {
 	tbl := NewTable(getTestTableName(),
-		NewKey(NewPartitionStringKey("id"), NewSortNumberKey("sub_id"))).
-		SetOnDemand(true)
+		NewKey(NewPartitionStringKey("id"), NewSortNumberKey("sub_id")))
+
 	err := (<-tbl.Publish(sess.Request())).Error()
 	if err != nil {
 		panic(err)

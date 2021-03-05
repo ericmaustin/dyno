@@ -155,6 +155,7 @@ func (q *QueryBuilder) Build() *dynamodb.QueryInput {
 	q.input.FilterExpression = expr.Filter()
 	q.input.KeyConditionExpression = expr.Projection()
 	q.input.KeyConditionExpression = expr.KeyCondition()
+	q.input.ProjectionExpression = expr.Projection()
 	return q.input
 }
 

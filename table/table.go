@@ -102,8 +102,8 @@ func (t *Table) Description() (*dynamodb.TableDescription, error) {
 	return t.description, nil
 }
 
-// Sync updates this table's description with the remote dynamodb table
-func (t *Table) Sync(req *dyno.Request) error {
+// Pull updates this table's description with the remote dynamodb table
+func (t *Table) Pull(req *dyno.Request) error {
 	out, err := operation.DescribeTable(t.Name()).Execute(req).OutputError()
 	if err != nil {
 		return err
@@ -119,6 +119,7 @@ func (t *Table) IsLoaded() bool {
 	return t.description != nil
 }
 
+// LogFields returns loggable fields for this table
 func (t *Table) LogFields() map[string]interface{} {
 	return map[string]interface{}{
 		LogFieldTableName: t.Name,
@@ -153,6 +154,7 @@ func (t *Table) GetSortKey(fieldName string, indexName string) *SortKey {
 	return nil
 }
 
+// IsKeyField checks if the given string is a key
 func (t *Table) IsKeyField(fieldName string) bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -180,6 +182,7 @@ func (t *Table) SortKeyName() string {
 	return t.key.SortName()
 }
 
+// PartitionKeyName returns the partition key name
 func (t *Table) PartitionKeyName() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -389,15 +392,15 @@ func NewTable(name interface{}, key *Key) *Table {
 	return &Table{
 		name:     n,
 		key:      key,
-		wcus:     0,
-		rcus:     0,
 		mu:       sync.RWMutex{},
 		lsis:     make(map[string]*Lsi),
 		gsis:     make(map[string]*Gsi),
-		onDemand: false,
+		// by default use on demand pricing
+		onDemand: true,
 	}
 }
 
+// UpdateCostUnitsOutput is the output of the update cost units operation
 type UpdateCostUnitsOutput struct {
 	Changed bool
 }
@@ -410,7 +413,7 @@ type GsiCostUpdate struct {
 }
 
 // UpdateWithDescription updates this table's settings with a dynamodb.TableDescription object
-func (t *Table) UpdateWithDescription(desc *dynamodb.TableDescription) {
+func (t *Table) UpdateWithDescription(desc *dynamodb.TableDescription) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.description = desc
@@ -425,7 +428,7 @@ func (t *Table) UpdateWithDescription(desc *dynamodb.TableDescription) {
 	}
 
 	if len(desc.GlobalSecondaryIndexes) < 1 {
-		return
+		return t
 	}
 
 	// update global secondary indexes
@@ -463,6 +466,7 @@ func (t *Table) UpdateWithDescription(desc *dynamodb.TableDescription) {
 		}
 	}
 	t.arn = *desc.TableArn
+	return t
 }
 
 // SetName sets the name for this table
@@ -509,32 +513,40 @@ func (t *Table) SetSortKey(sk *SortKey) *Table {
 	return t
 }
 
-// SetRCUs sets the read cost units for this table
-func (t *Table) SetRCUs(costUnits int64) *Table {
+func (t *Table) setOnDemand() {
+	if t.rcus > 0 && t.wcus > 0 {
+		t.onDemand = false
+	} else {
+		t.onDemand = true
+	}
+}
+
+
+// SetReadCostUnits sets the read cost units for this table
+func (t *Table) SetReadCostUnits(costUnits int64) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.rcus = costUnits
+	t.setOnDemand()
 	return t
 }
 
-// SetWCUs sets the write cost units for this table
-func (t *Table) SetWCUs(costUnits int64) *Table {
+// SetWriteCostUnits sets the write cost units for this table
+func (t *Table) SetWriteCostUnits(costUnits int64) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.wcus = costUnits
+	t.setOnDemand()
 	return t
 }
 
-// SetOnDemand sets whether this table should be on demand cost based.
-// if onDemand is true then wcus and rcus are set to 0
-func (t *Table) SetOnDemand(onDemand bool) *Table {
+// SetCostUnits sets both the read and write cost units
+func (t *Table) SetCostUnits(rcus, wcus int64) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.onDemand = onDemand
-	if t.onDemand {
-		t.wcus = 0
-		t.rcus = 0
-	}
+	t.rcus = rcus
+	t.wcus = wcus
+	t.setOnDemand()
 	return t
 }
 
