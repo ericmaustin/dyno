@@ -104,8 +104,9 @@ func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.
 		// gets us the struct field
 		ft := typ.Field(i)
 		fc := parseTag(ft.Tag.Get(FieldStructTagName))
-		if fc.Skip {
-			// field is ignored
+
+		// skip unexported or explicitly ignored fields
+		if len(ft.PkgPath) != 0 || fc.Skip {
 			continue
 		}
 

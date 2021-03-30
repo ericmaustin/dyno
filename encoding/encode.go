@@ -194,8 +194,9 @@ func addStructToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValu
 		// gets us the struct field
 		ft := typ.Field(i)
 		fc := parseTag(ft.Tag.Get(FieldStructTagName))
-		if fc.Skip || shouldOmit(rv, fc.OmitZero, fc.OmitNil) {
-			// field is ignored
+
+		// skip unexported or explicitly ignored fields
+		if len(ft.PkgPath) != 0 || fc.Skip || shouldOmit(rv, fc.OmitZero, fc.OmitNil) {
 			continue
 		}
 

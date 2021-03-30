@@ -53,9 +53,7 @@ func NameBuilders(input interface{}) []expression.NameBuilder {
 	case fmt.Stringer:
 		strNames = []string{inputTyped.String()}
 	case []string:
-		for _, s := range inputTyped {
-			strNames = append(strNames, s)
-		}
+		strNames = append(strNames, inputTyped...)
 	case []*string:
 		for _, s := range inputTyped {
 			strNames = append(strNames, *s)
