@@ -2,6 +2,7 @@ package log
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	awsSession "github.com/aws/aws-sdk-go/aws/session"
 	"github.com/sirupsen/logrus"
@@ -40,7 +41,7 @@ func TestCloudWatchLogging(t *testing.T) {
 	awsSess, err := awsSession.NewSession()
 	assert.NoError(t, err)
 
-	cwWriter := NewWriter(NewCloudWatchLogWriter(awsSess, "testgroup", "testing"),
+	cwWriter := NewWriter(NewCWLogWriter(context.Background(), awsSess, "testgroup", "testing"),
 		DEBUG, ERROR, INFO, WARNING).SetFormat(&logrus.JSONFormatter{})
 
 	log := New()
