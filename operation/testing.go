@@ -7,8 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno"
-	"github.com/ericmaustin/dyno/log"
-	"github.com/sirupsen/logrus"
 )
 
 type testEmbeddedItem struct {
@@ -42,9 +40,6 @@ func getTestTableName() string {
 }
 
 func createTestSession() *dyno.Session {
-	logger := log.New()
-	logger.SetLevel(logrus.DebugLevel)
-
 	// create the session
 	awsSess, err := session.NewSession()
 
@@ -53,8 +48,7 @@ func createTestSession() *dyno.Session {
 	}
 	/* get a session */
 	sess := dyno.New(awsSess).
-		SetMaxTimeout(time.Minute).
-		SetLogger(logger)
+		SetMaxTimeout(time.Minute)
 
 	return sess
 }

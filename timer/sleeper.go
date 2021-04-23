@@ -8,12 +8,14 @@ import (
 	"time"
 )
 
-type SleepContextCancelled struct{}
+//ErrSleeperCancelled returned when a sleeper is cancelled early
+type ErrSleeperCancelled struct{}
 
-func (e *SleepContextCancelled) Error() string {
+func (e *ErrSleeperCancelled) Error() string {
 	return "sleeper context has been cancelled"
 }
 
+//NextSleepDuration provided to set a custom func to determine the next sleep duration
 type NextSleepDuration func(sleepDuration time.Duration, count int) time.Duration
 
 // Sleeper is a more complex version of the base timer
@@ -73,7 +75,7 @@ func (s *Sleeper) Cancel() {
 	}
 }
 
-// Sleep returns a channel that will return a SleepContextCancelled error if context is cancelled before the next
+// Sleep returns a channel that will return a ErrSleeperCancelled error if context is cancelled before the next
 // sleep interval completes, nil otherwise
 func (s *Sleeper) Sleep() <-chan error {
 	s.mu.Lock()
@@ -104,7 +106,7 @@ func (s *Sleeper) Sleep() <-chan error {
 			errorCh <- nil
 		case <-s.ctx.Done():
 			// timeout was reached or context was cancelled
-			errorCh <- &SleepContextCancelled{}
+			errorCh <- &ErrSleeperCancelled{}
 		}
 	}()
 

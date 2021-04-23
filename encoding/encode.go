@@ -159,7 +159,7 @@ func mapToIfaceMap(rv reflect.Value, prepend, append string) (map[string]interfa
 	return iFaceMap, nil
 }
 
-func marshalAv(rv reflect.Value, omitZero, omitNil, toJson bool) (*dynamodb.AttributeValue, error) {
+func marshalAv(rv reflect.Value, omitZero, omitNil, toJSON bool) (*dynamodb.AttributeValue, error) {
 
 	if shouldOmit(rv, omitZero, omitNil) {
 		return nil, nil
@@ -167,7 +167,7 @@ func marshalAv(rv reflect.Value, omitZero, omitNil, toJson bool) (*dynamodb.Attr
 
 	rv = indirect(rv, false)
 
-	if toJson {
+	if toJSON {
 		// we're encoding to json to marshal value with json marshaller and set value to string
 		av := &dynamodb.AttributeValue{}
 		jsonBytes, err := json.Marshal(rv.Interface())
@@ -237,7 +237,7 @@ func addStructToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValu
 			continue
 		}
 		// marshal value as normal
-		av, err = marshalAv(val, fc.OmitZero, fc.OmitNil, fc.Json)
+		av, err = marshalAv(val, fc.OmitZero, fc.OmitNil, fc.JSON)
 		if err != nil {
 			return err
 		}
@@ -274,7 +274,7 @@ func addMapToAv(input map[string]interface{}, item map[string]*dynamodb.Attribut
 	return nil
 }
 
-// Based on the enoding/Json type reflect value type indirection in GoExec Stdlib
+// Based on the enoding/JSON type reflect value type indirection in GoExec Stdlib
 // https://golang.org/src/encoding/json/decode.go Indirect func.
 func indirect(rv reflect.Value, decodingNil bool) reflect.Value {
 	v0 := rv

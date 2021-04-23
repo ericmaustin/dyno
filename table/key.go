@@ -63,7 +63,7 @@ func NewPartitionStringKey(name string) *PartitionKey {
 	return NewPartitionKey(name, AttributeString)
 }
 
-// NewPartitionStringKey creates a new partitionKey key with given name
+// NewPartitionNumberKey creates a new numeric partitionKey key with given name
 func NewPartitionNumberKey(name string) *PartitionKey {
 	return NewPartitionKey(name, AttributeNumber)
 }
@@ -93,7 +93,7 @@ func NewSortNumberKey(name string) *SortKey {
 	return NewSortKey(name, AttributeNumber)
 }
 
-// NewSortNumberKey returns a new sort key with a Binary attribute
+// NewSortBinaryKey returns a new sort key with a Binary attribute
 func NewSortBinaryKey(name string) *SortKey {
 	return NewSortKey(name, AttributeBinary)
 }
@@ -139,7 +139,7 @@ func (sk *SortKey) LessThan(value interface{}) *expression.KeyConditionBuilder {
 	return &cnd
 }
 
-// Between returns a KeyConditionBuilder with a LessThanEquals condition
+// LessThanEquals returns a KeyConditionBuilder with a LessThanEquals condition
 func (sk *SortKey) LessThanEquals(value interface{}) *expression.KeyConditionBuilder {
 	cnd, err := GetKeyCondition(sk.KeyBase, condition.OperatorLessThanEqual, value)
 	if err != nil {
@@ -165,7 +165,7 @@ type Key struct {
 	attributes   []*dynamodb.AttributeDefinition
 }
 
-// NewKey
+// NewKey returns a new table key with the provided Partition and Sort keys
 func NewKey(pk *PartitionKey, sk *SortKey) *Key {
 	k := &Key{
 		partitionKey: pk,
@@ -255,10 +255,12 @@ func (k *Key) SortName() string {
 	return k.sortKey.Name()
 }
 
+//PartitionAttributeDefinition returns the partition key dynamodb.AttributeDefinition
 func (k *Key) PartitionAttributeDefinition() *dynamodb.AttributeDefinition {
 	return k.partitionKey.attributeDefinition
 }
 
+//SortAttributeDefinition returns the sort key dynamodb.AttributeDefinition
 func (k *Key) SortAttributeDefinition() *dynamodb.AttributeDefinition {
 	return k.sortKey.attributeDefinition
 }
@@ -271,7 +273,7 @@ func (k *Key) Copy() *Key {
 	}
 }
 
-// OperatorEqual tests whether 2 table keys are equal
+// Equals tests whether 2 table keys are equal
 func (k *Key) Equals(t2 *Key) (match bool) {
 	return k.partitionKey == t2.partitionKey && k.sortKey == t2.sortKey
 }

@@ -10,11 +10,13 @@ import (
 // UUID wraps uuid and provides custom dynamodb and json marshaling
 type UUID uuid.UUID
 
+//NewUUID creates a new uuid
 func NewUUID() UUID {
 	uid := UUID(uuid.New())
 	return uid
 }
 
+//IsZero returns true if this uuid is nil or 0
 func (u *UUID) IsZero() bool {
 	return u == nil || u.Equal(UUID{})
 }
@@ -24,7 +26,7 @@ func (u UUID) Equal(other UUID, others ...UUID) bool {
 	return UUIDEqual(u, other, others...)
 }
 
-// ParseIP takes a string and creates an IP
+// ParseUUID takes a string and creates a UUID
 func ParseUUID(in string) (UUID, error) {
 	parsedUUID, err := uuid.Parse(in)
 	if err != nil {
@@ -35,6 +37,7 @@ func ParseUUID(in string) (UUID, error) {
 	return u, nil
 }
 
+//String returns the uuid as a string
 func (u UUID) String() string {
 	return uuid.UUID(u).String()
 }
@@ -83,6 +86,7 @@ func (u *UUID) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+//UUIDEqual returns true if the provided UUIDS are all equal
 func UUIDEqual(a UUID, b UUID, others ...UUID) bool {
 	others = append(others, b)
 	for _, cmp := range others {

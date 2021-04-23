@@ -5,43 +5,14 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno"
-	"reflect"
 	"strconv"
 	"time"
 )
 
-/*
-UnixTime is an extension of the unixtime.Time type that marshals the unixtime GetWithToken on dynamodb and json to a Unix timestamp int
-*/
+//UnixTime is an extension of the unixtime.Time type that marshals the unixtime GetWithToken on dynamodb and json to a Unix timestamp int
 type UnixTime time.Time
 
-func UnixTimeNow() UnixTime {
-	return UnixTime(time.Now())
-}
-
-func ParseInt(in int64) UnixTime {
-	return UnixTime(time.Unix(0, in))
-}
-
-func (t UnixTime) MarshalDocumentValue() (interface{}, error) {
-	if t == UnixTime(time.Time{}) {
-		return int64(0), nil
-	}
-	return time.Time(t).UnixNano(), nil
-}
-
-func (t *UnixTime) UnmarshalDocumentValue(input interface{}) error {
-	// input should be int
-	switch v := input.(type) {
-	case *int64:
-		*t = UnixTime(time.Unix(0, *v))
-	default:
-		return fmt.Errorf("UnixTime requires a int val to unmarshal. got: %s", reflect.TypeOf(v))
-	}
-	return nil
-}
-
-// Equal calls the underlying ``unixtime.Time`` type's equal method against ``other`` UnixTime
+// IsZero turns true if UnixTime is nil or empty
 func (t *UnixTime) IsZero() bool {
 	if t == nil {
 		return true
@@ -54,7 +25,7 @@ func (t *UnixTime) Equal(other UnixTime) bool {
 	return time.Time(*t).Equal(time.Time(other))
 }
 
-// Equal calls the underlying ``unixtime.Time`` type's equal method against ``other`` UnixTime
+// EqualPtr calls the underlying ``unixtime.Time`` type's equal method against ``other`` UnixTime
 func (t *UnixTime) EqualPtr(other *UnixTime) bool {
 	if other == nil {
 		return t == nil
@@ -67,7 +38,7 @@ func (t UnixTime) Before(other UnixTime) bool {
 	return time.Time(t).Before(time.Time(other))
 }
 
-// Before calls the underlying ``unixtime.Time`` type's After method against ``other`` UnixTime
+// After calls the underlying ``unixtime.Time`` type's After method against ``other`` UnixTime
 func (t UnixTime) After(other UnixTime) bool {
 	return time.Time(t).After(time.Time(other))
 }
@@ -140,14 +111,17 @@ func (t UnixTime) ExpressionValue() interface{} {
 	return time.Time(t).UnixNano()
 }
 
+//UnixNano returns the unix timestamp as in int64
 func (t UnixTime) UnixNano() int64 {
 	return time.Time(t).UnixNano()
 }
 
+//String returns the underlying time.Time string output
 func (t UnixTime) String() string {
 	return time.Time(t).String()
 }
 
+//UnixTimeEqual returns true if all provided UnixTime are equal
 func UnixTimeEqual(a UnixTime, b UnixTime, others ...UnixTime) bool {
 	others = append(others, b)
 	for _, cmp := range others {
@@ -167,6 +141,7 @@ func Parse(layout string, value string) (UnixTime, error) {
 	return UnixTime(ts), err
 }
 
+//Must panics on error
 func Must(time UnixTime, err error) UnixTime {
 	if err != nil {
 		panic(err)

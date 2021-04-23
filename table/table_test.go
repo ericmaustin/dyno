@@ -8,9 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/ericmaustin/dyno"
-	"github.com/ericmaustin/dyno/log"
 	"github.com/ericmaustin/dyno/operation"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -59,8 +57,6 @@ func getTestTableName() string {
 }
 
 func createTestSession() *dyno.Session {
-	logging := log.New()
-	logging.SetLevel(logrus.DebugLevel)
 
 	// create the session
 	awsSess, err := session.NewSession()
@@ -70,8 +66,7 @@ func createTestSession() *dyno.Session {
 	}
 	/* get a session */
 	sess := dyno.New(awsSess).
-		SetMaxTimeout(time.Minute).
-		SetLogger(logging)
+		SetMaxTimeout(time.Minute)
 
 	return sess
 }

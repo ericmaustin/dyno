@@ -8,6 +8,7 @@ import (
 	"github.com/ericmaustin/dyno/encoding"
 )
 
+//UpdateReturnValues used to tell the operation what values to return
 type UpdateReturnValues string
 
 const (
@@ -22,9 +23,9 @@ const (
 	// UpdateReturnNew - Returns all of the attributes of the item, as they appear
 	// after the UpdateItem operation.
 	UpdateReturnNew = UpdateReturnValues("ALL_NEW")
-	// UpdatereturnUpdatedNew Returns only the updated attributes, as they appear after
+	// UpdateReturnUpdatedNew Returns only the updated attributes, as they appear after
 	// the UpdateItem operation.
-	UpdatereturnUpdatedNew = UpdateReturnValues("UPDATED_NEW")
+	UpdateReturnUpdatedNew = UpdateReturnValues("UPDATED_NEW")
 )
 
 // UpdateResult is returned as the result of a UpdateOperation
@@ -169,7 +170,7 @@ func (u *UpdateItemBuilder) Build() *dynamodb.UpdateItemInput {
 	return u.input
 }
 
-// Operation returns a new UpdateOperation with this builder's input
+// BuildOperation returns a new UpdateOperation with this builder's input
 func (u *UpdateItemBuilder) BuildOperation() *UpdateOperation {
 	return Update(u.Build())
 }
@@ -200,7 +201,7 @@ func (u *UpdateOperation) Input() *dynamodb.UpdateItemInput {
 // SetInput sets the current DeleteItemInput
 func (u *UpdateOperation) SetInput(input *dynamodb.UpdateItemInput) *UpdateOperation {
 	if !u.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	u.mu.Lock()
 	defer u.mu.Unlock()

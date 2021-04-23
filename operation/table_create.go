@@ -7,6 +7,7 @@ import (
 	"github.com/ericmaustin/dyno/encoding"
 )
 
+//TableBillingMode used to set what the table's billing mode should be
 type TableBillingMode string
 
 const (
@@ -61,11 +62,10 @@ func (b *CreateTableBuilder) AddAttributeDefinition(attribute *dynamodb.Attribut
 		if *attr.AttributeName == *attribute.AttributeName {
 			if *attr.AttributeType == *attribute.AttributeType {
 				return
-			} else {
-				panic(fmt.Errorf("cannot add duplicate attribute with mismatched type."+
-					"attrubuteName = %s, attributeTypes = %s, %s",
-					*attr.AttributeName, *attr.AttributeType, *attribute.AttributeType))
 			}
+			panic(fmt.Errorf("cannot add duplicate attribute with mismatched type."+
+				"attrubuteName = %s, attributeTypes = %s, %s",
+				*attr.AttributeName, *attr.AttributeType, *attribute.AttributeType))
 		}
 	}
 	b.input.AttributeDefinitions = append(b.input.AttributeDefinitions, attribute)
@@ -172,6 +172,7 @@ func (c *CreateTableResult) OutputError() (*dynamodb.CreateTableOutput, error) {
 	return c.Output(), c.err
 }
 
+//CreateTableOperation used as input to the CreateTable func
 type CreateTableOperation struct {
 	*baseOperation
 	wait  bool
@@ -188,10 +189,10 @@ func CreateTable(input *dynamodb.CreateTableInput) *CreateTableOperation {
 }
 
 // SetInput sets the input to be used for this CreateTableOperation
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (c *CreateTableOperation) SetInput(input *dynamodb.CreateTableInput) *CreateTableOperation {
 	if !c.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -201,10 +202,10 @@ func (c *CreateTableOperation) SetInput(input *dynamodb.CreateTableInput) *Creat
 
 // SetWait will set the wait flag to the the wait bool value
 // if true, then the CreateTableOperation will wait for the table to become available before returning
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (c *CreateTableOperation) SetWait(wait bool) *CreateTableOperation {
 	if !c.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -212,7 +213,7 @@ func (c *CreateTableOperation) SetWait(wait bool) *CreateTableOperation {
 	return c
 }
 
-// Execute executes the CreateTableOperation request
+// ExecuteInBatch executes the CreateTableOperation request
 func (c *CreateTableOperation) ExecuteInBatch(req *dyno.Request) Result {
 	return c.Execute(req)
 }

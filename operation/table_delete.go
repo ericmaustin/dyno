@@ -54,7 +54,7 @@ func (d *DeleteTableOperation) Input() *dynamodb.DeleteTableInput {
 // SetInput sets the current DeleteTableInput
 func (d *DeleteTableOperation) SetInput(input *dynamodb.DeleteTableInput) *DeleteTableOperation {
 	if !d.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()

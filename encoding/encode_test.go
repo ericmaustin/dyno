@@ -31,10 +31,10 @@ type testStruct struct {
 	SubStructOmitNil   *testSubStruct `dyno:",omitnil"`
 	SubStructAppend    *testSubStruct `dyno:"*,append=append"`
 	SubStructPrepend   *testSubStruct `dyno:"*,prepend=prepend"`
-	SubStructJson      *testSubStruct `dyno:",json"`
+	SubStructJSON      *testSubStruct `dyno:",json"`
 	SubStringSkip      *testSubStruct `dyno:"-"`
 	StringMap          map[string]string
-	StringMapJson      map[string]string `dyno:",json"`
+	StringMapJSON      map[string]string `dyno:",json"`
 	EmbeddedMap        map[string]string `dyno:"*,prepend=prepend_"`
 }
 
@@ -70,7 +70,7 @@ func getTestStruct() *testStruct {
 			SubString: "testSubStruct string prepend",
 			SubInt:    400,
 		},
-		SubStructJson: &testSubStruct{
+		SubStructJSON: &testSubStruct{
 			SubString: "testSubStruct string json",
 			SubInt:    500,
 		},
@@ -82,7 +82,7 @@ func getTestStruct() *testStruct {
 			"stringMap1": "a",
 			"stringMap2": "b",
 		},
-		StringMapJson: map[string]string{
+		StringMapJSON: map[string]string{
 			"stringMap1": "a",
 			"stringMap2": "b",
 		},

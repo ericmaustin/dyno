@@ -129,7 +129,7 @@ type Lsi struct {
 	Description *dynamodb.LocalSecondaryIndexDescription
 }
 
-// MewLsi creates a new Local Secondary Index with a given name and key
+// NewLsi creates a new Local Secondary Index with a given name and key
 func NewLsi(name string, key *Key) *Lsi {
 	return &Lsi{
 		Index: &Index{

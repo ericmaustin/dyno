@@ -26,6 +26,7 @@ func (b *BackupTableResult) OutputError() (*dynamodb.CreateBackupOutput, error) 
 	return b.output, b.err
 }
 
+//BackupTableOperation represents a BackupTable operation
 type BackupTableOperation struct {
 	*baseOperation
 	input *dynamodb.CreateBackupInput
@@ -34,7 +35,7 @@ type BackupTableOperation struct {
 // BackupTable creates a new BackupTableOperation with optional BackupTableInput
 func BackupTable(tableName, backupName string) *BackupTableOperation {
 	input := &dynamodb.CreateBackupInput{
-		TableName: &tableName,
+		TableName:  &tableName,
 		BackupName: &backupName,
 	}
 	b := &BackupTableOperation{
@@ -45,10 +46,10 @@ func BackupTable(tableName, backupName string) *BackupTableOperation {
 }
 
 // SetInput sets the inputBackupTableOperation
-// panics with InvalidState error if operation is not pending
+// panics with ErrInvalidState error if operation is not pending
 func (b *BackupTableOperation) SetInput(input *dynamodb.CreateBackupInput) *BackupTableOperation {
 	if !b.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -57,7 +58,7 @@ func (b *BackupTableOperation) SetInput(input *dynamodb.CreateBackupInput) *Back
 }
 
 // Input returns the current Input for the operation
-// returns InvalidState if the operation is not done
+// returns ErrInvalidState if the operation is not done
 func (b *BackupTableOperation) Input() *dynamodb.CreateBackupInput {
 	b.mu.RLock()
 	defer b.mu.RUnlock()

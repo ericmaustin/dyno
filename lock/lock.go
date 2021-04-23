@@ -3,17 +3,15 @@ package lock
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/condition"
 	"github.com/ericmaustin/dyno/operation"
 	"github.com/ericmaustin/dyno/table"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
-
-	//"github.com/sirupsen/logrus"
-	"sync"
-	"time"
 )
 
 const (
@@ -26,8 +24,11 @@ const (
 )
 
 const (
-	DefaultTimeout            = time.Second
-	DefaultLeaseDuration      = time.Millisecond * 500
+	//DefaultTimeout is the default timeout for the lock
+	DefaultTimeout = time.Second
+	//DefaultLeaseDuration is the default lock lease duration
+	DefaultLeaseDuration = time.Millisecond * 500
+	//DefaultHeartbeatFrequency is the default hertbean freq
 	DefaultHeartbeatFrequency = time.Millisecond * 100
 )
 
@@ -64,8 +65,6 @@ func (dl *Lock) Acquire() (err error) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	timer := time.NewTimer(dl.LockTimeout)
 
-	log := dl.Session.Log().WithField("table", dl.Table.Name())
-
 	defer func() {
 		ticker.Stop()
 		timer.Stop()
@@ -85,7 +84,7 @@ func (dl *Lock) Acquire() (err error) {
 		// set the key
 		SetKey(dyKey).
 		// return all new values
-		SetReturnValues(operation.UpdatereturnUpdatedNew).
+		SetReturnValues(operation.UpdateReturnUpdatedNew).
 		Set(LeaseFieldName, dl.LeaseDuration).
 		// set the lock expiration to = lock expiration time
 		Set(ExpiresFieldName, UnixTime(dl.currentLeaseExpires)).
@@ -104,7 +103,6 @@ func (dl *Lock) Acquire() (err error) {
 	for {
 		select {
 		case <-timer.C:
-			log.Debugf("lock failed to acquire. Lock Timed Result")
 			return &dyno.Error{Code: dyno.ErrLockTimeout}
 		case <-ticker.C:
 
@@ -115,7 +113,6 @@ func (dl *Lock) Acquire() (err error) {
 			if err != nil {
 				if dyno.IsAwsErrorCode(err, dynamodb.ErrCodeConditionalCheckFailedException) {
 					// conditional check failed... another process/routine holds the lock
-					log.Debugf("failed to acquire lock for session '%s'. Will retry.", sessionID)
 					continue // keep looping
 				} else {
 					select {
@@ -128,7 +125,6 @@ func (dl *Lock) Acquire() (err error) {
 					default:
 						// don't block
 					}
-					log.Errorf("Caught an unknown error while attempting to acquiring a record lock: %v", err)
 					// not an aws error, return it
 					return err
 				}
@@ -144,8 +140,6 @@ func (dl *Lock) Acquire() (err error) {
 					dl.HasLock = true
 					dl.SessionID = &sessionID
 					dl.StartHeartbeat()
-					log.Debugf("%s lock '%s' was acquired. Expiration = '%s'",
-						dl.Table.Name(), *dl.SessionID, dl.currentLeaseExpires)
 					return nil
 				}
 			}
@@ -173,11 +167,6 @@ func (dl *Lock) MustRelease() {
 // StartHeartbeat starts a go routine that will update the lease no the lock even ``freq``
 func (dl *Lock) StartHeartbeat() {
 
-	log := dl.Session.Log().WithFields(map[string]interface{}{
-		"table":   dl.Table.Name,
-		"lock_id": *dl.SessionID,
-	})
-
 	go func() {
 		// create a new Ticker to tick every heartbeat freq interval
 		ticker := time.NewTicker(dl.LockHeartbeatFrequency)
@@ -191,19 +180,16 @@ func (dl *Lock) StartHeartbeat() {
 			ticker.Stop()
 			// lock has been released
 			dl.HasLock = false
-			log.Debugf("%s lock '%s' was released", dl.Table.Name(), *dl.SessionID)
 			dl.SessionID = nil
 
 			if r := recover(); r != nil {
 				switch r.(type) {
 				case error:
-					log.Errorf("Got error during lock renew: %v", r)
 					ack = stopHeartBeatAck{&dyno.Error{
 						Code:    dyno.ErrLockFailedLeaseRenewal,
 						Message: fmt.Sprintf("%v", r),
 					}}
 				default:
-					log.Errorf("Got error during lock renew: %v", r)
 					ack = stopHeartBeatAck{&dyno.Error{
 						Code:    dyno.ErrLockFailedLeaseRenewal,
 						Message: fmt.Sprintf("%v", r),
@@ -237,11 +223,6 @@ func (dl *Lock) renew() {
 	dl.mu.Lock()
 	defer dl.mu.Unlock()
 
-	log := dl.Session.Log().WithFields(map[string]interface{}{
-		"table":   dl.Table.Name,
-		"lock_id": *dl.SessionID,
-	})
-
 	dyKey := dl.Table.ExtractKey(dl.Item)
 
 	// extend the lease by now + lease duration
@@ -250,7 +231,7 @@ func (dl *Lock) renew() {
 	updateInput := operation.NewUpdateItemBuilder().
 		SetTable(dl.Table.Name()).
 		SetKey(dyKey).
-		SetReturnValues(operation.UpdatereturnUpdatedNew).
+		SetReturnValues(operation.UpdateReturnUpdatedNew).
 		Set(ExpiresFieldName, UnixTime(dl.currentLeaseExpires)).
 		AddCondition(condition.Equal(VersionFieldName, UUID(*dl.SessionID))).
 		Build()
@@ -261,7 +242,6 @@ func (dl *Lock) renew() {
 
 	select {
 	case <-dl.Context.Done():
-		log.Debugf("lock context cancelled while attempting to renew. Renew ignored")
 		return
 	default:
 		// keep going
@@ -269,11 +249,11 @@ func (dl *Lock) renew() {
 
 	// panic if we got an error trying to update the record.
 	if err != nil {
-		log.Fatalf("Got error when attempting to update %s lock '%s' lease duration. Error: %v",
-			dl.Table.Name(), *dl.SessionID, err)
+		panic(fmt.Errorf("got error when attempting to update %s lock '%s' lease duration. Error: %v",
+			dl.Table.Name(), *dl.SessionID, err))
 	}
 	if _, ok := output.Attributes[ExpiresFieldName]; !ok {
-		log.Fatal(&dyno.Error{Code: dyno.ErrLockFailedLeaseRenewal})
+		panic(&dyno.Error{Code: dyno.ErrLockFailedLeaseRenewal})
 	}
 }
 
@@ -281,11 +261,6 @@ func (dl *Lock) renew() {
 func (dl *Lock) clear() {
 	dl.mu.Lock()
 	defer dl.mu.Unlock()
-
-	log := dl.Session.Log().WithFields(logrus.Fields{
-		"table":   dl.Table.Name,
-		"lock_id": *dl.SessionID,
-	})
 
 	// lease expires updated to "zero" time
 	dl.currentLeaseExpires = time.Time{}
@@ -295,7 +270,7 @@ func (dl *Lock) clear() {
 	updateInput := operation.NewUpdateItemBuilder().
 		SetTable(dl.Table.Name()).
 		SetKey(dyKey).
-		SetReturnValues(operation.UpdatereturnUpdatedNew).
+		SetReturnValues(operation.UpdateReturnUpdatedNew).
 		Set(ExpiresFieldName, UnixTime(dl.currentLeaseExpires)).
 		AddCondition(condition.Equal(VersionFieldName, UUID(*dl.SessionID))).
 		Build()
@@ -304,26 +279,21 @@ func (dl *Lock) clear() {
 
 	// panic if we got an error trying to update the record.
 	if err != nil {
-		if dyno.IsAwsErrorCode(err, dynamodb.ErrCodeConditionalCheckFailedException) {
-			log.Warningf("lock clear got error: %v. assuming lock is no longer valid", err)
-		} else {
+		if !dyno.IsAwsErrorCode(err, dynamodb.ErrCodeConditionalCheckFailedException) {
 			panic(fmt.Errorf("got error when attempting to clear lock '%s' session: %v",
 				err, *dl.SessionID))
 		}
 	}
-	log.Debugf("%s lock session '%s' was cleared.", dl.Table.Name(), *dl.SessionID)
 }
 
-/*
-Opts is used as the input for the Acquire func
-Required:
-	Document: the record that will be locked
-	KeyValues: the key fields for the record that will be locked
-Optional:
-	Timeout: the timeout as DurationNano for the lock
-	HeartbeatFreq: the freq of the heartbeat to renew the lock lease
-	LeaseDuration: the duration of the lease as a DurationNano
-*/
+//Opts is used as the input for the Acquire func
+//Required:
+//	Document: the record that will be locked
+//	KeyValues: the key fields for the record that will be locked
+//Optional:
+//	Timeout: the timeout as DurationNano for the lock
+//	HeartbeatFreq: the freq of the heartbeat to renew the lock lease
+//	LeaseDuration: the duration of the lease as a DurationNano
 type Opts struct {
 	Table              *table.Table `validate:"required"`
 	Item               interface{}  `validate:"required"`
@@ -333,30 +303,35 @@ type Opts struct {
 	Context            context.Context
 }
 
+//Opt is an option
 type Opt func(*Opts)
 
+//OptTimeout sets the timeout for the lock
 func OptTimeout(timeout time.Duration) Opt {
-	return Opt(func(o *Opts) {
+	return func(o *Opts) {
 		o.Timeout = timeout
-	})
+	}
 }
 
+//OptHeartbeatFrequency sets the heartbeat frequency for the lock
 func OptHeartbeatFrequency(freq time.Duration) Opt {
-	return Opt(func(o *Opts) {
+	return func(o *Opts) {
 		o.HeartbeatFrequency = freq
-	})
+	}
 }
 
+//OptLeaseDuration sets the lease duration
 func OptLeaseDuration(dur time.Duration) Opt {
-	return Opt(func(o *Opts) {
+	return func(o *Opts) {
 		o.LeaseDuration = dur
-	})
+	}
 }
 
+//OptContext sets the lock's context
 func OptContext(ctx context.Context) Opt {
-	return Opt(func(o *Opts) {
+	return func(o *Opts) {
 		o.Context = ctx
-	})
+	}
 }
 
 /*

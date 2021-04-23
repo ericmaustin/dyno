@@ -57,7 +57,7 @@ func (b *BatchGetBuilder) SetInput(input *dynamodb.BatchGetItemInput) *BatchGetB
 	return b
 }
 
-	// KeysAndAttributes used to create a dynamodb KeysAndAttributes struct easily
+// KeysAndAttributes used to create a dynamodb KeysAndAttributes struct easily
 func KeysAndAttributes(itemKeys interface{}, projection interface{}, consistentRead bool) *dynamodb.KeysAndAttributes {
 	item := encoding.MustMarshalItems(itemKeys)
 	k := &dynamodb.KeysAndAttributes{
@@ -159,7 +159,7 @@ func BatchGet(input *dynamodb.BatchGetItemInput) *BatchGetOperation {
 // SetInput sets the map of KeysAndAttributes for this BatchGetOperation
 func (bg *BatchGetOperation) SetInput(input *dynamodb.BatchGetItemInput) *BatchGetOperation {
 	if !bg.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	bg.mu.Lock()
 	defer bg.mu.Unlock()
@@ -168,10 +168,10 @@ func (bg *BatchGetOperation) SetInput(input *dynamodb.BatchGetItemInput) *BatchG
 }
 
 // SetHandler sets the target object to unmarshal the results into
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (bg *BatchGetOperation) SetHandler(handler ItemSliceHandler) *BatchGetOperation {
 	if !bg.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	bg.mu.Lock()
 	defer bg.mu.Unlock()
@@ -180,10 +180,10 @@ func (bg *BatchGetOperation) SetHandler(handler ItemSliceHandler) *BatchGetOpera
 }
 
 // SetConcurrency sets the workers for the batch request
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (bg *BatchGetOperation) SetConcurrency(concurrency int) *BatchGetOperation {
 	if !bg.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	bg.mu.Lock()
 	defer bg.mu.Unlock()

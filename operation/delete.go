@@ -48,7 +48,6 @@ func (d *DeleteItemBuilder) SetInput(input *dynamodb.DeleteItemInput) *DeleteIte
 	return d
 }
 
-
 // SetKey sets the target key for the item to tbe deleted
 func (d *DeleteItemBuilder) SetKey(key interface{}) *DeleteItemBuilder {
 	keyItem, err := encoding.MarshalItem(key)
@@ -93,7 +92,7 @@ func (d *DeleteItemBuilder) Build() *dynamodb.DeleteItemInput {
 	return d.input
 }
 
-// Operation returns a new DeleteOperation
+// BuildOperation returns a new DeleteOperation
 func (d *DeleteItemBuilder) BuildOperation() *DeleteOperation {
 	return Delete(d.Build())
 }
@@ -138,7 +137,7 @@ func (d *DeleteOperation) Input() *dynamodb.DeleteItemInput {
 // SetInput sets the current DeleteItemInput
 func (d *DeleteOperation) SetInput(input *dynamodb.DeleteItemInput) *DeleteOperation {
 	if !d.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()

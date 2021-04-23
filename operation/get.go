@@ -82,7 +82,7 @@ func (g *GetBuilder) Input() *dynamodb.GetItemInput {
 	return g.input
 }
 
-// Operation returns a GetOperation using the buidler's input
+// BuildOperation returns a GetOperation using the buidler's input
 func (g *GetBuilder) BuildOperation() *GetOperation {
 	return Get(g.input)
 }
@@ -90,8 +90,8 @@ func (g *GetBuilder) BuildOperation() *GetOperation {
 // GetOperation used for running a get operation on dynamodb
 type GetOperation struct {
 	*baseOperation
-	input     *dynamodb.GetItemInput
-	handler   ItemHandler
+	input   *dynamodb.GetItemInput
+	handler ItemHandler
 }
 
 // Get creates a new GetOperation with optional input and ItemHandler
@@ -104,10 +104,10 @@ func Get(input *dynamodb.GetItemInput) *GetOperation {
 }
 
 // SetHandler sets the target object to unmarshal the results into
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (g *GetOperation) SetHandler(handler ItemHandler) *GetOperation {
 	if !g.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()

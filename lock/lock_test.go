@@ -2,16 +2,15 @@ package lock
 
 import (
 	"fmt"
-	awsSession "github.com/aws/aws-sdk-go/aws/session"
-	"github.com/ericmaustin/dyno"
-	"github.com/ericmaustin/dyno/log"
-	"github.com/ericmaustin/dyno/operation"
-	"github.com/ericmaustin/dyno/table"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"testing"
 	"time"
+
+	awsSession "github.com/aws/aws-sdk-go/aws/session"
+	"github.com/ericmaustin/dyno"
+	"github.com/ericmaustin/dyno/operation"
+	"github.com/ericmaustin/dyno/table"
+	"github.com/stretchr/testify/assert"
 )
 
 type testItem struct {
@@ -41,8 +40,6 @@ func getTestTableName() string {
 // TestLock tests locking functionality
 func TestLock(t *testing.T) {
 
-	logger := log.New()
-	logger.SetLevel(logrus.DebugLevel)
 	// create the session
 	// create the session
 	awsSess, err := awsSession.NewSession()
@@ -50,17 +47,13 @@ func TestLock(t *testing.T) {
 
 	/* get a session */
 	sess := dyno.New(awsSess).
-		SetMaxTimeout(time.Minute).
-		SetLogger(logger)
+		SetMaxTimeout(time.Minute)
 
 	// set up the table
 	tbl := table.NewTable(getTestTableName(), table.NewKey(table.NewPartitionStringKey("id"), nil))
 
 	pubRes := <-tbl.Publish(sess.RequestWithTimeout(time.Minute))
-	sess.Log().Infof("pubRes: %v", pubRes)
-	pubOut, err := pubRes.OutputError()
-	assert.NoError(t, err)
-	sess.Log().Infof("pub result: %v", pubOut)
+	_, err = pubRes.OutputError()
 	assert.NoError(t, err)
 
 	items := []*testItem{
@@ -78,13 +71,11 @@ func TestLock(t *testing.T) {
 		AddPuts(tbl.Name(), items).
 		Build()
 
-	batchWriteOutput, err := operation.BatchWrite(writeBatchInput).
+	_, err = operation.BatchWrite(writeBatchInput).
 		Execute(sess.RequestWithTimeout(time.Minute)).
 		OutputError()
 
 	assert.NoError(t, err)
-
-	sess.Log().Debugf("BatchPut cache execution time = %v", batchWriteOutput)
 
 	queryInput := operation.NewQueryBuilder().
 		SetTable(tbl.Name()).
@@ -101,10 +92,6 @@ func TestLock(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotZero(t, len(queryOut))
 
-	for _, d := range resultItems {
-		sess.Log().Debugf("QueryOperation id %v", d.ID)
-	}
-
 	/* Test locking a record */
 	lock, err := Acquire(tbl, items[0], sess,
 		OptHeartbeatFrequency(time.Millisecond*200),
@@ -119,7 +106,6 @@ func TestLock(t *testing.T) {
 		OptTimeout(time.Second*5),
 		OptLeaseDuration(time.Second))
 
-	sess.Log().Debugf("lock attempt #2 err: %s", err2)
 	assert.Error(t, err2)
 
 	// release

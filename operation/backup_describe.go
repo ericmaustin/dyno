@@ -5,7 +5,7 @@ import (
 	"github.com/ericmaustin/dyno"
 )
 
-// DeleteResult is returned by GoExecute in a channel when operation completes
+// DescribeBackupResult is returned by GoExecute in a channel when operation completes
 type DescribeBackupResult struct {
 	resultBase
 	output *dynamodb.DescribeBackupOutput

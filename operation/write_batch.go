@@ -46,9 +46,10 @@ func NewBatchWriteBuilder() *BatchWriteBuilder {
 	return b
 }
 
+//SetInput sets the dynamodb.BatchWriteItemInput directly
 func (b *BatchWriteBuilder) SetInput(input *dynamodb.BatchWriteItemInput) *BatchWriteBuilder {
 	b.input = input
-	return  b
+	return b
 }
 
 // AddWriteRequests adds one or more WriteRequests for a given table to the input
@@ -93,7 +94,7 @@ func (b *BatchWriteBuilder) AddPuts(table, itemSlice interface{}) *BatchWriteBui
 	return b
 }
 
-// AddPut adds a put write request to the input
+// AddDelete adds a put write request to the input
 func (b *BatchWriteBuilder) AddDelete(table, key interface{}) *BatchWriteBuilder {
 	tableName := encoding.ToString(table)
 	keyItem, err := encoding.MarshalItem(key)
@@ -109,7 +110,7 @@ func (b *BatchWriteBuilder) AddDelete(table, key interface{}) *BatchWriteBuilder
 	return b
 }
 
-// AddPuts adds multiple delete requests from a given input that should be a slice of structs or maps
+// AddDeletes adds multiple delete requests from a given input that should be a slice of structs or maps
 func (b *BatchWriteBuilder) AddDeletes(table, keySlice interface{}) *BatchWriteBuilder {
 	tableName := encoding.ToString(table)
 	keyItems, err := encoding.MarshalItems(keySlice)
@@ -134,7 +135,7 @@ func (b *BatchWriteBuilder) Build() *dynamodb.BatchWriteItemInput {
 	return b.input
 }
 
-// Operation returns a new BatchWriteOperation with this builder's input
+// BuildOperation returns a new BatchWriteOperation with this builder's input
 func (b *BatchWriteBuilder) BuildOperation() *BatchWriteOperation {
 	return BatchWrite(b.Build())
 }
@@ -157,10 +158,10 @@ func BatchWrite(input *dynamodb.BatchWriteItemInput) *BatchWriteOperation {
 }
 
 // SetInput sets the BatchWriteItemInput for this BatchWriteOperation
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (bw *BatchWriteOperation) SetInput(input *dynamodb.BatchWriteItemInput) *BatchWriteOperation {
 	if !bw.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	bw.mu.Lock()
 	defer bw.mu.Unlock()
@@ -176,10 +177,10 @@ func (bw *BatchWriteOperation) Input() *dynamodb.BatchWriteItemInput {
 }
 
 // SetConcurrency sets the workers for the batch write request
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (bw *BatchWriteOperation) SetConcurrency(concurrency int) *BatchWriteOperation {
 	if !bw.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	bw.mu.Lock()
 	defer bw.mu.Unlock()
@@ -193,7 +194,7 @@ func (bw *BatchWriteOperation) ExecuteInBatch(req *dyno.Request) Result {
 	return bw.Execute(req)
 }
 
-// execute the batch write request
+// Execute the batch write request
 func (bw *BatchWriteOperation) Execute(req *dyno.Request) (out *BatchWriteResult) {
 	out = &BatchWriteResult{}
 	bw.setRunning()
@@ -265,10 +266,10 @@ func chunkBatchWrite(input *dynamodb.BatchWriteItemInput, max int) []*dynamodb.B
 
 		for _, req := range requests {
 			out[idx].RequestItems[tableName] = append(out[idx].RequestItems[tableName], req)
-			cnt += 1
+			cnt++
 			if cnt >= max {
 				cnt = 0
-				idx += 1
+				idx++
 				break
 			}
 		}

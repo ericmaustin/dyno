@@ -10,15 +10,21 @@ import (
 	"github.com/ericmaustin/dyno/encoding"
 )
 
+//ScanSelect used to tell the Scan operation what values to select
 type ScanSelect string
 
 const (
-	ScanSelectAllAttributes          = ScanSelect("ALL_ATTRIBUTES")
+	//ScanSelectAllAttributes returns all attributes
+	ScanSelectAllAttributes = ScanSelect("ALL_ATTRIBUTES")
+	//ScanSelectAllProjectedAttributes returns all projected attributes
 	ScanSelectAllProjectedAttributes = ScanSelect("ALL_PROJECTED_ATTRIBUTES")
-	ScanSelectCount                  = ScanSelect("COUNT")
-	ScanSelectSpecificAttributes     = ScanSelect("SPECIFIC_ATTRIBUTES")
+	//ScanSelectCount returns just the COUNT
+	ScanSelectCount = ScanSelect("COUNT")
+	//ScanSelectSpecificAttributes returns only the selected attributes
+	ScanSelectSpecificAttributes = ScanSelect("SPECIFIC_ATTRIBUTES")
 )
 
+//ScanBuilder used to build a scan input for use with a Scan operation
 type ScanBuilder struct {
 	input      *dynamodb.ScanInput
 	filter     *expression.ConditionBuilder
@@ -121,7 +127,7 @@ func (s *ScanBuilder) Build() *dynamodb.ScanInput {
 	return s.input
 }
 
-// Operation returns a new ScanOperation with this builder's input
+// BuildOperation returns a new ScanOperation with this builder's input
 func (s *ScanBuilder) BuildOperation() *ScanOperation {
 	return Scan(s.Build())
 }
@@ -207,7 +213,7 @@ func CopyScanInput(input *dynamodb.ScanInput) *dynamodb.ScanInput {
 	return n
 }
 
-// GetResult is returned by the ScanOperation Execution in a channel when operation completes
+// ScanResult is returned by the ScanOperation Execution in a channel when operation completes
 type ScanResult struct {
 	resultBase
 	output []*dynamodb.ScanOutput
@@ -231,8 +237,8 @@ func (s *ScanResult) OutputError() ([]*dynamodb.ScanOutput, error) {
 // ScanOperation handles scan Input operations
 type ScanOperation struct {
 	*baseOperation
-	input     *dynamodb.ScanInput
-	handler   ItemSliceHandler
+	input   *dynamodb.ScanInput
+	handler ItemSliceHandler
 }
 
 // Scan creates a new scan operation with the given scan input and handler
@@ -251,10 +257,10 @@ func (s *ScanOperation) Input() *dynamodb.ScanInput {
 }
 
 // SetInput sets the ScanInput
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (s *ScanOperation) SetInput(input *dynamodb.ScanInput) *ScanOperation {
 	if !s.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -263,10 +269,10 @@ func (s *ScanOperation) SetInput(input *dynamodb.ScanInput) *ScanOperation {
 }
 
 // SetHandler sets the handler to be used for this scan
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (s *ScanOperation) SetHandler(handler ItemSliceHandler) *ScanOperation {
 	if !s.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -277,7 +283,7 @@ func (s *ScanOperation) SetHandler(handler ItemSliceHandler) *ScanOperation {
 // SetLimit sets the scan limit
 func (s *ScanOperation) SetLimit(limit int64) *ScanOperation {
 	if !s.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -289,7 +295,7 @@ func (s *ScanOperation) SetLimit(limit int64) *ScanOperation {
 // this will change the number of scan workers that will Execute to complete the scan
 func (s *ScanOperation) SetSegments(totalSegments int64) *ScanOperation {
 	if !s.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -300,7 +306,7 @@ func (s *ScanOperation) SetSegments(totalSegments int64) *ScanOperation {
 // SetStartKey sets the start key on the ScanInput
 func (s *ScanOperation) SetStartKey(startKey map[string]*dynamodb.AttributeValue) *ScanOperation {
 	if !s.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -357,7 +363,7 @@ func (s *scanState) error() error {
 	return s.err
 }
 
-// doScan executes this ScanOperation
+// Execute executes this ScanOperation
 func (s *ScanOperation) Execute(req *dyno.Request) (out *ScanResult) {
 	out = &ScanResult{}
 	s.setRunning()
@@ -391,7 +397,7 @@ func (s *ScanOperation) Execute(req *dyno.Request) (out *ScanResult) {
 	return
 }
 
-// GetResult is returned by the ScanOperation Execution in a channel when operation completes
+// ScanCountResult is returned by the ScanOperation Execution in a channel when operation completes
 type ScanCountResult struct {
 	resultBase
 	output int64
@@ -412,10 +418,10 @@ func (s *ScanCountResult) OutputError() (int64, error) {
 	return s.output, s.err
 }
 
-// ScanOperation is used to Execute a scan
+// ScanCountOperation is used to Execute a scan that returns a count
 type ScanCountOperation struct {
 	*baseOperation
-	input     *dynamodb.ScanInput
+	input *dynamodb.ScanInput
 }
 
 // Input returns a ptr to the scan Input
@@ -426,10 +432,10 @@ func (s *ScanCountOperation) Input() *dynamodb.ScanInput {
 }
 
 // SetInput sets the ScanInput
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (s *ScanCountOperation) SetInput(input *dynamodb.ScanInput) *ScanCountOperation {
 	if !s.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -449,7 +455,7 @@ func ScanCount(input *dynamodb.ScanInput) *ScanCountOperation {
 // this will change the number of scan workers that will Execute to complete the scan
 func (s *ScanCountOperation) SetSegments(totalSegments int64) *ScanCountOperation {
 	if !s.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -460,7 +466,7 @@ func (s *ScanCountOperation) SetSegments(totalSegments int64) *ScanCountOperatio
 // SetStartKey sets the start key on the ScanInput
 func (s *ScanCountOperation) SetStartKey(startKey map[string]*dynamodb.AttributeValue) *ScanCountOperation {
 	if !s.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -483,7 +489,7 @@ func (s *ScanCountOperation) GoExecute(req *dyno.Request) <-chan *ScanCountResul
 	return outCh
 }
 
-// doScan executes this ScanOperation
+// Execute executes this ScanOperation
 func (s *ScanCountOperation) Execute(req *dyno.Request) (out *ScanCountResult) {
 	out = &ScanCountResult{}
 	s.setRunning()

@@ -37,10 +37,10 @@ func TestUnmarshalRecord(t *testing.T) {
 	fmt.Printf("append:\n%+v\n", target.SubStructAppend)
 	assert.Equal(t, s.SubStructPrepend.SubString, target.SubStructPrepend.SubString)
 	assert.Equal(t, s.SubStructAppend.SubInt, target.SubStructAppend.SubInt)
-	assert.Equal(t, s.SubStructJson.SubString, target.SubStructJson.SubString)
+	assert.Equal(t, s.SubStructJSON.SubString, target.SubStructJSON.SubString)
 	assert.Equal(t, s.SubStructPtr.SubString, target.SubStructPtr.SubString)
 	assert.Equal(t, s.SubStruct.SubString, target.SubStruct.SubString)
-	assert.Equal(t, s.StringMapJson["stringMap1"], target.StringMapJson["stringMap1"])
+	assert.Equal(t, s.StringMapJSON["stringMap1"], target.StringMapJSON["stringMap1"])
 	assert.Equal(t, s.StringMap["stringMap1"], target.StringMap["stringMap1"])
 	assert.Equal(t, s.EmbeddedMap["nestedMap1"], target.EmbeddedMap["nestedMap1"])
 }

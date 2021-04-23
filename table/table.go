@@ -21,14 +21,15 @@ var (
 )
 
 const (
+	//AttributeNumber set when the attribute is numeric
 	AttributeNumber = "N"
+	//AttributeBinary set when the attribute is binary
 	AttributeBinary = "B"
+	//AttributeString set when the attribute is a string
 	AttributeString = "S"
 )
 
-const LogFieldTableName = "table"
-
-// TimeSpanMapper represents a dynamodb table
+// Table represents a dynamodb table
 type Table struct {
 	// the name of the table
 	name string `validate:"required"`
@@ -52,7 +53,7 @@ type Table struct {
 	arn string
 }
 
-// Key returns this table's name as a string
+// Name returns this table's name as a string
 func (t *Table) Name() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -66,6 +67,7 @@ func (t *Table) Key() *Key {
 	return t.key
 }
 
+//IsOnDemand returns true if the table is set to On Demand pricing
 func (t *Table) IsOnDemand() bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -119,15 +121,6 @@ func (t *Table) IsLoaded() bool {
 	return t.description != nil
 }
 
-// LogFields returns loggable fields for this table
-func (t *Table) LogFields() map[string]interface{} {
-	return map[string]interface{}{
-		LogFieldTableName: t.Name,
-		"table_ptr":       fmt.Sprintf("%p", t),
-		"table_arn":       t.arn,
-	}
-}
-
 // GetSortKey returns a sortKey key defined on this table either on the table itself or on any index attached to this table
 func (t *Table) GetSortKey(fieldName string, indexName string) *SortKey {
 	t.mu.RLock()
@@ -175,7 +168,7 @@ func (t *Table) HasSortKey() bool {
 	return t.key.sortKey != nil
 }
 
-// HasSortKey returns true if this table's sortKey Key is set
+// SortKeyName returns the table's sort key
 func (t *Table) SortKeyName() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -390,11 +383,11 @@ func NewTable(name interface{}, key *Key) *Table {
 
 	// create a table with given table key
 	return &Table{
-		name:     n,
-		key:      key,
-		mu:       sync.RWMutex{},
-		lsis:     make(map[string]*Lsi),
-		gsis:     make(map[string]*Gsi),
+		name: n,
+		key:  key,
+		mu:   sync.RWMutex{},
+		lsis: make(map[string]*Lsi),
+		gsis: make(map[string]*Gsi),
 		// by default use on demand pricing
 		onDemand: true,
 	}
@@ -520,7 +513,6 @@ func (t *Table) setOnDemand() {
 		t.onDemand = true
 	}
 }
-
 
 // SetReadCostUnits sets the read cost units for this table
 func (t *Table) SetReadCostUnits(costUnits int64) *Table {
@@ -741,6 +733,7 @@ func (t *Table) CreateBatchKeysAndAttributes(items interface{}, consistentRead b
 	return
 }
 
+//BackupResult returned by the BackUp method
 type BackupResult struct {
 	DescribeBackupOutput *dynamodb.DescribeBackupOutput
 	Err                  error

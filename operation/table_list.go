@@ -92,10 +92,10 @@ func (l *ListTableOperation) Input() *dynamodb.ListTablesInput {
 }
 
 // SetInput sets the ListTablesInput
-// panics with InvalidState error if operation is not pending
+// panics with ErrInvalidState error if operation is not pending
 func (l *ListTableOperation) SetInput(input *dynamodb.ListTablesInput) *ListTableOperation {
 	if !l.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -104,10 +104,10 @@ func (l *ListTableOperation) SetInput(input *dynamodb.ListTablesInput) *ListTabl
 }
 
 // SetStartTable sets the ExclusiveStartTableName on the Input
-// panics with InvalidState error if operation is not pending
+// panics with ErrInvalidState error if operation is not pending
 func (l *ListTableOperation) SetStartTable(startTableName string) *ListTableOperation {
 	if !l.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -116,10 +116,10 @@ func (l *ListTableOperation) SetStartTable(startTableName string) *ListTableOper
 }
 
 // SetLimit sets the Limit on the Input
-// panics with InvalidState error if operation is not pending
+// panics with ErrInvalidState error if operation is not pending
 func (l *ListTableOperation) SetLimit(limit int64) *ListTableOperation {
 	if !l.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()

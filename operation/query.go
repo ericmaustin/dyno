@@ -179,10 +179,10 @@ func (q *QueryOperation) Input() *dynamodb.QueryInput {
 }
 
 // SetInput sets the QueryInput
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (q *QueryOperation) SetInput(input *dynamodb.QueryInput) *QueryOperation {
 	if !q.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -199,10 +199,10 @@ func Query(input *dynamodb.QueryInput) *QueryOperation {
 }
 
 // SetHandler sets the handler to be used for this Input
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (q *QueryOperation) SetHandler(handler ItemSliceHandler) *QueryOperation {
 	if !q.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -213,7 +213,7 @@ func (q *QueryOperation) SetHandler(handler ItemSliceHandler) *QueryOperation {
 // SetLimit sets the page size
 func (q *QueryOperation) SetLimit(limit int64) *QueryOperation {
 	if !q.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -224,7 +224,7 @@ func (q *QueryOperation) SetLimit(limit int64) *QueryOperation {
 // SetStartKey sets the start key on the QueryInput
 func (q *QueryOperation) SetStartKey(startKey map[string]*dynamodb.AttributeValue) *QueryOperation {
 	if !q.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -235,7 +235,7 @@ func (q *QueryOperation) SetStartKey(startKey map[string]*dynamodb.AttributeValu
 // SetScanIndexForward tells the Input to return results records desc order by the scan index
 func (q *QueryOperation) SetScanIndexForward(indexForward bool) *QueryOperation {
 	if !q.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -249,7 +249,7 @@ func (q *QueryOperation) ExecuteInBatch(req *dyno.Request) Result {
 	return q.Execute(req)
 }
 
-// doQuery executes the Input
+// Execute executes the Input
 func (q *QueryOperation) Execute(req *dyno.Request) (out *QueryResult) {
 	out = &QueryResult{}
 	q.setRunning()

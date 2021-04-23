@@ -6,6 +6,7 @@ import (
 	"sync"
 )
 
+//BatchStatus is the status of the Batch operation
 type BatchStatus string
 
 // BatchResult is the result of the batch request
@@ -29,6 +30,8 @@ func (b *BatchResult) OutputError() (*BatchCounts, error) {
 	return b.output, b.err
 }
 
+//BatchCounts holds all number of Pending, Running, Successful, and Errors
+// from this batch
 type BatchCounts struct {
 	Pending int
 	Running int
@@ -45,7 +48,7 @@ type Batch struct {
 	wg         *sync.WaitGroup
 }
 
-// NewBatchWithContext a batch from a slice of operations with a given context
+// NewBatch creates a batch from a slice of operations with a given context
 func NewBatch(ctx context.Context, operations []Operation) *Batch {
 	if operations == nil {
 		operations = make([]Operation, 0)
@@ -71,13 +74,13 @@ func (b *Batch) Counts() *BatchCounts {
 	for _, op := range b.operations {
 		switch op.Status() {
 		case StatusDone:
-			counts.Success += 1
+			counts.Success++
 		case StatusRunning:
-			counts.Running += 1
+			counts.Running++
 		case StatusError:
-			counts.Errors += 1
+			counts.Errors++
 		default:
-			counts.Pending += 1
+			counts.Pending++
 		}
 	}
 	return counts
@@ -143,7 +146,7 @@ func (b *Batch) Execute(sess *dyno.Session) (out *BatchResult) {
 	for {
 		select {
 		case res := <-resCh:
-			cnt += 1
+			cnt++
 			if res != nil && res.Error() != nil {
 				b.done() // stop all routines and return the error
 				out.err = res.Error()

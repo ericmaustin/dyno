@@ -34,7 +34,7 @@ const (
 	OperatorIn = Operator("in")
 	// OperatorExists "HasValue"
 	OperatorExists = Operator("ex")
-	// OperatorNotExists
+	// OperatorNotExists operator "nex"
 	OperatorNotExists = Operator("nex")
 )
 

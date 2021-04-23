@@ -6,7 +6,6 @@ require (
 	github.com/gojp/goreportcard v0.0.0-20200928020921-6cb26c2f6add // indirect
 	github.com/google/uuid v1.1.0
 	github.com/mattn/goveralls v0.0.7 // indirect
-	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.5.1
 )
 

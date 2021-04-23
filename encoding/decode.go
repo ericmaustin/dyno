@@ -152,7 +152,7 @@ func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.
 
 		av := item[fn]
 
-		if err := unmarshalItem(av, rv.Elem().Field(i), fc.Json); err != nil {
+		if err := unmarshalItem(av, rv.Elem().Field(i), fc.JSON); err != nil {
 			return err
 		}
 	}
@@ -194,7 +194,7 @@ func unmarshalItemToEmbededMap(item map[string]*dynamodb.AttributeValue, rv refl
 	return nil
 }
 
-func unmarshalItem(item *dynamodb.AttributeValue, rv reflect.Value, fromJson bool) error {
+func unmarshalItem(item *dynamodb.AttributeValue, rv reflect.Value, fromJSON bool) error {
 	if item.NULL != nil && *item.NULL {
 		// ignore nil values
 		return nil
@@ -204,7 +204,7 @@ func unmarshalItem(item *dynamodb.AttributeValue, rv reflect.Value, fromJson boo
 
 	target := reflect.New(rv.Type())
 
-	if fromJson {
+	if fromJSON {
 		if item.S == nil || len(*item.S) < 1 {
 			// string is empty, no json data to unmarshal
 			return nil

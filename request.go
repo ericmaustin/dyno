@@ -74,13 +74,12 @@ type Request struct {
 // newRequest creates a new request
 func newRequest(ctx context.Context, cancel context.CancelFunc, s *Session) *Request {
 	r := &Request{
-		mu:      &sync.RWMutex{},
-		Session: s,
+		mu:        &sync.RWMutex{},
+		Session:   s,
 		requestID: uuid.New().String(),
-		ctx:     ctx,
-		cancel:  cancel,
+		ctx:       ctx,
+		cancel:    cancel,
 	}
-	r.SetLogger(s.Log().WithField("request_id", r.requestID))
 	return r
 }
 
@@ -143,7 +142,7 @@ func (r *Request) Execute(execFunc ExecutionFunction) error {
 	return exec.do(execFunc)
 }
 
-// Scan executes a scan api call with a ScanInput
+// Scan executes a scan api call with a dynamodb.ScanInput
 func (r *Request) Scan(in *dynamodb.ScanInput) (out *dynamodb.ScanOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().ScanWithContext(ctx, in)
@@ -152,7 +151,7 @@ func (r *Request) Scan(in *dynamodb.ScanInput) (out *dynamodb.ScanOutput, err er
 	return
 }
 
-// Query executes a query api call with a QueryInput
+// Query executes a query api call with a dynamodb.QueryInput
 func (r *Request) Query(in *dynamodb.QueryInput) (out *dynamodb.QueryOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().QueryWithContext(ctx, in)
@@ -161,7 +160,7 @@ func (r *Request) Query(in *dynamodb.QueryInput) (out *dynamodb.QueryOutput, err
 	return
 }
 
-// PutItem runs a put item api call with a PutItemInput
+// PutItem runs a put item api call with a dynamodb.PutItemInput
 func (r *Request) PutItem(in *dynamodb.PutItemInput) (out *dynamodb.PutItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().PutItemWithContext(ctx, in)
@@ -170,6 +169,7 @@ func (r *Request) PutItem(in *dynamodb.PutItemInput) (out *dynamodb.PutItemOutpu
 	return
 }
 
+//GetItem runs a GetItem dynamodb operation with a dynamodb.GetItemInput
 func (r *Request) GetItem(in *dynamodb.GetItemInput) (out *dynamodb.GetItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().GetItemWithContext(ctx, in)
@@ -178,7 +178,7 @@ func (r *Request) GetItem(in *dynamodb.GetItemInput) (out *dynamodb.GetItemOutpu
 	return
 }
 
-// UpdateItem runs an update item api call with a UpdateItemInput
+// UpdateItem runs an update item api call with a dynamodb.UpdateItemInput
 func (r *Request) UpdateItem(in *dynamodb.UpdateItemInput) (out *dynamodb.UpdateItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().UpdateItemWithContext(ctx, in)
@@ -187,7 +187,7 @@ func (r *Request) UpdateItem(in *dynamodb.UpdateItemInput) (out *dynamodb.Update
 	return
 }
 
-// DeleteItem runs a delete item api call with a DeleteItemInput
+// DeleteItem runs a delete item api call with a dynamodb.DeleteItemInput
 func (r *Request) DeleteItem(in *dynamodb.DeleteItemInput) (out *dynamodb.DeleteItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().DeleteItemWithContext(ctx, in)
@@ -196,7 +196,7 @@ func (r *Request) DeleteItem(in *dynamodb.DeleteItemInput) (out *dynamodb.Delete
 	return
 }
 
-// BatchGetItem runs a batch get item api call with a BatchGetItemInput
+// BatchGetItem runs a batch get item api call with a dynamodb.BatchGetItemInput
 func (r *Request) BatchGetItem(in *dynamodb.BatchGetItemInput) (out *dynamodb.BatchGetItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().BatchGetItemWithContext(ctx, in)
@@ -205,6 +205,7 @@ func (r *Request) BatchGetItem(in *dynamodb.BatchGetItemInput) (out *dynamodb.Ba
 	return
 }
 
+//BatchWriteItem runs a batch write item api call with a dynamodb.BatchWriteItemInput
 func (r *Request) BatchWriteItem(in *dynamodb.BatchWriteItemInput) (out *dynamodb.BatchWriteItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().BatchWriteItemWithContext(ctx, in)
@@ -213,6 +214,7 @@ func (r *Request) BatchWriteItem(in *dynamodb.BatchWriteItemInput) (out *dynamod
 	return
 }
 
+//CreateTable runs a create table api call with a dynamodb.CreateTableInput
 func (r *Request) CreateTable(in *dynamodb.CreateTableInput) (out *dynamodb.CreateTableOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().CreateTableWithContext(ctx, in)
@@ -221,6 +223,7 @@ func (r *Request) CreateTable(in *dynamodb.CreateTableInput) (out *dynamodb.Crea
 	return
 }
 
+//CreateGlobalTable runs a create global table api call with a dynamodb.CreateGlobalTableInput
 func (r *Request) CreateGlobalTable(in *dynamodb.CreateGlobalTableInput) (out *dynamodb.CreateGlobalTableOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().CreateGlobalTableWithContext(ctx, in)
@@ -229,6 +232,7 @@ func (r *Request) CreateGlobalTable(in *dynamodb.CreateGlobalTableInput) (out *d
 	return
 }
 
+//DescribeTable runs a describe table api call with a dynamodb.DescribeTableInput
 func (r *Request) DescribeTable(in *dynamodb.DescribeTableInput) (out *dynamodb.DescribeTableOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().DescribeTableWithContext(ctx, in)
@@ -237,6 +241,7 @@ func (r *Request) DescribeTable(in *dynamodb.DescribeTableInput) (out *dynamodb.
 	return
 }
 
+//UpdateTable runs an update table api call with a dynamodb.UpdateTableInput
 func (r *Request) UpdateTable(in *dynamodb.UpdateTableInput) (out *dynamodb.UpdateTableOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().UpdateTableWithContext(ctx, in)
@@ -245,6 +250,7 @@ func (r *Request) UpdateTable(in *dynamodb.UpdateTableInput) (out *dynamodb.Upda
 	return
 }
 
+//ListTables runs a list table api call with a dynamodb.ListTablesInput
 func (r *Request) ListTables(in *dynamodb.ListTablesInput) (out *dynamodb.ListTablesOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().ListTablesWithContext(ctx, in)
@@ -253,6 +259,7 @@ func (r *Request) ListTables(in *dynamodb.ListTablesInput) (out *dynamodb.ListTa
 	return
 }
 
+//CreateBackup runs a create table backup api call with a dynamodb.CreateBackupInput
 func (r *Request) CreateBackup(in *dynamodb.CreateBackupInput) (out *dynamodb.CreateBackupOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().CreateBackupWithContext(ctx, in)
@@ -261,6 +268,7 @@ func (r *Request) CreateBackup(in *dynamodb.CreateBackupInput) (out *dynamodb.Cr
 	return
 }
 
+//DescribeBackup runs a describe table backup api call with a dynamodb.DescribeBackupInput
 func (r *Request) DescribeBackup(in *dynamodb.DescribeBackupInput) (out *dynamodb.DescribeBackupOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().DescribeBackupWithContext(ctx, in)
@@ -269,6 +277,7 @@ func (r *Request) DescribeBackup(in *dynamodb.DescribeBackupInput) (out *dynamod
 	return
 }
 
+//DeleteBackup runs a delete table backup api call with a dynamodb.DeleteBackupInput
 func (r *Request) DeleteBackup(in *dynamodb.DeleteBackupInput) (out *dynamodb.DeleteBackupOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().DeleteBackupWithContext(ctx, in)
@@ -277,6 +286,7 @@ func (r *Request) DeleteBackup(in *dynamodb.DeleteBackupInput) (out *dynamodb.De
 	return
 }
 
+//ListBackups runs a delete list backups api call with a dynamodb.ListBackupsInput
 func (r *Request) ListBackups(in *dynamodb.ListBackupsInput) (out *dynamodb.ListBackupsOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().ListBackupsWithContext(ctx, in)
@@ -285,6 +295,7 @@ func (r *Request) ListBackups(in *dynamodb.ListBackupsInput) (out *dynamodb.List
 	return
 }
 
+//DeleteTable runs a delete table api call with a dynamodb.DeleteTableInput
 func (r *Request) DeleteTable(in *dynamodb.DeleteTableInput) (out *dynamodb.DeleteTableOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().DeleteTableWithContext(ctx, in)
@@ -293,6 +304,7 @@ func (r *Request) DeleteTable(in *dynamodb.DeleteTableInput) (out *dynamodb.Dele
 	return
 }
 
+//RestoreTableFromBackup runs a restore table from backup api call with a dynamodb.RestoreTableFromBackupInput
 func (r *Request) RestoreTableFromBackup(in *dynamodb.RestoreTableFromBackupInput) (out *dynamodb.RestoreTableFromBackupOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().RestoreTableFromBackupWithContext(ctx, in)

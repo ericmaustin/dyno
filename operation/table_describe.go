@@ -36,7 +36,7 @@ type DescribeTableOperation struct {
 func DescribeTable(tableName string) *DescribeTableOperation {
 	d := &DescribeTableOperation{
 		baseOperation: newBase(),
-		input: &dynamodb.DescribeTableInput{TableName: &tableName},
+		input:         &dynamodb.DescribeTableInput{TableName: &tableName},
 	}
 
 	return d
@@ -52,7 +52,7 @@ func (d *DescribeTableOperation) Input() *dynamodb.DescribeTableInput {
 // SetInput sets the current DescribeTableInput
 func (d *DescribeTableOperation) SetInput(input *dynamodb.DescribeTableInput) *DescribeTableOperation {
 	if !d.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()

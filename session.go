@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/ericmaustin/dyno/log"
 	"github.com/google/uuid"
 	"regexp"
 	"sync"
@@ -19,22 +18,11 @@ var (
 // Session represents a single dyno session that includes an aws session
 type Session struct {
 	instanceID string
-	log        log.Logrus
 	client     *dynamodb.DynamoDB
 	mu         *sync.RWMutex
 	awsSession *session.Session
 	maxTimeout time.Duration
 	ctx        context.Context
-}
-
-// Log returns the log for this session
-func (s *Session) Log() log.Logrus {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.log == nil {
-		s.log = log.New().WithField("session_id", s.instanceID)
-	}
-	return s.log
 }
 
 // DynamoClient gets a dynamo client attached to this session
@@ -67,14 +55,6 @@ func (s *Session) SetContext(ctx context.Context) *Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.ctx = ctx
-	return s
-}
-
-// SetLogger sets the logger for the session
-func (s *Session) SetLogger(logger log.Logrus) *Session {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.log = logger.WithField("session_id", s.instanceID)
 	return s
 }
 

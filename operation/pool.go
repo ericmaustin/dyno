@@ -6,18 +6,6 @@ import (
 	"sync"
 )
 
-type PoolNotRunningError struct {}
-
-func (e *PoolNotRunningError) Error() string {
-	return "Pool is not running"
-}
-
-type PoolOperationDidNotRun struct {}
-
-func (e *PoolOperationDidNotRun) Error() string {
-	return "Pool operation did not run"
-}
-
 // poolOperation is a single pool operation used internally
 type poolOperation struct {
 	op    Operation
@@ -30,14 +18,14 @@ type PoolResult struct {
 	res Result
 	out <-chan Result
 	sig chan struct{}
-	mu *sync.Mutex
+	mu  *sync.Mutex
 }
 
 // Error get the error from the output
 func (p *PoolResult) Error() error {
 	<-p.sig
 	if p.res == nil {
-		return &PoolOperationDidNotRun{}
+		return &ErrPoolOperationDidNotRun{}
 	}
 	return p.res.Error()
 }
@@ -46,17 +34,17 @@ func (p *PoolResult) Error() error {
 func (p *PoolResult) OutputError() (interface{}, error) {
 	<-p.sig
 	if p.res == nil {
-		return nil, &PoolOperationDidNotRun{}
+		return nil, &ErrPoolOperationDidNotRun{}
 	}
 	return p.res.OutputInterface(), p.res.Error()
 }
 
 func (p *PoolResult) wait() {
-	defer func(){
+	defer func() {
 		p.sig <- struct{}{}
 		close(p.sig)
 	}()
-	r, ok := <- p.out
+	r, ok := <-p.out
 	if !ok {
 		return
 	}
@@ -80,14 +68,14 @@ func NewPool(ctx context.Context, workers int) *Pool {
 
 // Pool is a batch request handler that spawns a number of workers to handle requests
 type Pool struct {
-	running     bool
-	ctx         context.Context
-	done        context.CancelFunc
-	workers     int
-	active      int64
-	input       chan *poolOperation
-	mu          *sync.RWMutex
-	wg          *sync.WaitGroup
+	running bool
+	ctx     context.Context
+	done    context.CancelFunc
+	workers int
+	active  int64
+	input   chan *poolOperation
+	mu      *sync.RWMutex
+	wg      *sync.WaitGroup
 }
 
 // IsRunning returns true if the pool is running
@@ -130,7 +118,7 @@ func (p *Pool) executeOperation(op *poolOperation) {
 		p.subActive(1)
 	}()
 	select {
-	case op.resCh<-op.op.ExecuteInBatch(op.req):
+	case op.resCh <- op.op.ExecuteInBatch(op.req):
 		// result done
 	case <-p.ctx.Done():
 		// context cancelled, exit early
@@ -139,15 +127,14 @@ func (p *Pool) executeOperation(op *poolOperation) {
 
 // Stop stops the worker pool
 func (p *Pool) Stop() {
-	p.done() // cancel the context
+	p.done()    // cancel the context
 	p.wg.Wait() // wait for workers to exit
 }
-
 
 // Do adds the operation to the pool and returns a PoolResult
 func (p *Pool) Do(op Operation, req *dyno.Request) (*PoolResult, error) {
 	if !p.IsRunning() {
-		return nil, &PoolNotRunningError{}
+		return nil, &ErrPoolNotRunning{}
 	}
 	resCh := make(chan Result)
 	res := &PoolResult{
@@ -163,7 +150,6 @@ func (p *Pool) Do(op Operation, req *dyno.Request) (*PoolResult, error) {
 	}
 	return res, nil
 }
-
 
 // MustDo wraps Do and panics on error
 func (p *Pool) MustDo(op Operation, req *dyno.Request) *PoolResult {
@@ -187,7 +173,7 @@ func (p *Pool) Start() {
 
 // worker represents a operation execution worker
 func (p *Pool) worker() {
-	defer func(){
+	defer func() {
 		p.setRunning(false)
 		p.wg.Done()
 	}()

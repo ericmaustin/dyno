@@ -35,7 +35,7 @@ type RestoreTableOperation struct {
 // RestoreTable creates a new RestoreTableOperation with optional RestoreTableFromBackupInput
 func RestoreTable(backupArn, tableName string) *RestoreTableOperation {
 	input := &dynamodb.RestoreTableFromBackupInput{
-		BackupArn: &backupArn,
+		BackupArn:       &backupArn,
 		TargetTableName: &tableName,
 	}
 	b := &RestoreTableOperation{
@@ -55,7 +55,7 @@ func (r *RestoreTableOperation) Input() *dynamodb.RestoreTableFromBackupInput {
 // SetInput sets the current RestoreTableFromBackupInput
 func (r *RestoreTableOperation) SetInput(input *dynamodb.RestoreTableFromBackupInput) *RestoreTableOperation {
 	if !r.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()

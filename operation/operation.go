@@ -8,33 +8,18 @@ import (
 	"github.com/ericmaustin/dyno"
 )
 
-const LogFieldOperation = "operation"
-
+//Status is the status of the operation
 type Status string
 
-type MissingTableError struct{}
-
-func (e *MissingTableError) Error() string {
-	return "operation is missing a table"
-}
-
-type MissingRequestError struct{}
-
-func (e *MissingRequestError) Error() string {
-	return "operation is missing a request"
-}
-
-type InvalidState struct{}
-
-func (e *InvalidState) Error() string {
-	return "operation is an invalid state"
-}
-
 const (
+	//StatusRunning set as the operation status when running
 	StatusRunning = Status("RUNNING")
+	//StatusPending set as the operation status when pending
 	StatusPending = Status("PENDING")
-	StatusDone    = Status("DONE")
-	StatusError   = Status("ERROR")
+	//StatusDone set as the operation status when operation is finished
+	StatusDone = Status("DONE")
+	//StatusError set as the operation status when operation is in an error state
+	StatusError = Status("ERROR")
 )
 
 // Operation interface that an operation must satisfy in order to be able to be used in an Batch
@@ -88,6 +73,7 @@ func (t *Timing) done() {
 	t.finished = dyno.TimePtr(time.Now())
 }
 
+//RunningTime returns the running time as a Duration
 func (t *Timing) RunningTime() time.Duration {
 	if t.started == nil {
 		return 0
@@ -98,6 +84,7 @@ func (t *Timing) RunningTime() time.Duration {
 	return t.finished.Sub(*t.started)
 }
 
+//TotalTime returns the total ellapsed time of the operation
 func (t *Timing) TotalTime() time.Duration {
 	if t.finished != nil {
 		return time.Since(*t.created)
@@ -148,7 +135,7 @@ func (b *baseOperation) IsDone() bool {
 
 func (b *baseOperation) setRunning() {
 	if b.status == StatusRunning {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -185,10 +172,10 @@ func (b *baseOperation) Status() Status {
 }
 
 // Reset resets this operation
-// panics with an InvalidState error if operation is running
+// panics with an ErrInvalidState error if operation is running
 func (b *baseOperation) Reset() {
 	if b.IsRunning() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()

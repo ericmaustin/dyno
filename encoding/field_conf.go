@@ -19,7 +19,7 @@ type fieldConfig struct {
 	Embed    bool
 	OmitNil  bool
 	OmitZero bool
-	Json     bool
+	JSON     bool
 }
 
 func parseTag(tagStr string) *fieldConfig {
@@ -86,6 +86,6 @@ func parseTagPart(part string, conf *fieldConfig) {
 		conf.Name = ""
 		conf.Skip = true
 	case "json":
-		conf.Json = true
+		conf.JSON = true
 	}
 }

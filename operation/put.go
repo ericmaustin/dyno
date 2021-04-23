@@ -8,11 +8,14 @@ import (
 	"github.com/ericmaustin/dyno/encoding"
 )
 
+//PutReturnValues is used to tell the operation what return values should be included
 type PutReturnValues string
 
 const (
+	//PutReturnNone used to return NO values
 	PutReturnNone = PutReturnValues("NONE")
-	PutReturnOld  = PutReturnValues("ALL_OLD")
+	//PutReturnOld used to return only OLD values
+	PutReturnOld = PutReturnValues("ALL_OLD")
 )
 
 // PutResult is the result of a PutOperation
@@ -108,7 +111,7 @@ func (p *PutBuilder) Build() *dynamodb.PutItemInput {
 	return p.input
 }
 
-// Operation returns a PutOperation using this builder's input
+// BuildOperation returns a PutOperation using this builder's input
 func (p *PutBuilder) BuildOperation() *PutOperation {
 	return Put(p.Build())
 }
@@ -119,7 +122,7 @@ type PutOperation struct {
 	input *dynamodb.PutItemInput
 }
 
-// put creates a New PutOperation with optional PutInput
+// Put creates a New PutOperation with optional PutInput
 func Put(input *dynamodb.PutItemInput) *PutOperation {
 	p := &PutOperation{
 		baseOperation: newBase(),
@@ -129,10 +132,10 @@ func Put(input *dynamodb.PutItemInput) *PutOperation {
 }
 
 // SetInput sets the PutItemInput
-// panics with an InvalidState error if operation isn't pending
+// panics with an ErrInvalidState error if operation isn't pending
 func (p *PutOperation) SetInput(input *dynamodb.PutItemInput) *PutOperation {
 	if !p.IsPending() {
-		panic(&InvalidState{})
+		panic(&ErrInvalidState{})
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
