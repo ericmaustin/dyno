@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ericmaustin/dyno"
@@ -23,7 +24,7 @@ func (q *QueryTestSuite) TearDownSuite() {
 	destroytestTable(q.sess)
 }
 
-func (q *QueryTestSuite) TestScanOperation() {
+func (q *QueryTestSuite) TestQueryOperation() {
 
 	target := make([]*testItem, 0)
 
@@ -31,7 +32,7 @@ func (q *QueryTestSuite) TestScanOperation() {
 	scanOutput, err := NewQueryBuilder().
 		SetTable(getTestTableName()).
 		AddKeyCondition(condition.KeyEqual("id", "A")).
-		BuildOperation(). // get the operation
+		BuildOperation().                    // get the operation
 		SetHandler(LoadSlice(&target, nil)). // set the handler to unmarshal the target
 		Execute(q.sess.Request()).
 		OutputError()
@@ -40,6 +41,22 @@ func (q *QueryTestSuite) TestScanOperation() {
 	q.NotNil(scanOutput)
 	q.Len(target, 1)
 	q.Equal("A", target[0].ID)
+}
+
+func (q *QueryTestSuite) TestQueryCountOperation() {
+
+	// scan for records with no conditions
+	scanOutput, err := NewQueryBuilder().
+		SetTable(getTestTableName()).
+		AddKeyCondition(condition.KeyEqual("id", "A")).
+		BuildCountOperation(). // get the operation
+		Execute(q.sess.Request()).
+		OutputError()
+
+	q.NoError(err)
+	q.NotNil(scanOutput)
+	q.Equal(scanOutput, int64(1))
+	fmt.Println("scan count=", scanOutput)
 }
 
 // In order for 'go test' to Execute this suite, we need to create

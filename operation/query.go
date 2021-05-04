@@ -8,13 +8,13 @@ import (
 	"github.com/ericmaustin/dyno/encoding"
 )
 
-// QueryResult is returned by the GetOperation Execution in a channel when operation completes
+// QueryResult is returned by the QueryOperation Execution in a channel when operation completes
 type QueryResult struct {
 	resultBase
 	output []*dynamodb.QueryOutput
 }
 
-// OutputInterface returns the QueryOutput from the DeleteResult as an interface
+// OutputInterface returns the QueryOutput from the QueryResult as an interface
 func (q *QueryResult) OutputInterface() interface{} {
 	return q.output
 }
@@ -153,15 +153,51 @@ func (q *QueryBuilder) Build() *dynamodb.QueryInput {
 	q.input.ExpressionAttributeNames = expr.Names()
 	q.input.ExpressionAttributeValues = expr.Values()
 	q.input.FilterExpression = expr.Filter()
-	q.input.KeyConditionExpression = expr.Projection()
 	q.input.KeyConditionExpression = expr.KeyCondition()
 	q.input.ProjectionExpression = expr.Projection()
+	return q.input
+}
+
+// BuildCount builds the input input with included projection, key conditions, and filters
+// and removes the projection values to only return counts
+func (q *QueryBuilder) BuildCount() *dynamodb.QueryInput {
+	if q.projection == nil && q.keyCnd == nil && q.filter == nil {
+		// no expression builder is needed
+		return q.input
+	}
+	builder := expression.NewBuilder()
+
+	// set the selection to be a count
+	q.input.SetSelect("COUNT")
+	// add key condition
+	if q.keyCnd != nil {
+		builder = builder.WithKeyCondition(*q.keyCnd)
+	}
+	// add filter
+	if q.filter != nil {
+		builder = builder.WithFilter(*q.filter)
+	}
+	// build the Expression
+	expr, err := builder.Build()
+	if err != nil {
+		panic(err)
+	}
+
+	q.input.ExpressionAttributeNames = expr.Names()
+	q.input.ExpressionAttributeValues = expr.Values()
+	q.input.FilterExpression = expr.Filter()
+	q.input.KeyConditionExpression = expr.KeyCondition()
 	return q.input
 }
 
 // BuildOperation builds the input and returns a QueryOperation
 func (q *QueryBuilder) BuildOperation() *QueryOperation {
 	return Query(q.Build())
+}
+
+// BuildCountOperation builds the input and returns a QueryCountOperation
+func (q *QueryBuilder) BuildCountOperation() *QueryCountOperation {
+	return QueryCount(q.BuildCount())
 }
 
 // QueryOperation runs query operations and handles their res
@@ -298,6 +334,120 @@ func (q *QueryOperation) GoExecute(req *dyno.Request) <-chan *QueryResult {
 	go func() {
 		defer close(outCh)
 		outCh <- q.Execute(req)
+	}()
+	return outCh
+}
+
+// QueryCountResult is returned by the QueryCountOperation Execution in a channel when operation completes
+type QueryCountResult struct {
+	resultBase
+	output int64
+}
+
+// OutputInterface returns the QueryOutput from the QueryCountResult as an interface
+func (qc *QueryCountResult) OutputInterface() interface{} {
+	return qc.output
+}
+
+// Output returns the QueryOutput slice from the QueryResult
+func (qc *QueryCountResult) Output() int64 {
+	return qc.output
+}
+
+// OutputError returns the QueryOutput slice and the error from the QueryResult for convenience
+func (qc *QueryCountResult) OutputError() (int64, error) {
+	return qc.Output(), qc.err
+}
+
+// QueryCountOperation runs query operations and handles their res
+type QueryCountOperation struct {
+	*baseOperation
+	input *dynamodb.QueryInput
+}
+
+// Input returns a ptr to the Input Input
+func (qc *QueryCountOperation) Input() *dynamodb.QueryInput {
+	qc.mu.RLock()
+	defer qc.mu.RUnlock()
+	return qc.input
+}
+
+// SetInput sets the QueryInput
+// panics with an ErrInvalidState error if operation isn't pending
+func (qc *QueryCountOperation) SetInput(input *dynamodb.QueryInput) *QueryCountOperation {
+	if !qc.IsPending() {
+		panic(&ErrInvalidState{})
+	}
+	qc.mu.Lock()
+	defer qc.mu.Unlock()
+	qc.input = input
+	return qc
+}
+
+// QueryCount creates a new QueryCountOperation
+func QueryCount(input *dynamodb.QueryInput) *QueryCountOperation {
+	return &QueryCountOperation{
+		baseOperation: newBase(),
+		input:         input,
+	}
+}
+
+// SetStartKey sets the start key on the QueryCountInput
+func (qc *QueryCountOperation) SetStartKey(startKey map[string]*dynamodb.AttributeValue) *QueryCountOperation {
+	if !qc.IsPending() {
+		panic(&ErrInvalidState{})
+	}
+	qc.mu.Lock()
+	defer qc.mu.Unlock()
+	qc.input.ExclusiveStartKey = startKey
+	return qc
+}
+
+// ExecuteInBatch executes the QueryCountOperation using given Request
+// and returns a Result used for executing this operation in a batch
+func (qc *QueryCountOperation) ExecuteInBatch(req *dyno.Request) Result {
+	return qc.Execute(req)
+}
+
+// Execute executes the QueryCountOperation
+func (qc *QueryCountOperation) Execute(req *dyno.Request) (out *QueryCountResult) {
+	out = &QueryCountResult{}
+	qc.setRunning()
+	defer qc.setDone(out)
+
+	var output *dynamodb.QueryOutput
+
+	// start a for loop that keeps scanning as we page through returned ProjectionColumns
+	for {
+		// Execute the input
+		output, out.err = req.Query(qc.input)
+
+		if out.err != nil {
+			return
+		}
+
+		// add the count
+		out.output += *output.Count
+
+		if *output.Count < 1 || output.LastEvaluatedKey == nil {
+			// nothing left to do
+			break
+		}
+
+		// set the start to key to the last evaluated key to keep looping
+		qc.input.ExclusiveStartKey = output.LastEvaluatedKey
+	}
+
+	return
+}
+
+// GoExecute executes the QueryOperation and returns a channel that will contain a QueryResult
+// when operation completes
+func (qc *QueryCountOperation) GoExecute(req *dyno.Request) <-chan *QueryCountResult {
+	outCh := make(chan *QueryCountResult)
+	go func() {
+		defer close(outCh)
+		outCh <- qc.Execute(req)
 	}()
 	return outCh
 }
