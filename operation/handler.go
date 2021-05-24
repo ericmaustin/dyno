@@ -49,3 +49,14 @@ func LoadSlice(target interface{}, mu *sync.Mutex) ItemSliceHandler {
 		return nil
 	}
 }
+
+// LoadAttributeValues should be used for simple unmarshalling of dynamodb item slices
+// into their native dynamodb attribute values types
+func LoadAttributeValues(target []map[string]*dynamodb.AttributeValue, mu *sync.Mutex) ItemSliceHandler {
+	return func(rec []map[string]*dynamodb.AttributeValue) error {
+		mu.Lock()
+		defer mu.Unlock()
+		target = append(target, rec...)
+		return nil
+	}
+}

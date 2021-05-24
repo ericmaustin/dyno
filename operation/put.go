@@ -63,7 +63,13 @@ func (p *PutBuilder) SetInput(input *dynamodb.PutItemInput) *PutBuilder {
 
 // SetItem sets the item that will be used to build the put input
 func (p *PutBuilder) SetItem(item interface{}) *PutBuilder {
-	p.input.Item = encoding.MustMarshalItem(item)
+	return p.SetAttributeValueMap(encoding.MustMarshalItem(item))
+}
+
+// SetAttributeValueMap sets the item with an attribute value map
+// this bypasses the marshaller from the encoding module
+func (p *PutBuilder) SetAttributeValueMap(item map[string]*dynamodb.AttributeValue) *PutBuilder {
+	p.input.Item = item
 	return p
 }
 

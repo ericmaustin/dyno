@@ -77,8 +77,12 @@ func (u *UpdateItemBuilder) Add(field, value interface{}) *UpdateItemBuilder {
 
 // AddItem adds an add operation on this update with the given fields and values from an item
 func (u *UpdateItemBuilder) AddItem(item interface{}) *UpdateItemBuilder {
-	encodedItem := encoding.MustMarshalItem(item)
-	for key, value := range encodedItem {
+	return u.AddAttributeValues(encoding.MustMarshalItem(item))
+}
+
+// AddAttributeValues adds an add operation on this update with the given fields and values from an item
+func (u *UpdateItemBuilder) AddAttributeValues(item map[string]*dynamodb.AttributeValue) *UpdateItemBuilder {
+	for key, value := range item {
 		u.updateBuilder = u.updateBuilder.Add(expression.Name(key), expression.Value(value))
 	}
 	return u
@@ -92,12 +96,17 @@ func (u *UpdateItemBuilder) Delete(field, value interface{}) *UpdateItemBuilder 
 
 // DeleteItem adds a delete operation on this update with the given fields and values from an item
 func (u *UpdateItemBuilder) DeleteItem(item interface{}) *UpdateItemBuilder {
-	encodedItem := encoding.MustMarshalItem(item)
-	for key, value := range encodedItem {
+	return u.DeleteAttributeValues(encoding.MustMarshalItem(item))
+}
+
+// DeleteAttributeValues adds a delete operation on this update with the given fields and values from an item
+func (u *UpdateItemBuilder) DeleteAttributeValues(item map[string]*dynamodb.AttributeValue) *UpdateItemBuilder {
+	for key, value := range item {
 		u.updateBuilder = u.updateBuilder.Delete(expression.Name(key), expression.Value(value))
 	}
 	return u
 }
+
 
 // Remove adds one or more Remove operations on this update with the given field name
 func (u *UpdateItemBuilder) Remove(fields ...interface{}) *UpdateItemBuilder {
@@ -115,8 +124,12 @@ func (u *UpdateItemBuilder) Set(field string, value interface{}) *UpdateItemBuil
 
 // SetItem adds a set operation on this update with the given fields and values from an item
 func (u *UpdateItemBuilder) SetItem(item interface{}) *UpdateItemBuilder {
-	encodedItem := encoding.MustMarshalItem(item)
-	for key, value := range encodedItem {
+	return u.SetAttributeValues(encoding.MustMarshalItem(item))
+}
+
+//SetAttributeValues adds a set operation on this update with the given fields and values from an item
+func (u *UpdateItemBuilder) SetAttributeValues(item map[string]*dynamodb.AttributeValue) *UpdateItemBuilder {
+	for key, value := range item {
 		u.updateBuilder = u.updateBuilder.Set(expression.Name(key), expression.Value(value))
 	}
 	return u

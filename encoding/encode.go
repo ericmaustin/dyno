@@ -14,6 +14,10 @@ import (
 // MarshalItems marshals an input slice into a slice of attribute value maps
 // panics if the input's kind is not a slice
 func MarshalItems(input interface{}) ([]map[string]*dynamodb.AttributeValue, error) {
+	if avMapSlice, ok := input.([]map[string]*dynamodb.AttributeValue); ok {
+		// input is already a slice of attribute value maps
+		return avMapSlice, nil
+	}
 	records := make([]map[string]*dynamodb.AttributeValue, 0)
 	if err := AppendItems(&records, input); err != nil {
 		return nil, err
@@ -54,6 +58,9 @@ func AppendItems(items *[]map[string]*dynamodb.AttributeValue, input interface{}
 
 // MarshalItem marshals a given input that is a map or a struct into an attribute value map
 func MarshalItem(input interface{}) (map[string]*dynamodb.AttributeValue, error) {
+	if avMap, ok := input.(map[string]*dynamodb.AttributeValue); ok {
+		return avMap, nil
+	}
 	return marshalValueToRecord(reflect.ValueOf(input))
 }
 

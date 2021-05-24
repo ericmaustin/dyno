@@ -50,11 +50,12 @@ func (d *DeleteItemBuilder) SetInput(input *dynamodb.DeleteItemInput) *DeleteIte
 
 // SetKey sets the target key for the item to tbe deleted
 func (d *DeleteItemBuilder) SetKey(key interface{}) *DeleteItemBuilder {
-	keyItem, err := encoding.MarshalItem(key)
-	if err != nil {
-		panic(err)
-	}
-	d.input.SetKey(keyItem)
+	return d.SetKeyAttributeValues(encoding.MustMarshalItem(key))
+}
+
+// SetKeyAttributeValues sets the target key for the item to tbe deleted
+func (d *DeleteItemBuilder) SetKeyAttributeValues(key map[string]*dynamodb.AttributeValue) *DeleteItemBuilder {
+	d.input.SetKey(key)
 	return d
 }
 

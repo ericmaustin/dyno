@@ -62,14 +62,16 @@ func (b *BatchWriteBuilder) AddWriteRequests(tableName string, requests ...*dyna
 
 // AddPut adds a put write request to the input
 func (b *BatchWriteBuilder) AddPut(table, item interface{}) *BatchWriteBuilder {
+	return b.AddPutWithAttributeValueMap(table, encoding.MustMarshalItem(item))
+}
+
+// AddPutWithAttributeValueMap adds a put write request to the input with an attribute value map
+// this bypasses marshalling with the encoding module
+func (b *BatchWriteBuilder) AddPutWithAttributeValueMap(table interface{}, item map[string]*dynamodb.AttributeValue) *BatchWriteBuilder {
 	tableName := encoding.ToString(table)
-	itemMap, err := encoding.MarshalItem(item)
-	if err != nil {
-		panic(err)
-	}
 	b.AddWriteRequests(tableName, &dynamodb.WriteRequest{
 		PutRequest: &dynamodb.PutRequest{
-			Item: itemMap,
+			Item: item,
 		},
 	})
 
@@ -78,12 +80,13 @@ func (b *BatchWriteBuilder) AddPut(table, item interface{}) *BatchWriteBuilder {
 
 // AddPuts adds multiple put requests from a given input that should be a slice of structs or maps
 func (b *BatchWriteBuilder) AddPuts(table, itemSlice interface{}) *BatchWriteBuilder {
-	tableName := encoding.ToString(table)
-	itemMaps, err := encoding.MarshalItems(itemSlice)
-	if err != nil {
-		panic(err)
-	}
+	return b.AddPutsWithAttributeValueMaps(table, encoding.MustMarshalItems(itemSlice))
+}
 
+
+// AddPutsWithAttributeValueMaps adds multiple put requests from a given slice of attribute value maps
+func (b *BatchWriteBuilder) AddPutsWithAttributeValueMaps(table interface{}, itemMaps []map[string]*dynamodb.AttributeValue) *BatchWriteBuilder {
+	tableName := encoding.ToString(table)
 	for _, item := range itemMaps {
 		b.AddWriteRequests(tableName, &dynamodb.WriteRequest{
 			PutRequest: &dynamodb.PutRequest{
@@ -94,13 +97,14 @@ func (b *BatchWriteBuilder) AddPuts(table, itemSlice interface{}) *BatchWriteBui
 	return b
 }
 
-// AddDelete adds a put write request to the input
+// AddDelete adds a delete request to the input
 func (b *BatchWriteBuilder) AddDelete(table, key interface{}) *BatchWriteBuilder {
+	return b.AddDeleteWithAttributeValueMap(table, encoding.MustMarshalItem(key))
+}
+
+// AddDeleteWithAttributeValueMap adds a delete request to the input
+func (b *BatchWriteBuilder) AddDeleteWithAttributeValueMap(table interface{}, keyItem map[string]*dynamodb.AttributeValue) *BatchWriteBuilder {
 	tableName := encoding.ToString(table)
-	keyItem, err := encoding.MarshalItem(key)
-	if err != nil {
-		panic(err)
-	}
 	b.AddWriteRequests(tableName, &dynamodb.WriteRequest{
 		DeleteRequest: &dynamodb.DeleteRequest{
 			Key: keyItem,
@@ -112,12 +116,13 @@ func (b *BatchWriteBuilder) AddDelete(table, key interface{}) *BatchWriteBuilder
 
 // AddDeletes adds multiple delete requests from a given input that should be a slice of structs or maps
 func (b *BatchWriteBuilder) AddDeletes(table, keySlice interface{}) *BatchWriteBuilder {
-	tableName := encoding.ToString(table)
-	keyItems, err := encoding.MarshalItems(keySlice)
-	if err != nil {
-		panic(err)
-	}
+	return b.AddDeletesWithAttributeValueMaps(table, encoding.MustMarshalItems(keySlice))
+}
 
+
+// AddDeletesWithAttributeValueMaps adds multiple delete requests from a given input that should be a slice of structs or maps
+func (b *BatchWriteBuilder) AddDeletesWithAttributeValueMaps(table interface{}, keyItems []map[string]*dynamodb.AttributeValue) *BatchWriteBuilder {
+	tableName := encoding.ToString(table)
 	for _, k := range keyItems {
 		b.AddWriteRequests(tableName, &dynamodb.WriteRequest{
 			DeleteRequest: &dynamodb.DeleteRequest{
