@@ -2,6 +2,8 @@ package encoding
 
 import (
 	"fmt"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/ericmaustin/dyno"
 	"testing"
 	"time"
 
@@ -90,4 +92,28 @@ func TestUnmarshalRecords(t *testing.T) {
 	assert.NoError(t, err)
 	fmt.Printf("%s", target[0].Time)
 	assert.True(t, tm.Equal(target[0].Time))
+}
+
+type UnMarshalStruct struct {
+	Foo *string
+}
+
+func (u *UnMarshalStruct) UnmarshalItem(av map[string]*dynamodb.AttributeValue) error {
+	u.Foo = new(string)
+	*u.Foo = *av["Foo"].S
+	return nil
+}
+
+func TestItemUnmarshaller(t *testing.T) {
+
+	av := map[string]*dynamodb.AttributeValue{
+		"Foo": {
+			S: dyno.StringPtr("Bar"),
+		},
+	}
+
+	newFoo := new(UnMarshalStruct)
+	err := UnmarshalItem(av, newFoo)
+	assert.NoError(t, err)
+	assert.Equal(t, *newFoo.Foo, "Bar")
 }

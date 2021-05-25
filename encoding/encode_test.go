@@ -3,6 +3,7 @@ package encoding
 import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/ericmaustin/dyno"
 	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
@@ -199,4 +200,23 @@ func TestNameBuildersFromStringSlice(t *testing.T) {
 		"test2",
 	})
 	fmt.Printf("%+v\n", names)
+}
+
+type MarshalStruct struct {
+	Foo *string
+}
+
+func (m *MarshalStruct) MarshalItem() (map[string]*dynamodb.AttributeValue, error) {
+	return map[string]*dynamodb.AttributeValue{
+		"Foo": {
+			S: m.Foo,
+		},
+	}, nil
+}
+
+func TestItemMarshaller(t *testing.T) {
+	newFoo := &MarshalStruct{Foo: dyno.StringPtr("Bar")}
+	av, err := MarshalItem(newFoo)
+	assert.NoError(t, err)
+	assert.Equal(t, *av["Foo"].S, "Bar")
 }

@@ -11,6 +11,14 @@ import (
 	"github.com/ericmaustin/dyno"
 )
 
+//ItemMarshaller allows more control over encoding structs to attribute value maps
+type ItemMarshaller interface {
+	MarshalItem() (map[string]*dynamodb.AttributeValue, error)
+	//UpdateItem(map[string]*dynamodb.AttributeValue) error
+}
+
+var intermMarshallerReflectType = reflect.TypeOf((*ItemMarshaller)(nil)).Elem()
+
 // MarshalItems marshals an input slice into a slice of attribute value maps
 // panics if the input's kind is not a slice
 func MarshalItems(input interface{}) ([]map[string]*dynamodb.AttributeValue, error) {
@@ -46,6 +54,18 @@ func AppendItems(items *[]map[string]*dynamodb.AttributeValue, input interface{}
 		}
 	}
 
+	// if item marshaller then marshal
+	if rv.Type().Elem().Implements(intermMarshallerReflectType) {
+		for i := 0; i < rv.Len(); i++ {
+			av, err := rv.Index(i).Interface().(ItemMarshaller).MarshalItem()
+			if err != nil {
+				return err
+			}
+			*items = append(*items, av)
+		}
+		return nil
+	}
+
 	for i := 0; i < rv.Len(); i++ {
 		rec, err := marshalValueToRecord(rv.Index(i))
 		if err != nil {
@@ -60,6 +80,9 @@ func AppendItems(items *[]map[string]*dynamodb.AttributeValue, input interface{}
 func MarshalItem(input interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	if avMap, ok := input.(map[string]*dynamodb.AttributeValue); ok {
 		return avMap, nil
+	}
+	if marshaller, ok := input.(ItemMarshaller); ok {
+		return marshaller.MarshalItem()
 	}
 	return marshalValueToRecord(reflect.ValueOf(input))
 }

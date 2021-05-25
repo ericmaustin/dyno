@@ -10,8 +10,19 @@ import (
 	"github.com/ericmaustin/dyno"
 )
 
+//ItemUnmarshaller allows more control over decoding structs from attribute value maps
+type ItemUnmarshaller interface {
+	UnmarshalItem(avMap map[string]*dynamodb.AttributeValue) error
+}
+
+var itemUnmarshallerReflectType = reflect.TypeOf((*ItemUnmarshaller)(nil)).Elem()
+
 // UnmarshalItems decodes a slice of items into the given input that must be a ptr to a slice
 func UnmarshalItems(items []map[string]*dynamodb.AttributeValue, input interface{}) error {
+	if len(items) < 1 {
+		return nil
+	}
+
 	rv := reflect.ValueOf(input)
 
 	if rv.Kind() != reflect.Ptr {
@@ -31,14 +42,38 @@ func UnmarshalItems(items []map[string]*dynamodb.AttributeValue, input interface
 		}
 	}
 
+	// check if unmarshaller
+	if sliceVal.Type().Elem().Implements(itemUnmarshallerReflectType) {
+		for _, item := range items {
+			// create a new value from the slice's element type
+			target := reflect.New(sliceVal.Type().Elem())
+			// run the unmarshaller
+			if err := target.Interface().(ItemUnmarshaller).UnmarshalItem(item); err != nil {
+				return err
+			}
+			sliceVal.Set(reflect.Append(sliceVal, target))
+		}
+		return nil
+	}
+
+	// check if slice of ptrs
+	if sliceVal.Type().Elem().Kind() == reflect.Ptr {
+		for _, item := range items {
+			// create a new value from the slice's element type
+			target := reflect.New(sliceVal.Type().Elem()).Elem()
+			target = reflect.New(indirect(target, false).Type())
+			if err := unmarshalItemToValue(item, target); err != nil {
+				return err
+			}
+			sliceVal.Set(reflect.Append(sliceVal, target))
+		}
+		return nil
+	}
+
+	// slice of non-ptrs
 	for _, item := range items {
 		// create a new value from the slice's element type
-		var target reflect.Value
-		if sliceVal.Type().Elem().Kind() == reflect.Ptr {
-			target = reflect.New(sliceVal.Type().Elem()).Elem()
-		} else {
-			target = reflect.New(sliceVal.Type().Elem())
-		}
+		target := reflect.New(sliceVal.Type().Elem())
 		target = reflect.New(indirect(target, false).Type())
 		if err := unmarshalItemToValue(item, target); err != nil {
 			return err
@@ -52,6 +87,9 @@ func UnmarshalItems(items []map[string]*dynamodb.AttributeValue, input interface
 // UnmarshalItem unmarshals a map of dynamodb attribute values into given input struct or map
 // if the item is a map, the map must have the keys already set in the map
 func UnmarshalItem(item map[string]*dynamodb.AttributeValue, input interface{}) error {
+	if unmarshaller, ok := input.(ItemUnmarshaller); ok {
+		return unmarshaller.UnmarshalItem(item)
+	}
 	return unmarshalItemToValue(item, reflect.ValueOf(input))
 }
 
