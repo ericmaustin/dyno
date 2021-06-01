@@ -7,7 +7,7 @@ import (
 
 // RestoreTableResult is returned as the result of a RestoreTableOperation
 type RestoreTableResult struct {
-	resultBase
+	ResultBase
 	output *dynamodb.RestoreTableFromBackupOutput
 }
 
@@ -23,12 +23,12 @@ func (r *RestoreTableResult) Output() *dynamodb.RestoreTableFromBackupOutput {
 
 // OutputError returns the RestoreTableFromBackupOutput the error from the RestoreTableResult for convenience
 func (r *RestoreTableResult) OutputError() (*dynamodb.RestoreTableFromBackupOutput, error) {
-	return r.output, r.err
+	return r.output, r.Err
 }
 
 // RestoreTableOperation represents a restore table operation
 type RestoreTableOperation struct {
-	*baseOperation
+	*BaseOperation
 	input *dynamodb.RestoreTableFromBackupInput
 }
 
@@ -39,7 +39,7 @@ func RestoreTable(backupArn, tableName string) *RestoreTableOperation {
 		TargetTableName: &tableName,
 	}
 	b := &RestoreTableOperation{
-		baseOperation: newBase(),
+		BaseOperation: NewBase(),
 		input:         input,
 	}
 	return b
@@ -47,8 +47,8 @@ func RestoreTable(backupArn, tableName string) *RestoreTableOperation {
 
 // Input returns current RestoreTableFromBackupInput
 func (r *RestoreTableOperation) Input() *dynamodb.RestoreTableFromBackupInput {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.Mu.RLock()
+	defer r.Mu.RUnlock()
 	return r.input
 }
 
@@ -57,8 +57,8 @@ func (r *RestoreTableOperation) SetInput(input *dynamodb.RestoreTableFromBackupI
 	if !r.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.Mu.Lock()
+	defer r.Mu.Unlock()
 	r.input = input
 	return r
 }
@@ -83,8 +83,8 @@ func (r *RestoreTableOperation) GoExecute(req *dyno.Request) <-chan *RestoreTabl
 // Execute runs the RestoreTableOperation and returns a RestoreTableResult
 func (r *RestoreTableOperation) Execute(req *dyno.Request) (out *RestoreTableResult) {
 	out = &RestoreTableResult{}
-	r.setRunning()
-	defer r.setDone(out)
-	out.output, out.err = req.RestoreTableFromBackup(r.input)
+	r.SetRunning()
+	defer r.SetDone(out)
+	out.output, out.Err = req.RestoreTableFromBackup(r.input)
 	return
 }

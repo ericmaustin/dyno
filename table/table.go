@@ -1,7 +1,10 @@
 package table
 
 import (
+	//"errors"
 	"fmt"
+	"github.com/ericmaustin/dyno/input"
+	"github.com/ericmaustin/dyno/operation"
 	"sync"
 	"time"
 
@@ -10,7 +13,7 @@ import (
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/condition"
 	"github.com/ericmaustin/dyno/encoding"
-	"github.com/ericmaustin/dyno/operation"
+	//"github.com/ericmaustin/dyno/operation"
 )
 
 var (
@@ -32,7 +35,7 @@ const (
 // Table represents a dynamodb table
 type Table struct {
 	// the name of the table
-	name string `validate:"required"`
+	name *string `validate:"required"`
 	// the table key
 	key *Key `validate:"required"`
 	// map of global secondary indexes
@@ -57,7 +60,10 @@ type Table struct {
 func (t *Table) Name() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.name
+	if t.name == nil {
+		return ""
+	}
+	return *t.name
 }
 
 // Key returns this table's Key
@@ -128,20 +134,20 @@ func (t *Table) GetSortKey(fieldName string, indexName string) *SortKey {
 	if len(indexName) > 0 {
 		if _, ok := t.lsis[indexName]; ok &&
 			t.lsis[indexName].Key.sortKey != nil &&
-			t.lsis[indexName].Key.sortKey.name == fieldName {
+			t.lsis[indexName].Key.sortKey.Name() == fieldName {
 			return t.lsis[indexName].Key.sortKey
 		}
 
 		if _, ok := t.gsis[indexName]; ok &&
 			t.gsis[indexName].Key.sortKey != nil &&
-			t.gsis[indexName].Key.sortKey.name == fieldName {
+			t.gsis[indexName].Key.sortKey.Name() == fieldName {
 			return t.gsis[indexName].Key.sortKey
 		}
 
 		return nil
 	}
 
-	if t.HasSortKey() && t.key.sortKey.name == fieldName {
+	if t.HasSortKey() && t.key.sortKey.Name() == fieldName {
 		return t.key.sortKey
 	}
 	return nil
@@ -189,7 +195,7 @@ func (t *Table) Copy(name string) *Table {
 	defer t.mu.RUnlock()
 	// create copy of the table's primary attributes
 	table := &Table{
-		name:     name,
+		name:     &name,
 		key:      t.key.Copy(),
 		wcus:     t.wcus,
 		rcus:     t.rcus,
@@ -291,13 +297,13 @@ func (t *Table) AddLsi(lsi *Lsi) error {
 
 // ExtractKey converts a item's key ProjectionColumns to a map of dynamodb attribute ProjectionColumns for a item
 // belonging to this table
-func (t *Table) ExtractKey(input interface{}) map[string]*dynamodb.AttributeValue {
-	return t.key.extract(encoding.MustMarshalItem(input))
+func (t *Table) ExtractKey(input interface{}) (map[string]*dynamodb.AttributeValue, error) {
+	return t.key.ExtractValues(encoding.MustMarshalItem(input))
 }
 
 // ExtractKeys converts a list of records to a list of dynamodb attribute items
-func (t *Table) ExtractKeys(input interface{}) []map[string]*dynamodb.AttributeValue {
-	return t.key.extractAll(encoding.MustMarshalItems(input))
+func (t *Table) ExtractKeys(input interface{}) ([]map[string]*dynamodb.AttributeValue, error) {
+	return t.key.ExtractAllValues(encoding.MustMarshalItems(input))
 }
 
 // ExtractPartitionKeyValue extracts this table's partition key attribute value from a given input
@@ -320,12 +326,12 @@ type PublishTableOutput struct {
 }
 
 // CreateTableBuilder returns the table builder for this table
-func (t *Table) CreateTableBuilder() *operation.CreateTableBuilder {
+func (t *Table) CreateTableBuilder() *input.CreateTableBuilder {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
-	builder := operation.NewCreateTableBuilder().
-		SetName(t.name)
+	builder := input.NewCreateTableBuilder()
+	builder.TableName = t.name
 
 	if !t.onDemand {
 
@@ -337,7 +343,7 @@ func (t *Table) CreateTableBuilder() *operation.CreateTableBuilder {
 			t.wcus = DefaultWCUs
 		}
 
-		builder.SetProvisionedThroughput(t.rcus, t.wcus)
+		builder.SetProvisionedThroughputCapacityUnits(t.rcus, t.wcus)
 	}
 
 	// if we have a key then create attribute definitions for all the keys
@@ -371,6 +377,50 @@ func (t *Table) CreateTableBuilder() *operation.CreateTableBuilder {
 
 	return builder
 }
+//
+//func NewTableFromInput(input *dynamodb.CreateTableInput) (*Table, error) {
+//	var k *Key
+//
+//	if input.KeySchema != nil && len(input.KeySchema) > 0 {
+//
+//		for _, ks := range input.KeySchema {
+//			if ks.KeyType == nil {
+//				return nil, errors.New("input.KeySchema.KeyType must not be nil")
+//			}
+//			if ks.AttributeName == nil {
+//				return nil, errors.New("input.KeySchema.AttributeName must not be nil")
+//			}
+//			name := input.AttributeDefinitions
+//
+//			switch *ks.KeyType {
+//			case "HASH":
+//
+//			}
+//
+//		}
+//
+//			key = &Key{
+//			partitionKey: nil,
+//			sortKey:      nil,
+//			schema:       nil,
+//			attributes:   nil,
+//		}
+//	}
+//
+//
+//	tbl := &Table{
+//		name:        input.TableName,
+//		key:         nil,
+//		gsis:        nil,
+//		lsis:        nil,
+//		rcus:        0,
+//		wcus:        0,
+//		onDemand:    false,
+//		description: nil,
+//		mu:          sync.RWMutex{},
+//		arn:         "",
+//	}
+//}
 
 // NewTable creates new table with provided table name, table key, and and options
 // Mapper key is required
@@ -383,7 +433,7 @@ func NewTable(name interface{}, key *Key) *Table {
 
 	// create a table with given table key
 	return &Table{
-		name: n,
+		name: &n,
 		key:  key,
 		mu:   sync.RWMutex{},
 		lsis: make(map[string]*Lsi),
@@ -466,7 +516,7 @@ func (t *Table) UpdateWithDescription(desc *dynamodb.TableDescription) *Table {
 func (t *Table) SetName(name string) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.name = name
+	t.name = &name
 	return t
 }
 
@@ -641,13 +691,13 @@ func (t *Table) CreateBackupInput(backupName string) *dynamodb.CreateBackupInput
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return &dynamodb.CreateBackupInput{
-		BackupName: &t.name,
+		BackupName: t.name,
 		TableName:  &backupName,
 	}
 }
 
 // CreateDeleteInput creates a DeleteItemInput for this table
-func (t *Table) CreateDeleteInput(item interface{}, condition *expression.ConditionBuilder) (input *dynamodb.DeleteItemInput, err error) {
+func (t *Table) CreateDeleteInput(item interface{}) (input *dynamodb.DeleteItemInput, err error) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	// marshal the item
@@ -660,7 +710,10 @@ func (t *Table) CreateDeleteInput(item interface{}, condition *expression.Condit
 	}
 
 	// get the key values
-	itemKey = t.key.extract(dynoItem)
+	itemKey, err = t.key.ExtractValues(dynoItem)
+	if err != nil {
+		return
+	}
 
 	return operation.CreateDeleteInput(t.name, itemKey, condition), nil
 }
@@ -670,20 +723,26 @@ func (t *Table) CreateGetInput(key interface{}, projection *expression.Projectio
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
-	var expr expression.Expression
+	var (
+		keyItem map[string]*dynamodb.AttributeValue
+		expr expression.Expression
+	)
 
 	// encode the dynamo outputs
-	keyItem, err := encoding.MarshalItem(key)
+	keyItem, err = encoding.MarshalItem(key)
 	if err != nil {
 		return
 	}
 
-	// extract the key
-	keyItem = t.key.extract(keyItem)
+	// ExtractValues the key
+	keyItem, err = t.key.ExtractValues(keyItem)
+	if err != nil {
+		return
+	}
 
 	// doPut the dynamo API call
 	input = &dynamodb.GetItemInput{
-		TableName: &t.name,
+		TableName: t.name,
 		Key:       keyItem,
 	}
 
@@ -713,7 +772,7 @@ func (t *Table) CreateBatchKeysAndAttributes(items interface{}, consistentRead b
 	keys = t.ExtractKeys(items)
 
 	input = map[string]*dynamodb.KeysAndAttributes{
-		t.name: {
+		*t.name: {
 			Keys:           make([]map[string]*dynamodb.AttributeValue, len(keys)),
 			ConsistentRead: &consistentRead,
 		},
@@ -726,8 +785,8 @@ func (t *Table) CreateBatchKeysAndAttributes(items interface{}, consistentRead b
 		if err != nil {
 			return
 		}
-		input[t.name].ExpressionAttributeNames = expr.Names()
-		input[t.name].ProjectionExpression = expr.Projection()
+		input[*t.name].ExpressionAttributeNames = expr.Names()
+		input[*t.name].ProjectionExpression = expr.Projection()
 	}
 
 	return
@@ -790,12 +849,12 @@ func (t *Table) Delete(req *dyno.Request, timeout *time.Duration) <-chan *operat
 			doneCh <- out
 			close(doneCh)
 		}()
-		out = operation.DeleteTable(t.name).Execute(req)
-		if out.Error() != nil {
-			return
-		}
+		input := input.DeleteTableInput(t.name)
+
+		out, err := req.DeleteTable(input)
+
 		// wait for the table to be deleted
-		waitErr := operation.WaitForTableDeletion(req, *out.Output().TableDescription.TableName, timeout)
+		waitErr := operation.WaitForTableDeletion(req, out.TableDescription.TableName, timeout)
 		if waitErr != nil {
 			out.SetError(waitErr)
 			return
@@ -806,74 +865,75 @@ func (t *Table) Delete(req *dyno.Request, timeout *time.Duration) <-chan *operat
 	return doneCh
 }
 
-// BatchWriteBuilder creates a BatchWriteBuilder for this table with given puts and deletes
-func (t *Table) BatchWriteBuilder(puts interface{}, deletes interface{}) *operation.BatchWriteBuilder {
-	bw := operation.NewBatchWriteBuilder()
-	if puts != nil {
-		bw.AddPuts(t.Name(), puts)
-	}
-	if deletes != nil {
-		bw.AddDeletes(t.Name(), deletes)
-	}
-	return bw
-}
-
-// GetItemBuilder creates a GetBuilder for this table with optional item
-func (t *Table) GetItemBuilder(item interface{}) *operation.GetBuilder {
-	b := operation.NewGetBuilder().SetTable(t.Name())
-	if item != nil {
-		keyItem := t.ExtractKey(item)
-		b.SetKey(keyItem)
-	}
-	return b
-}
-
-// DeleteItemBuilder creates a DeleteItemBuilder for this table with optional item
-func (t *Table) DeleteItemBuilder(item interface{}) *operation.DeleteItemBuilder {
-	b := operation.NewDeleteBuilder().SetTable(t.Name())
-	if item != nil {
-		keyItem := t.ExtractKey(item)
-		b.SetKey(keyItem)
-	}
-	return b
-}
-
-// UpdateItemBuilder creates an UpdateItemBuilder for this table with given item
-func (t *Table) UpdateItemBuilder() *operation.UpdateItemBuilder {
-	return operation.NewUpdateItemBuilder().SetTable(t.Name())
-}
-
-// ScanBuilder creates an ScanBuilder for this table
-func (t *Table) ScanBuilder() *operation.ScanBuilder {
-	return operation.NewScanBuilder().SetTable(t.Name())
-}
-
-// ScanIndexBuilder creates an ScanBuilder for this table with given index name
-// returns index not found error if index doesnt exist
-func (t *Table) ScanIndexBuilder(idx string) (*operation.ScanBuilder, error) {
-	if !t.HasIndex(idx) {
-		return nil, fmt.Errorf("%s is not a valid index on table %s", idx, t.Name())
-	}
-	return operation.NewScanBuilder().SetTable(t.Name()).SetIndex(idx), nil
-}
-
-// QueryBuilder creates an QueryBuilder for this table
-func (t *Table) QueryBuilder() *operation.QueryBuilder {
-	return operation.NewQueryBuilder().SetTable(t.Name())
-}
-
-// QueryIndexBuilder creates an QueryBuilder for this table with given index name
-// returns index not found error if index doesnt exist
-func (t *Table) QueryIndexBuilder(idx string) (*operation.QueryBuilder, error) {
-	if !t.HasIndex(idx) {
-		return nil, fmt.Errorf("%s is not a valid index on table %s", idx, t.Name())
-	}
-	return operation.NewQueryBuilder().SetTable(t.Name()).SetIndex(idx), nil
-}
-
-// PutItemBuilder creates an PutBuilder for this table with optional item
-func (t *Table) PutItemBuilder(item interface{}) *operation.PutBuilder {
-	return operation.NewPutBuilder().
-		SetTable(t.Name()).
-		SetItem(item)
-}
+//
+//// BatchWriteBuilder creates a BatchWriteBuilder for this table with given puts and deletes
+//func (t *Table) BatchWriteBuilder(puts interface{}, deletes interface{}) *operation.BatchWriteBuilder {
+//	bw := operation.NewBatchWriteBuilder()
+//	if puts != nil {
+//		bw.AddPuts(t.Name(), puts)
+//	}
+//	if deletes != nil {
+//		bw.AddDeletes(t.Name(), deletes)
+//	}
+//	return bw
+//}
+//
+//// GetItemBuilder creates a GetBuilder for this table with optional item
+//func (t *Table) GetItemBuilder(item interface{}) *operation.GetBuilder {
+//	b := operation.NewGetBuilder().SetTable(t.Name())
+//	if item != nil {
+//		keyItem := t.ExtractKey(item)
+//		b.SetKey(keyItem)
+//	}
+//	return b
+//}
+//
+//// DeleteItemBuilder creates a DeleteItemBuilder for this table with optional item
+//func (t *Table) DeleteItemBuilder(item interface{}) *operation.DeleteItem {
+//	b := operation.NewDeleteBuilder().SetTable(t.Name())
+//	if item != nil {
+//		keyItem := t.ExtractKey(item)
+//		b.SetKey(keyItem)
+//	}
+//	return b
+//}
+//
+//// UpdateItemBuilder creates an UpdateItemBuilder for this table with given item
+//func (t *Table) UpdateItemBuilder() *operation.UpdateItemBuilder {
+//	return operation.NewUpdateItemBuilder().SetTable(t.Name())
+//}
+//
+//// ScanBuilder creates an ScanBuilder for this table
+//func (t *Table) ScanBuilder() *operation.ScanBuilder {
+//	return operation.NewScanBuilder().SetTable(t.Name())
+//}
+//
+//// ScanIndexBuilder creates an ScanBuilder for this table with given index name
+//// returns index not found error if index doesnt exist
+//func (t *Table) ScanIndexBuilder(idx string) (*operation.ScanBuilder, error) {
+//	if !t.HasIndex(idx) {
+//		return nil, fmt.Errorf("%s is not a valid index on table %s", idx, t.Name())
+//	}
+//	return operation.NewScanBuilder().SetTable(t.Name()).SetIndex(idx), nil
+//}
+//
+//// QueryBuilder creates an QueryBuilder for this table
+//func (t *Table) QueryBuilder() *operation.QueryBuilder {
+//	return operation.NewQueryBuilder().SetTable(t.Name())
+//}
+//
+//// QueryIndexBuilder creates an QueryBuilder for this table with given index name
+//// returns index not found error if index doesnt exist
+//func (t *Table) QueryIndexBuilder(idx string) (*operation.QueryBuilder, error) {
+//	if !t.HasIndex(idx) {
+//		return nil, fmt.Errorf("%s is not a valid index on table %s", idx, t.Name())
+//	}
+//	return operation.NewQueryBuilder().SetTable(t.Name()).SetIndex(idx), nil
+//}
+//
+//// PutItemBuilder creates an PutBuilder for this table with optional item
+//func (t *Table) PutItemBuilder(item interface{}) *operation.PutBuilder {
+//	return operation.NewPutBuilder().
+//		SetTable(t.Name()).
+//		SetItem(item)
+//}

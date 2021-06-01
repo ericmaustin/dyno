@@ -7,7 +7,7 @@ import (
 
 // ListTableResult is returned as the result of a ListTableOperation
 type ListTableResult struct {
-	resultBase
+	ResultBase
 	names []string
 }
 
@@ -23,7 +23,7 @@ func (d *ListTableResult) Output() []string {
 
 // OutputError returns the ListTablesOutput the error from the ListTableResult for convenience
 func (d *ListTableResult) OutputError() ([]string, error) {
-	return d.names, d.err
+	return d.names, d.Err
 }
 
 // ListTableBuilder used for dynamically creating a ListTablesInput
@@ -68,14 +68,14 @@ func (b *ListTableBuilder) Operation() *ListTableOperation {
 
 // ListTableOperation represents a single ListTables operation
 type ListTableOperation struct {
-	*baseOperation
+	*BaseOperation
 	input *dynamodb.ListTablesInput
 }
 
 // ListTables creates a new ListTableOperation with optional ListTablesInput
 func ListTables(input *dynamodb.ListTablesInput) *ListTableOperation {
 	l := &ListTableOperation{
-		baseOperation: newBase(),
+		BaseOperation: NewBase(),
 		input:         input,
 	}
 	if l.input == nil {
@@ -86,8 +86,8 @@ func ListTables(input *dynamodb.ListTablesInput) *ListTableOperation {
 
 // Input returns current ListTablesInput
 func (l *ListTableOperation) Input() *dynamodb.ListTablesInput {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
+	l.Mu.RLock()
+	defer l.Mu.RUnlock()
 	return l.input
 }
 
@@ -97,8 +97,8 @@ func (l *ListTableOperation) SetInput(input *dynamodb.ListTablesInput) *ListTabl
 	if !l.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.Mu.Lock()
+	defer l.Mu.Unlock()
 	l.input = input
 	return l
 }
@@ -109,8 +109,8 @@ func (l *ListTableOperation) SetStartTable(startTableName string) *ListTableOper
 	if !l.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.Mu.Lock()
+	defer l.Mu.Unlock()
 	l.input.SetExclusiveStartTableName(startTableName)
 	return l
 }
@@ -121,8 +121,8 @@ func (l *ListTableOperation) SetLimit(limit int64) *ListTableOperation {
 	if !l.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.Mu.Lock()
+	defer l.Mu.Unlock()
 	l.input.SetLimit(limit)
 	return l
 }
@@ -149,8 +149,8 @@ func (l *ListTableOperation) Execute(req *dyno.Request) (out *ListTableResult) {
 	out = &ListTableResult{
 		names: make([]string, 0),
 	}
-	l.setRunning()
-	defer l.setDone(out)
+	l.SetRunning()
+	defer l.SetDone(out)
 
 	var output *dynamodb.ListTablesOutput
 
@@ -159,9 +159,9 @@ func (l *ListTableOperation) Execute(req *dyno.Request) (out *ListTableResult) {
 			l.input.ExclusiveStartTableName = output.LastEvaluatedTableName
 		}
 
-		output, out.err = req.ListTables(l.input)
+		output, out.Err = req.ListTables(l.input)
 
-		if out.err != nil {
+		if out.Err != nil {
 			break
 		}
 

@@ -7,7 +7,7 @@ import (
 
 // DescribeTableResult is returned as the result of a DescribeTableOperation
 type DescribeTableResult struct {
-	resultBase
+	ResultBase
 	output *dynamodb.DescribeTableOutput
 }
 
@@ -23,19 +23,19 @@ func (d *DescribeTableResult) Output() *dynamodb.DescribeTableOutput {
 
 // OutputError returns the DescribeTableOutput the error from the DescribeTableResult for convenience
 func (d *DescribeTableResult) OutputError() (*dynamodb.DescribeTableOutput, error) {
-	return d.output, d.err
+	return d.output, d.Err
 }
 
 // DescribeTableOperation represents a describe table operation
 type DescribeTableOperation struct {
-	*baseOperation
+	*BaseOperation
 	input *dynamodb.DescribeTableInput
 }
 
 // DescribeTable creates a new DescribeTableInput with a given table name
 func DescribeTable(tableName string) *DescribeTableOperation {
 	d := &DescribeTableOperation{
-		baseOperation: newBase(),
+		BaseOperation: NewBase(),
 		input:         &dynamodb.DescribeTableInput{TableName: &tableName},
 	}
 
@@ -44,8 +44,8 @@ func DescribeTable(tableName string) *DescribeTableOperation {
 
 // Input returns current DescribeTableInput
 func (d *DescribeTableOperation) Input() *dynamodb.DescribeTableInput {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
+	d.Mu.RLock()
+	defer d.Mu.RUnlock()
 	return d.input
 }
 
@@ -54,8 +54,8 @@ func (d *DescribeTableOperation) SetInput(input *dynamodb.DescribeTableInput) *D
 	if !d.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.Mu.Lock()
+	defer d.Mu.Unlock()
 	d.input = input
 	return d
 }
@@ -80,9 +80,9 @@ func (d *DescribeTableOperation) GoExecute(req *dyno.Request) <-chan *DescribeTa
 // Execute runs the DescribeTableOperation and returns a DescribeTableResult
 func (d *DescribeTableOperation) Execute(req *dyno.Request) (out *DescribeTableResult) {
 	out = &DescribeTableResult{}
-	d.setRunning()
-	defer d.setDone(out)
+	d.SetRunning()
+	defer d.SetDone(out)
 
-	out.output, out.err = req.DescribeTable(d.input)
+	out.output, out.Err = req.DescribeTable(d.input)
 	return
 }

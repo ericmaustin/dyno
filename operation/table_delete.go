@@ -7,7 +7,7 @@ import (
 
 // DeleteTableResult is returned as the result of a DeleteTableOperation
 type DeleteTableResult struct {
-	resultBase
+	ResultBase
 	output *dynamodb.DeleteTableOutput
 }
 
@@ -23,12 +23,12 @@ func (d *DeleteTableResult) Output() *dynamodb.DeleteTableOutput {
 
 // OutputError returns the DeleteTableOutput the error from the DeleteResult for convenience
 func (d *DeleteTableResult) OutputError() (*dynamodb.DeleteTableOutput, error) {
-	return d.output, d.err
+	return d.output, d.Err
 }
 
 // DeleteTableOperation represents a delete table operation
 type DeleteTableOperation struct {
-	*baseOperation
+	*BaseOperation
 	input *dynamodb.DeleteTableInput
 }
 
@@ -38,7 +38,7 @@ func DeleteTable(tableName string) *DeleteTableOperation {
 		TableName: &tableName,
 	}
 	d := &DeleteTableOperation{
-		baseOperation: newBase(),
+		BaseOperation: NewBase(),
 		input:         input,
 	}
 	return d
@@ -46,8 +46,8 @@ func DeleteTable(tableName string) *DeleteTableOperation {
 
 // Input returns current DeleteTableInput
 func (d *DeleteTableOperation) Input() *dynamodb.DeleteTableInput {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
+	d.Mu.RLock()
+	defer d.Mu.RUnlock()
 	return d.input
 }
 
@@ -56,8 +56,8 @@ func (d *DeleteTableOperation) SetInput(input *dynamodb.DeleteTableInput) *Delet
 	if !d.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.Mu.Lock()
+	defer d.Mu.Unlock()
 	d.input = input
 	return d
 }
@@ -81,9 +81,9 @@ func (d *DeleteTableOperation) GoExecute(req *dyno.Request) <-chan *DeleteTableR
 // Execute executes the DeleteTableOperation
 func (d *DeleteTableOperation) Execute(req *dyno.Request) (out *DeleteTableResult) {
 	out = &DeleteTableResult{}
-	d.setRunning()
-	defer d.setDone(out)
+	d.SetRunning()
+	defer d.SetDone(out)
 
-	out.output, out.err = req.DeleteTable(d.input)
+	out.output, out.Err = req.DeleteTable(d.input)
 	return
 }

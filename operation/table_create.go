@@ -153,7 +153,7 @@ func (b *CreateTableBuilder) Operation() *CreateTableOperation {
 
 // CreateTableResult returned by CreateTableOperation
 type CreateTableResult struct {
-	resultBase
+	ResultBase
 	output *dynamodb.CreateTableOutput
 }
 
@@ -169,12 +169,12 @@ func (c *CreateTableResult) Output() *dynamodb.CreateTableOutput {
 
 // OutputError returns the CreateTableOutput and the error from the CreateTableResult for convenience
 func (c *CreateTableResult) OutputError() (*dynamodb.CreateTableOutput, error) {
-	return c.Output(), c.err
+	return c.Output(), c.Err
 }
 
 //CreateTableOperation used as input to the CreateTable func
 type CreateTableOperation struct {
-	*baseOperation
+	*BaseOperation
 	wait  bool
 	input *dynamodb.CreateTableInput
 }
@@ -182,7 +182,7 @@ type CreateTableOperation struct {
 // CreateTable creates a new CreateTableOperation with optional CreateTableInput input
 func CreateTable(input *dynamodb.CreateTableInput) *CreateTableOperation {
 	c := &CreateTableOperation{
-		baseOperation: newBase(),
+		BaseOperation: NewBase(),
 		input:         input,
 	}
 	return c
@@ -194,8 +194,8 @@ func (c *CreateTableOperation) SetInput(input *dynamodb.CreateTableInput) *Creat
 	if !c.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
 	c.input = input
 	return c
 }
@@ -207,8 +207,8 @@ func (c *CreateTableOperation) SetWait(wait bool) *CreateTableOperation {
 	if !c.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
 	c.wait = wait
 	return c
 }
@@ -221,21 +221,21 @@ func (c *CreateTableOperation) ExecuteInBatch(req *dyno.Request) Result {
 // Execute executes the CreateTableOperation request
 func (c *CreateTableOperation) Execute(req *dyno.Request) (out *CreateTableResult) {
 	out = &CreateTableResult{}
-	c.setRunning()
-	defer c.setDone(out)
-	out.output, out.err = req.CreateTable(c.input)
+	c.SetRunning()
+	defer c.SetDone(out)
+	out.output, out.Err = req.CreateTable(c.input)
 	if c.wait {
-		if out.err != nil && dyno.IsAwsErrorCode(out.Error(), dynamodb.ErrCodeResourceInUseException) {
+		if out.Err != nil && dyno.IsAwsErrorCode(out.Error(), dynamodb.ErrCodeResourceInUseException) {
 			tblDescOut, tblDescErr := DescribeTable(*c.input.TableName).Execute(req).OutputError()
 			if tblDescErr != nil {
-				out.err = tblDescErr
+				out.Err = tblDescErr
 			} else {
 				out.output = &dynamodb.CreateTableOutput{TableDescription: tblDescOut.Table}
 			}
-		} else if out.err != nil {
+		} else if out.Err != nil {
 			return
 		}
-		_, out.err = WaitForTableReady(req, *c.input.TableName, nil)
+		_, out.Err = WaitForTableReady(req, *c.input.TableName, nil)
 	}
 	return
 }

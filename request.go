@@ -2,6 +2,7 @@ package dyno
 
 import (
 	"context"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno/timer"
@@ -123,14 +124,14 @@ func (r *Request) Execute(execFunc ExecutionFunction) error {
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
+	r.mu.RLock()
 	if _, ok := r.ctx.Deadline(); !ok {
 		// no deadline set, so use max timeout
 		ctx, cancel = context.WithTimeout(r.Context(), r.MaxTimeout())
 	} else {
-		r.mu.RLock()
 		ctx, cancel = r.ctx, r.cancel
-		r.mu.RUnlock()
 	}
+	r.mu.RUnlock()
 	exec := &execution{
 		ctx:    ctx,
 		cancel: cancel,
@@ -143,9 +144,40 @@ func (r *Request) Execute(execFunc ExecutionFunction) error {
 }
 
 // Scan executes a scan api call with a dynamodb.ScanInput
-func (r *Request) Scan(in *dynamodb.ScanInput) (out *dynamodb.ScanOutput, err error) {
+func (r *Request) Scan(in *dynamodb.ScanInput, handler ScanHandler) (out *dynamodb.ScanOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().ScanWithContext(ctx, in)
+		if err != nil {
+			return err
+		}
+		if handler == nil {
+			return handler(out)
+		}
+		return err
+	})
+	return
+}
+
+// ScanAll executes a scan api call with a dynamodb.ScanInput and keeps scanning until there are no more
+// LastEvaluatedKey values
+func (r *Request) ScanAll(in *dynamodb.ScanInput, handler ScanHandler) (out []*dynamodb.ScanOutput, err error) {
+	var o *dynamodb.ScanOutput
+	err = r.Execute(func(ctx context.Context) error {
+		for {
+			o, err = r.DynamoClient().ScanWithContext(ctx, in)
+			out = append(out, o)
+			if err != nil {
+				return err
+			}
+			if err = handler(o); err != nil {
+				return err
+			}
+			if o.LastEvaluatedKey == nil {
+				// no more work
+				break
+			}
+			in.ExclusiveStartKey = o.LastEvaluatedKey
+		}
 		return err
 	})
 	return
@@ -170,9 +202,15 @@ func (r *Request) PutItem(in *dynamodb.PutItemInput) (out *dynamodb.PutItemOutpu
 }
 
 //GetItem runs a GetItem dynamodb operation with a dynamodb.GetItemInput
-func (r *Request) GetItem(in *dynamodb.GetItemInput) (out *dynamodb.GetItemOutput, err error) {
+func (r *Request) GetItem(in *dynamodb.GetItemInput, handler GetItemHandler) (out *dynamodb.GetItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().GetItemWithContext(ctx, in)
+		if err != nil {
+			return err
+		}
+		if handler == nil {
+			return handler(out)
+		}
 		return err
 	})
 	return
@@ -197,9 +235,41 @@ func (r *Request) DeleteItem(in *dynamodb.DeleteItemInput) (out *dynamodb.Delete
 }
 
 // BatchGetItem runs a batch get item api call with a dynamodb.BatchGetItemInput
-func (r *Request) BatchGetItem(in *dynamodb.BatchGetItemInput) (out *dynamodb.BatchGetItemOutput, err error) {
+func (r *Request) BatchGetItem(in *dynamodb.BatchGetItemInput, handler BatchGetItemHandler) (out *dynamodb.BatchGetItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().BatchGetItemWithContext(ctx, in)
+		if err != nil {
+			return err
+		}
+		if handler == nil {
+			return handler(out)
+		}
+		return err
+	})
+	return
+}
+
+// BatchGetItemAll runs a batch get item api call with a dynamodb.BatchGetItemInput
+// and continues to run batch get item requests until no unprocessed keys remain
+func (r *Request) BatchGetItemAll(in *dynamodb.BatchGetItemInput, handler BatchGetItemHandler) (out []*dynamodb.BatchGetItemOutput, err error) {
+	var o *dynamodb.BatchGetItemOutput
+	err = r.Execute(func(ctx context.Context) error {
+		for {
+			o, err = r.DynamoClient().BatchGetItemWithContext(ctx, in)
+			out = append(out, o)
+			if err != nil {
+				return err
+			}
+			if handler != nil {
+				if err = handler(o); err != nil {
+					return err
+				}
+			}
+			if o.UnprocessedKeys == nil || len(o.UnprocessedKeys) < 1 {
+				break
+			}
+			in.RequestItems = o.UnprocessedKeys
+		}
 		return err
 	})
 	return
@@ -312,3 +382,174 @@ func (r *Request) RestoreTableFromBackup(in *dynamodb.RestoreTableFromBackupInpu
 	})
 	return
 }
+
+//ListenForTableDeletion returns a channel that will be passed an error when
+// the table is either deleted (will return nil) or errors during waiting
+// The table must be already deleted or either active or being deleted or else an error will be returned
+func (r *Request) ListenForTableDeletion(tableName string) <-chan error {
+	out := make(chan error)
+
+	ticker := time.NewTicker(time.Millisecond * 100)
+
+	go func() {
+		var (
+			err, apiErr      error
+			tableDescription *dynamodb.DescribeTableOutput
+		)
+		defer func() {
+			out <- err
+			close(out)
+		}()
+		for {
+			select {
+			case <-r.ctx.Done():
+				err = fmt.Errorf("timed out listening for table %s ready state", tableName)
+			case <-ticker.C:
+				tableDescription, apiErr = r.DescribeTable(&dynamodb.DescribeTableInput{
+					TableName: &tableName,
+				})
+
+				// set the error if there was one
+				if apiErr != nil {
+					if IsAwsErrorCode(apiErr, dynamodb.ErrCodeResourceNotFoundException) {
+						// this error means successful deletion
+						return
+					}
+					// all other errors are a problem
+					err = apiErr
+					return
+				}
+
+				if tableDescription.Table != nil {
+					switch *tableDescription.Table.TableStatus {
+					case dynamodb.TableStatusDeleting, dynamodb.TableStatusActive:
+						continue
+					default:
+						err = fmt.Errorf("table %s is in an invalid state: '%v'", tableName, *tableDescription.Table.TableStatus)
+						return
+					}
+				}
+			}
+		}
+	}()
+	return out
+}
+
+//TableReadyOutput used as output for ListenForTableReady
+// will hold an error value in Err if ListenForTableReady failed
+type TableReadyOutput struct {
+	*dynamodb.DescribeTableOutput
+	Err error
+}
+
+//ListenForTableReady returns a channel that will be passed an error when
+// the table is either ready (will return nil) or errors during waiting
+func (r *Request) ListenForTableReady(tableName string) <-chan *TableReadyOutput {
+	outCh := make(chan *TableReadyOutput)
+
+	ticker := time.NewTicker(time.Millisecond * 100)
+
+	go func() {
+		var (
+			apiErr      error
+			tableDescription *dynamodb.DescribeTableOutput
+		)
+		out := new(TableReadyOutput)
+		defer func() {
+			outCh <- out
+			close(outCh)
+		}()
+		for {
+			select {
+			case <-r.ctx.Done():
+				out.Err = fmt.Errorf("timed out listening for table %s ready state", tableName)
+			case <-ticker.C:
+				tableDescription, apiErr = r.DescribeTable(&dynamodb.DescribeTableInput{
+					TableName: &tableName,
+				})
+
+				if apiErr != nil {
+					if !IsAwsErrorCode(apiErr, dynamodb.ErrCodeResourceNotFoundException) {
+						// not found is fine, but anything else is a problem
+						out.Err = apiErr
+						return
+					}
+					continue
+				}
+
+				if tableDescription.Table != nil {
+					switch *tableDescription.Table.TableStatus {
+					case dynamodb.TableStatusActive:
+						out.DescribeTableOutput = tableDescription
+						return
+					case dynamodb.TableStatusCreating:
+						continue
+					default:
+						out.Err = fmt.Errorf("table %s is in an invalid state: '%v'", tableName, *tableDescription.Table.TableStatus)
+						return
+					}
+				}
+			}
+		}
+	}()
+	return outCh
+}
+
+////
+//type BackupCompletionOutput struct {
+//	*dynamodb.DescribeTableOutput
+//	Err error
+//}
+//
+//
+////ListenForBackupCompleted returns...
+//func (r *Request) ListenForBackupCompleted(backupArn string) <-chan *BackupCompletionOutput {
+//	outCh := make(chan *BackupCompletionOutput)
+//
+//	ticker := time.NewTicker(time.Millisecond * 100)
+//
+//	go func() {
+//		var (
+//			apiErr      error
+//			tableDescription *dynamodb.DescribeTableOutput
+//		)
+//		out := new(TableReadyOutput)
+//		defer func() {
+//			outCh <- out
+//			close(outCh)
+//		}()
+//		for {
+//			select {
+//			case <-r.ctx.Done():
+//				out.Err = fmt.Errorf("timed out listening for table %s ready state", tableName)
+//			case <-ticker.C:
+//				tableDescription, apiErr = r.DescribeTable(&dynamodb.DescribeTableInput{
+//					TableName: &tableName,
+//				})
+//
+//				if apiErr != nil {
+//					if !IsAwsErrorCode(apiErr, dynamodb.ErrCodeResourceNotFoundException) {
+//						// not found is fine, but anything else is a problem
+//						out.Err = apiErr
+//						return
+//					}
+//					continue
+//				}
+//
+//				if tableDescription.Table != nil {
+//					switch *tableDescription.Table.TableStatus {
+//					case dynamodb.TableStatusActive:
+//						out.DescribeTableOutput = tableDescription
+//						return
+//					case dynamodb.TableStatusCreating:
+//						continue
+//					default:
+//						out.Err = fmt.Errorf("table %s is in an invalid state: '%v'", tableName, *tableDescription.Table.TableStatus)
+//						return
+//					}
+//				}
+//			}
+//		}
+//	}()
+//	return outCh
+//}

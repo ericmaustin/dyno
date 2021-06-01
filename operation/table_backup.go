@@ -7,7 +7,7 @@ import (
 
 // BackupTableResult is the result of a BackUp table operation
 type BackupTableResult struct {
-	resultBase
+	ResultBase
 	output *dynamodb.CreateBackupOutput
 }
 
@@ -23,12 +23,12 @@ func (b *BackupTableResult) Output() *dynamodb.CreateBackupOutput {
 
 // OutputError returns the res and the error from the BackupTableResult for convenience
 func (b *BackupTableResult) OutputError() (*dynamodb.CreateBackupOutput, error) {
-	return b.output, b.err
+	return b.output, b.Err
 }
 
 //BackupTableOperation represents a BackupTable operation
 type BackupTableOperation struct {
-	*baseOperation
+	*BaseOperation
 	input *dynamodb.CreateBackupInput
 }
 
@@ -39,7 +39,7 @@ func BackupTable(tableName, backupName string) *BackupTableOperation {
 		BackupName: &backupName,
 	}
 	b := &BackupTableOperation{
-		baseOperation: newBase(),
+		BaseOperation: NewBase(),
 		input:         input,
 	}
 	return b
@@ -51,8 +51,8 @@ func (b *BackupTableOperation) SetInput(input *dynamodb.CreateBackupInput) *Back
 	if !b.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.Mu.Lock()
+	defer b.Mu.Unlock()
 	b.input = input
 	return b
 }
@@ -60,8 +60,8 @@ func (b *BackupTableOperation) SetInput(input *dynamodb.CreateBackupInput) *Back
 // Input returns the current Input for the operation
 // returns ErrInvalidState if the operation is not done
 func (b *BackupTableOperation) Input() *dynamodb.CreateBackupInput {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+	b.Mu.RLock()
+	defer b.Mu.RUnlock()
 	return b.input
 }
 
@@ -85,9 +85,9 @@ func (b *BackupTableOperation) GoExecute(req *dyno.Request) <-chan *BackupTableR
 // Execute executes the BackupTableOperation
 func (b *BackupTableOperation) Execute(req *dyno.Request) (out *BackupTableResult) {
 	out = &BackupTableResult{}
-	b.setRunning()
-	defer b.setDone(out)
+	b.SetRunning()
+	defer b.SetDone(out)
 	// call the api
-	out.output, out.err = req.CreateBackup(b.input)
+	out.output, out.Err = req.CreateBackup(b.input)
 	return
 }

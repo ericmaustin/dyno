@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ericmaustin/dyno"
+	testing2 "github.com/ericmaustin/dyno/internal/dynotest"
 	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
@@ -12,19 +13,19 @@ import (
 type BatchTestSuite struct {
 	suite.Suite
 	sess    *dyno.Session
-	records []*testItem
+	records []*testing2.testItem
 	keys    []map[string]string
 }
 
 func (s *BatchTestSuite) SetupSuite() {
-	s.sess = createTestSession()
-	createTestTable(s.sess)
-	s.records = putTestRecords(s.sess)
-	s.keys = putTestKeys(s.records)
+	s.sess = testing2.createTestSession()
+	testing2.createTestTable(s.sess)
+	s.records = testing2.putTestRecords(s.sess)
+	s.keys = testing2.putTestKeys(s.records)
 }
 
 func (s *BatchTestSuite) TearDownSuite() {
-	destroytestTable(s.sess)
+	testing2.destroytestTable(s.sess)
 }
 
 func (s *BatchTestSuite) TestBatchGet() {
@@ -57,7 +58,7 @@ func (s *BatchTestSuite) getGets() []Operation {
 	out := make([]Operation, len(s.records))
 	for i, rec := range s.records {
 		getInput := NewGetBuilder().
-			SetTable(getTestTableName()).
+			SetTable(testing2.getTestTableName()).
 			SetKey(map[string]string{
 				"id": rec.ID,
 			}).Input()

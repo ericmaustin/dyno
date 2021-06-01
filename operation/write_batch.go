@@ -12,7 +12,7 @@ const dynamoBatchWriteLimit = 25
 
 // BatchWriteResult is returned as the result of a BatchWriteOperation
 type BatchWriteResult struct {
-	resultBase
+	ResultBase
 	output []*dynamodb.BatchWriteItemOutput
 }
 
@@ -28,7 +28,7 @@ func (b *BatchWriteResult) Output() []*dynamodb.BatchWriteItemOutput {
 
 // OutputError returns the BatchWriteItemOutput slice and the error from the BatchWriteResult for convenience
 func (b *BatchWriteResult) OutputError() ([]*dynamodb.BatchWriteItemOutput, error) {
-	return b.output, b.err
+	return b.output, b.Err
 }
 
 // BatchWriteBuilder used to build a BatchWriteItemInput dynamically with encoding support
@@ -148,7 +148,7 @@ func (b *BatchWriteBuilder) BuildOperation() *BatchWriteOperation {
 // BatchWriteOperation is used to write a slice of records to a table
 // if workers is 0 then there is no limit to how many go routines are spawned
 type BatchWriteOperation struct {
-	*baseOperation
+	*BaseOperation
 	input       *dynamodb.BatchWriteItemInput
 	concurrency int
 }
@@ -156,7 +156,7 @@ type BatchWriteOperation struct {
 // BatchWrite creates a new BatchWriteOperation with optional BatchWriteItemInput
 func BatchWrite(input *dynamodb.BatchWriteItemInput) *BatchWriteOperation {
 	bw := &BatchWriteOperation{
-		baseOperation: newBase(),
+		BaseOperation: NewBase(),
 		input:         input,
 	}
 	return bw
@@ -168,16 +168,16 @@ func (bw *BatchWriteOperation) SetInput(input *dynamodb.BatchWriteItemInput) *Ba
 	if !bw.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	bw.mu.Lock()
-	defer bw.mu.Unlock()
+	bw.Mu.Lock()
+	defer bw.Mu.Unlock()
 	bw.input = input
 	return bw
 }
 
 // Input returns the current BatchWriteItemInput for this BatchWriteOperation
 func (bw *BatchWriteOperation) Input() *dynamodb.BatchWriteItemInput {
-	bw.mu.RLock()
-	defer bw.mu.RUnlock()
+	bw.Mu.RLock()
+	defer bw.Mu.RUnlock()
 	return bw.input
 }
 
@@ -187,8 +187,8 @@ func (bw *BatchWriteOperation) SetConcurrency(concurrency int) *BatchWriteOperat
 	if !bw.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	bw.mu.Lock()
-	defer bw.mu.Unlock()
+	bw.Mu.Lock()
+	defer bw.Mu.Unlock()
 	bw.concurrency = concurrency
 	return bw
 }
@@ -202,8 +202,8 @@ func (bw *BatchWriteOperation) ExecuteInBatch(req *dyno.Request) Result {
 // Execute the batch write request
 func (bw *BatchWriteOperation) Execute(req *dyno.Request) (out *BatchWriteResult) {
 	out = &BatchWriteResult{}
-	bw.setRunning()
-	defer bw.setDone(out)
+	bw.SetRunning()
+	defer bw.SetDone(out)
 
 	if bw.concurrency == 0 {
 		// automatically set the workers to number of processes needed to Execute all at once
@@ -235,7 +235,7 @@ func (bw *BatchWriteOperation) Execute(req *dyno.Request) (out *BatchWriteResult
 	wg.Wait()
 	close(sem)
 	out.output = state.outputs
-	out.err = state.err
+	out.Err = state.err
 	return
 }
 

@@ -3,6 +3,7 @@ package operation
 import (
 	"fmt"
 	"github.com/ericmaustin/dyno"
+	testing2 "github.com/ericmaustin/dyno/internal/dynotest"
 	"github.com/stretchr/testify/suite"
 	"testing"
 )
@@ -13,13 +14,13 @@ type DeleteTestSuite struct {
 }
 
 func (d *DeleteTestSuite) SetupSuite() {
-	d.sess = createTestSession()
-	createTestTable(d.sess)
-	putTestRecords(d.sess)
+	d.sess = testing2.createTestSession()
+	testing2.createTestTable(d.sess)
+	testing2.putTestRecords(d.sess)
 }
 
 func (d *DeleteTestSuite) TearDownSuite() {
-	destroytestTable(d.sess)
+	testing2.destroytestTable(d.sess)
 }
 
 func (d *DeleteTestSuite) TestDelete() {
@@ -31,7 +32,7 @@ func (d *DeleteTestSuite) TestDelete() {
 
 	// scan for records with no conditions
 	deleteInput := NewDeleteBuilder().
-		SetTable(getTestTableName()).
+		SetTable(testing2.getTestTableName()).
 		SetKey(key).
 		Build()
 

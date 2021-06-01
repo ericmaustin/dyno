@@ -1,6 +1,8 @@
 package table
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
@@ -11,8 +13,8 @@ import (
 
 // KeyBase is the base struct used for all key types
 type KeyBase struct {
-	name                string
-	attributeType       string
+	name                *string
+	attributeType       *string
 	attributeDefinition *dynamodb.AttributeDefinition
 }
 
@@ -21,8 +23,8 @@ func newKey(name, attributeType string) *KeyBase {
 		panic(fmt.Errorf("attribute type '%s' is not valid", attributeType))
 	}
 	return &KeyBase{
-		name:          name,
-		attributeType: attributeType,
+		name:          &name,
+		attributeType: &attributeType,
 		attributeDefinition: &dynamodb.AttributeDefinition{
 			AttributeName: dyno.StringPtr(name),
 			AttributeType: dyno.StringPtr(attributeType),
@@ -37,20 +39,23 @@ type PartitionKey struct {
 
 // Name returns the name of this key
 func (k *KeyBase) Name() string {
-	return k.name
+	if k.name == nil {
+		return ""
+	}
+	return *k.name
 }
 
 // Equals returns a new ``KeyConditionBuilder`` with this key equal to input value
 func (k *KeyBase) Equals(value interface{}) *expression.KeyConditionBuilder {
-	exp := expression.Key(k.name).Equal(expression.Value(value))
+	exp := expression.Key(*k.name).Equal(expression.Value(value))
 	return &exp
 }
 
 func (k *KeyBase) extractValue(avMap map[string]*dynamodb.AttributeValue) *dynamodb.AttributeValue {
-	if _, ok := avMap[k.name]; !ok {
+	if _, ok := avMap[*k.name]; !ok {
 		return nil
 	}
-	return avMap[k.name]
+	return avMap[*k.name]
 }
 
 // NewPartitionKey creates a new partitionKey key with given name and attribute type
@@ -209,7 +214,7 @@ func (k *Key) buildSchemaAndAttributeDefinitions() {
 	if k.partitionKey != nil {
 		attributes = append(attributes, k.partitionKey.attributeDefinition)
 		keySchema = append(keySchema, &dynamodb.KeySchemaElement{
-			AttributeName: dyno.StringPtr(k.partitionKey.name),
+			AttributeName: k.partitionKey.name,
 			KeyType:       dyno.StringPtr("HASH"),
 		})
 	}
@@ -217,7 +222,7 @@ func (k *Key) buildSchemaAndAttributeDefinitions() {
 	if k.sortKey != nil {
 		attributes = append(attributes, k.sortKey.attributeDefinition)
 		keySchema = append(keySchema, &dynamodb.KeySchemaElement{
-			AttributeName: dyno.StringPtr(k.sortKey.name),
+			AttributeName: k.sortKey.name,
 			KeyType:       dyno.StringPtr("RANGE"),
 		})
 	}
@@ -228,22 +233,21 @@ func (k *Key) buildSchemaAndAttributeDefinitions() {
 
 // String implements the string interface for the table key
 func (k *Key) String() string {
-
-	str := ""
-
+	var buf bytes.Buffer
 	if k.partitionKey != nil {
-		str += fmt.Sprintf("PK:'%s'", k.partitionKey.name)
+		fmt.Fprintf(&buf,"PK:'%s'", k.partitionKey.Name())
 	}
-
 	if k.sortKey != nil {
-		str += fmt.Sprintf("SK:'%s'", k.sortKey.name)
+		fmt.Fprintf(&buf,"SK:'%s'", k.sortKey.Name())
 	}
-
-	return str
+	return buf.String()
 }
 
 // PartitionName returns the PartitionKey's name string
 func (k *Key) PartitionName() string {
+	if k.partitionKey == nil {
+		return ""
+	}
 	return k.partitionKey.Name()
 }
 
@@ -343,37 +347,51 @@ func GetKeyCondition(key *KeyBase, operator interface{}, values ...interface{}) 
 		Message: fmt.Sprintf("No operator exists for '%v'", op)}
 }
 
-func (k *Key) extract(item map[string]*dynamodb.AttributeValue) map[string]*dynamodb.AttributeValue {
-
-	keyMap := map[string]*dynamodb.AttributeValue{}
-
-	if k.partitionKey != nil {
-		av := k.partitionKey.extractValue(item)
-		if av == nil {
-			panic(fmt.Sprintf("item %v does not have required partitionKey key '%s' value",
-				item, k.partitionKey.name))
-		}
-
-		keyMap[k.partitionKey.name] = av
-	}
-
-	if k.sortKey != nil {
-		av := k.sortKey.extractValue(item)
-		if av == nil {
-			panic(fmt.Sprintf("item %v does not have required sortKey key '%s' value",
-				item, k.sortKey.name))
-		}
-
-		keyMap[k.sortKey.name] = av
-	}
-
-	return keyMap
+//ExtractValues extracts the key values from a given dynamodb.AttributeValue map
+func (k *Key) ExtractValues(item map[string]*dynamodb.AttributeValue) (map[string]*dynamodb.AttributeValue, error) {
+	return ExtractKeyValuesFromAttributeValueMap(k, item)
 }
 
-func (k *Key) extractAll(items []map[string]*dynamodb.AttributeValue) []map[string]*dynamodb.AttributeValue {
+//ExtractAllValues extracts all the key values from a given slice of dynamodb.AttributeValue maps
+func (k *Key) ExtractAllValues(items []map[string]*dynamodb.AttributeValue) ([]map[string]*dynamodb.AttributeValue, error) {
 	out := make([]map[string]*dynamodb.AttributeValue, len(items))
+	var err error
 	for i, item := range items {
-		out[i] = k.extract(item)
+		out[i], err = ExtractKeyValuesFromAttributeValueMap(k, item)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return out
+	return out, nil
+}
+
+//ExtractKeyValuesFromAttributeValueMap extracts the key values from a given dynamodb.AttributeValue map
+func ExtractKeyValuesFromAttributeValueMap(key *Key, item map[string]*dynamodb.AttributeValue) (map[string]*dynamodb.AttributeValue, error) {
+	keyMap := map[string]*dynamodb.AttributeValue{}
+
+	if key.partitionKey != nil {
+		av := key.partitionKey.extractValue(item)
+		if av == nil {
+			return nil, fmt.Errorf("item %v does not have required partitionKey key '%s' value",
+				item, key.partitionKey.name)
+		}
+		if key.partitionKey.name == nil {
+			return nil, errors.New("partition key name must not be nil")
+		}
+		keyMap[*key.partitionKey.name] = av
+	}
+
+	if key.sortKey != nil {
+		av := key.sortKey.extractValue(item)
+		if av == nil {
+			return nil, fmt.Errorf("item %v does not have required sortKey key '%s' value",
+				item, key.sortKey.name)
+		}
+		if key.partitionKey.name == nil {
+			return nil, errors.New("sort key name must not be nil")
+		}
+		keyMap[*key.sortKey.name] = av
+	}
+
+	return keyMap, nil
 }

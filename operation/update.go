@@ -30,7 +30,7 @@ const (
 
 // UpdateResult is returned as the result of a UpdateOperation
 type UpdateResult struct {
-	resultBase
+	ResultBase
 	output *dynamodb.UpdateItemOutput
 }
 
@@ -46,7 +46,7 @@ func (u *UpdateResult) Output() *dynamodb.UpdateItemOutput {
 
 // OutputError returns the UpdateItemOutput and the error from the UpdateResult for convenience
 func (u *UpdateResult) OutputError() (*dynamodb.UpdateItemOutput, error) {
-	return u.output, u.err
+	return u.output, u.Err
 }
 
 // UpdateItemBuilder is used to build a dynamodb UpdateItemInput
@@ -56,7 +56,7 @@ type UpdateItemBuilder struct {
 	cnd           *expression.ConditionBuilder
 }
 
-// NewUpdateItemBuilder creates a new UpdateItemBuilder with optional existing UpdateItemInput as the baseOperation
+// NewUpdateItemBuilder creates a new UpdateItemBuilder with optional existing UpdateItemInput as the BaseOperation
 func NewUpdateItemBuilder() *UpdateItemBuilder {
 	return &UpdateItemBuilder{
 		input: &dynamodb.UpdateItemInput{},
@@ -192,22 +192,22 @@ func (u *UpdateItemBuilder) BuildOperation() *UpdateOperation {
 UpdateOperation used as Input for UpdateOperation
 */
 type UpdateOperation struct {
-	*baseOperation
+	*BaseOperation
 	input *dynamodb.UpdateItemInput
 }
 
 // Update returns a a new UpdateOperation with optional update item input
 func Update(input *dynamodb.UpdateItemInput) *UpdateOperation {
 	return &UpdateOperation{
-		baseOperation: newBase(),
+		BaseOperation: NewBase(),
 		input:         input,
 	}
 }
 
 // Input returns current UpdateItemInput
 func (u *UpdateOperation) Input() *dynamodb.UpdateItemInput {
-	u.mu.RLock()
-	defer u.mu.RUnlock()
+	u.Mu.RLock()
+	defer u.Mu.RUnlock()
 	return u.input
 }
 
@@ -216,8 +216,8 @@ func (u *UpdateOperation) SetInput(input *dynamodb.UpdateItemInput) *UpdateOpera
 	if !u.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	u.mu.Lock()
-	defer u.mu.Unlock()
+	u.Mu.Lock()
+	defer u.Mu.Unlock()
 	u.input = input
 	return u
 }
@@ -242,8 +242,8 @@ func (u *UpdateOperation) GoExecute(req *dyno.Request) <-chan *UpdateResult {
 // Execute runs the UpdateOperation and returns a UpdateResult
 func (u *UpdateOperation) Execute(req *dyno.Request) (out *UpdateResult) {
 	out = &UpdateResult{}
-	u.setRunning()
-	defer u.setDone(out)
-	out.output, out.err = req.UpdateItem(u.input)
+	u.SetRunning()
+	defer u.SetDone(out)
+	out.output, out.Err = req.UpdateItem(u.input)
 	return
 }

@@ -6,29 +6,10 @@ import (
 	"sync"
 )
 
+type Executer func(req *dyno.Request) error
+
 //BatchStatus is the status of the Batch operation
 type BatchStatus string
-
-// BatchResult is the result of the batch request
-type BatchResult struct {
-	resultBase
-	output *BatchCounts
-}
-
-// OutputInterface returns the BatchCounts from the BatchResult as an interface
-func (b *BatchResult) OutputInterface() interface{} {
-	return b.output
-}
-
-// Output returns the BatchCounts from the BatchResult
-func (b *BatchResult) Output() *BatchCounts {
-	return b.output
-}
-
-// OutputError returns the BatchCounts and the error from the BatchResult for convenience
-func (b *BatchResult) OutputError() (*BatchCounts, error) {
-	return b.output, b.err
-}
 
 //BatchCounts holds all number of Pending, Running, Successful, and Errors
 // from this batch
@@ -36,33 +17,26 @@ type BatchCounts struct {
 	Pending int
 	Running int
 	Success int
-	Errors  int
 }
 
 // Batch is a batch request
 type Batch struct {
-	*baseOperation
-	operations []Operation
+	ctx        context.Context
+	done       context.CancelFunc
+	operations []Executer
 	workers    int
 	mu         *sync.RWMutex
 	wg         *sync.WaitGroup
+	counts     *BatchCounts
+	status     Status
 }
 
 // NewBatch creates a batch from a slice of operations with a given context
-func NewBatch(ctx context.Context, operations []Operation) *Batch {
-	if operations == nil {
-		operations = make([]Operation, 0)
-	}
+func NewBatch(ctx context.Context) *Batch {
 	ctx, done := context.WithCancel(ctx)
 	return &Batch{
-		baseOperation: &baseOperation{
-			ctx:    ctx,
-			done:   done,
-			mu:     sync.RWMutex{},
-			status: StatusPending,
-			timing: newTiming(),
-		},
-		operations: operations,
+		ctx: 		ctx,
+		done: 		done,
 		mu:         &sync.RWMutex{},
 		wg:         &sync.WaitGroup{},
 	}
@@ -70,20 +44,9 @@ func NewBatch(ctx context.Context, operations []Operation) *Batch {
 
 // Counts returns counts of all pending, running, and completed tasks in that order
 func (b *Batch) Counts() *BatchCounts {
-	counts := &BatchCounts{}
-	for _, op := range b.operations {
-		switch op.Status() {
-		case StatusDone:
-			counts.Success++
-		case StatusRunning:
-			counts.Running++
-		case StatusError:
-			counts.Errors++
-		default:
-			counts.Pending++
-		}
-	}
-	return counts
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.counts
 }
 
 // Cancel the request
@@ -104,28 +67,22 @@ func (b *Batch) SetWorkerCount(concurrency int) *Batch {
 	return b
 }
 
-// AddOperations adds one or more operations to the batch
-func (b *Batch) AddOperations(ops ...Operation) *Batch {
+// AddFunc adds one or more operations to the batch
+func (b *Batch) AddFunc(ops ...Executer) *Batch {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.operations = append(b.operations, ops...)
+	b.counts.Pending += len(ops)
 	return b
 }
 
 // Execute executes batch operations
-func (b *Batch) Execute(sess *dyno.Session) (out *BatchResult) {
-	out = &BatchResult{}
-	b.setRunning()
+func (b *Batch) Execute(sess *dyno.Session) (*BatchCounts, error) {
+	b.status = StatusRunning
 	defer func() {
 		b.mu.Lock()
 		defer b.mu.Unlock()
-		out.SetTiming(b.timing)
-		out.output = b.Counts()
-		if out.Error() != nil {
-			b.status = StatusError
-		} else {
-			b.status = StatusDone
-		}
+		b.status = StatusDone
 	}()
 
 	// workers = num operations if not set
@@ -133,38 +90,34 @@ func (b *Batch) Execute(sess *dyno.Session) (out *BatchResult) {
 		b.workers = len(b.operations)
 	}
 
-	operations := make(chan Operation)
-	resCh := make(chan Result)
+	funcs := make(chan Executer)
+	resCh := make(chan error)
 
-	go b.workEmitter(operations)
+	go b.workEmitter(funcs)
 
 	for i := 0; i < b.workers; i++ {
-		go b.worker(sess, operations, resCh)
+		go b.worker(sess, funcs, resCh)
 	}
 
-	cnt := 0
 	for {
 		select {
-		case res := <-resCh:
-			cnt++
-			if res != nil && res.Error() != nil {
-				b.done() // stop all routines and return the error
-				out.err = res.Error()
-				return
+		case err := <-resCh:
+			if err != nil {
+				b.done()
+				return b.counts, err
 			}
 		case <-b.ctx.Done():
-			return
+			return b.counts, nil
 		}
 	}
 }
 
 // workEmitter emits work to the workers
-func (b *Batch) workEmitter(operations chan<- Operation) {
+func (b *Batch) workEmitter(funcs chan<- Executer) {
 	defer func() {
-		close(operations)
+		close(funcs)
 		b.mu.Lock()
 		defer b.mu.Unlock()
-		b.timing.done()
 		b.done()
 	}()
 	for _, req := range b.operations {
@@ -176,21 +129,22 @@ func (b *Batch) workEmitter(operations chan<- Operation) {
 			//pass
 		}
 		b.wg.Add(1)
-		operations <- req
+		b.counts.Running++
+		funcs <- req
 	}
 	b.wg.Wait()
 }
 
 // worker runs
-func (b *Batch) worker(sess *dyno.Session, operations <-chan Operation, resCh chan<- Result) {
+func (b *Batch) worker(sess *dyno.Session, funcChan <-chan Executer, resCh chan<- error) {
 	for {
 		select {
-		case op, ok := <-operations:
+		case f, ok := <-funcChan:
 			if !ok {
 				// no more work
 				return
 			}
-			resCh <- op.ExecuteInBatch(sess.Request())
+			resCh <- f(sess.Request())
 			b.wg.Done()
 		case <-b.ctx.Done():
 			return

@@ -2,10 +2,8 @@ package operation
 
 import (
 	"context"
-	"sync"
-	"time"
-
 	"github.com/ericmaustin/dyno"
+	"sync"
 )
 
 //Status is the status of the operation
@@ -18,170 +16,110 @@ const (
 	StatusPending = Status("PENDING")
 	//StatusDone set as the operation status when operation is finished
 	StatusDone = Status("DONE")
-	//StatusError set as the operation status when operation is in an error state
-	StatusError = Status("ERROR")
 )
 
-// Operation interface that an operation must satisfy in order to be able to be used in an Batch
+// Operation interface that an operation must satisfy in order to be able to be used in an Batch or Pool
 type Operation interface {
 	ExecuteInBatch(req *dyno.Request) Result
 	Status() Status
-	RunningTime() time.Duration
 	Reset()
 }
 
 // Result represents the res of a completed operation
 type Result interface {
-	Error() error
-	Timing() *Timing
-	OutputInterface() interface{}
-	SetTiming(*Timing)
-	SetError(error)
+	OutputInterface() (interface{}, error)
 }
 
-// resultBase is the base of all result structs in the operation module
-type resultBase struct {
-	timing *Timing
-	err    error
+// ResultBase is the base of all result structs in the operation module
+type ResultBase struct {
+	Err error
 }
 
 // SetError sets the results error
-func (r *resultBase) SetError(err error) {
-	r.err = err
+func (r *ResultBase) SetError(err error) {
+	r.Err = err
 }
 
-// Error returns the  Operation Result's  error
-func (r *resultBase) Error() error {
-	return r.err
-}
+//// Error returns the  Operation Result's  error
+//func (r *ResultBase) Error() error {
+//	return r.err
+//}
 
-// Timing returns the Operation Result's timing
-func (r *resultBase) Timing() *Timing {
-	return r.timing
-}
-
-// SetTiming sets the Operation Result's timing
-func (r *resultBase) SetTiming(timing *Timing) {
-	r.timing = timing
-}
-
-func (t *Timing) start() {
-	t.started = dyno.TimePtr(time.Now())
-}
-
-func (t *Timing) done() {
-	t.finished = dyno.TimePtr(time.Now())
-}
-
-//RunningTime returns the running time as a Duration
-func (t *Timing) RunningTime() time.Duration {
-	if t.started == nil {
-		return 0
-	}
-	if t.finished != nil {
-		return time.Since(*t.started)
-	}
-	return t.finished.Sub(*t.started)
-}
-
-//TotalTime returns the total ellapsed time of the operation
-func (t *Timing) TotalTime() time.Duration {
-	if t.finished != nil {
-		return time.Since(*t.created)
-	}
-	return t.finished.Sub(*t.created)
-}
-
-// baseOperation used as the baseOperation struct type for all operations
-type baseOperation struct {
-	ctx    context.Context
-	done   context.CancelFunc
-	mu     sync.RWMutex
+// BaseOperation used as the BaseOperation struct type for all operations
+type BaseOperation struct {
+	Ctx    context.Context
+	Done   context.CancelFunc
+	Mu     sync.RWMutex
 	status Status
-	timing *Timing
 }
 
-func newBase() *baseOperation {
+//NewBase creates a new base operation
+func NewBase() *BaseOperation {
 	ctx, done := context.WithCancel(context.Background())
-	return &baseOperation{
-		ctx:    ctx,
-		done:   done,
-		mu:     sync.RWMutex{},
+	return &BaseOperation{
+		Ctx:    ctx,
+		Done:   done,
+		Mu:     sync.RWMutex{},
 		status: StatusPending,
-		timing: newTiming(),
 	}
 }
 
 // IsPending returns true if operation is pending execution
-func (b *baseOperation) IsPending() bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+func (b *BaseOperation) IsPending() bool {
+	b.Mu.RLock()
+	defer b.Mu.RUnlock()
 	return b.status == StatusPending
 }
 
 // IsRunning returns true if operation is currently being executed
-func (b *baseOperation) IsRunning() bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+func (b *BaseOperation) IsRunning() bool {
+	b.Mu.RLock()
+	defer b.Mu.RUnlock()
 	return b.status == StatusRunning
 }
 
 // IsDone returns true if operation is done
-func (b *baseOperation) IsDone() bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+func (b *BaseOperation) IsDone() bool {
+	b.Mu.RLock()
+	defer b.Mu.RUnlock()
 	return b.status == StatusDone
 }
 
-func (b *baseOperation) setRunning() {
+func (b *BaseOperation) SetRunning() {
 	if b.status == StatusRunning {
-		panic(&ErrInvalidState{})
+		// already running
+		return
 	}
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.Mu.Lock()
+	defer b.Mu.Unlock()
 	b.status = StatusRunning
-	b.timing.start()
 }
 
-func (b *baseOperation) setDone(result Result) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.timing.done()
-	if result.Error() != nil {
-		b.status = StatusError
-	} else {
-		b.status = StatusDone
-	}
-	result.SetTiming(b.timing)
-	b.done()
+func (b *BaseOperation) SetDone() {
+	b.Mu.Lock()
+	defer b.Mu.Unlock()
+	b.status = StatusDone
+	b.Done()
 }
 
-// RunningTime returns the execution duration of this operation
-// if operation is currently running, will return duration up to now
-func (b *baseOperation) RunningTime() time.Duration {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	return b.timing.RunningTime()
-}
-
-// Status returns the current status of the operation
-func (b *baseOperation) Status() Status {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+// GetStatus returns the current status of the operation
+func (b *BaseOperation) GetStatus() Status {
+	b.Mu.RLock()
+	defer b.Mu.RUnlock()
 	return b.status
 }
 
 // Reset resets this operation
 // panics with an ErrInvalidState error if operation is running
-func (b *baseOperation) Reset() {
+func (b *BaseOperation) Reset() error {
 	if b.IsRunning() {
-		panic(&ErrInvalidState{})
+		return ErrInvalidState
 	}
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.Mu.Lock()
+	defer b.Mu.Unlock()
 	ctx, done := context.WithCancel(context.Background())
 	b.status = StatusPending
-	b.timing = newTiming()
-	b.ctx = ctx
-	b.done = done
+	b.Ctx = ctx
+	b.Done = done
+	return nil
 }

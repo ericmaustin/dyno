@@ -2,6 +2,7 @@ package operation
 
 import (
 	"fmt"
+	testing2 "github.com/ericmaustin/dyno/internal/dynotest"
 	"testing"
 
 	"github.com/ericmaustin/dyno"
@@ -15,22 +16,22 @@ type QueryTestSuite struct {
 }
 
 func (q *QueryTestSuite) SetupSuite() {
-	q.sess = createTestSession()
-	createTestTable(q.sess)
-	putTestRecords(q.sess)
+	q.sess = testing2.createTestSession()
+	testing2.createTestTable(q.sess)
+	testing2.putTestRecords(q.sess)
 }
 
 func (q *QueryTestSuite) TearDownSuite() {
-	destroytestTable(q.sess)
+	testing2.destroytestTable(q.sess)
 }
 
 func (q *QueryTestSuite) TestQueryOperation() {
 
-	target := make([]*testItem, 0)
+	target := make([]*testing2.testItem, 0)
 
 	// scan for records with no conditions
 	scanOutput, err := NewQueryBuilder().
-		SetTable(getTestTableName()).
+		SetTable(testing2.getTestTableName()).
 		AddKeyCondition(condition.KeyEqual("id", "A")).
 		BuildOperation().                    // get the operation
 		SetHandler(LoadSlice(&target, nil)). // set the handler to unmarshal the target
@@ -47,7 +48,7 @@ func (q *QueryTestSuite) TestQueryCountOperation() {
 
 	// scan for records with no conditions
 	scanOutput, err := NewQueryBuilder().
-		SetTable(getTestTableName()).
+		SetTable(testing2.getTestTableName()).
 		AddKeyCondition(condition.KeyEqual("id", "A")).
 		BuildCountOperation(). // get the operation
 		Execute(q.sess.Request()).

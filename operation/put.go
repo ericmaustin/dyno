@@ -20,7 +20,7 @@ const (
 
 // PutResult is the result of a PutOperation
 type PutResult struct {
-	resultBase
+	ResultBase
 	output *dynamodb.PutItemOutput
 }
 
@@ -39,7 +39,7 @@ func (p *PutResult) Output() *dynamodb.PutItemOutput {
 
 // OutputError returns the PutItemOutput and the error from the PutResult for convenience
 func (p *PutResult) OutputError() (*dynamodb.PutItemOutput, error) {
-	return p.Output(), p.err
+	return p.Output(), p.Err
 }
 
 // PutBuilder allows for dynamic building of a PutItem input
@@ -124,14 +124,14 @@ func (p *PutBuilder) BuildOperation() *PutOperation {
 
 // PutOperation used as input for PutOperation
 type PutOperation struct {
-	*baseOperation
+	*BaseOperation
 	input *dynamodb.PutItemInput
 }
 
 // Put creates a New PutOperation with optional PutInput
 func Put(input *dynamodb.PutItemInput) *PutOperation {
 	p := &PutOperation{
-		baseOperation: newBase(),
+		BaseOperation: NewBase(),
 		input:         input,
 	}
 	return p
@@ -143,8 +143,8 @@ func (p *PutOperation) SetInput(input *dynamodb.PutItemInput) *PutOperation {
 	if !p.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.Mu.Lock()
+	defer p.Mu.Unlock()
 	p.input = input
 	return p
 }
@@ -158,9 +158,9 @@ func (p *PutOperation) ExecuteInBatch(req *dyno.Request) Result {
 // Execute executes the PutOperation
 func (p *PutOperation) Execute(req *dyno.Request) (out *PutResult) {
 	out = &PutResult{}
-	p.setRunning()
-	defer p.setDone(out)
-	out.output, out.err = req.PutItem(p.input)
+	p.SetRunning()
+	defer p.SetDone(out)
+	out.output, out.Err = req.PutItem(p.input)
 	return
 }
 

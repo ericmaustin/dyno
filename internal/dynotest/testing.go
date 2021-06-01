@@ -1,6 +1,7 @@
-package operation
+package dynotest
 
 import (
+	"github.com/ericmaustin/dyno/operation"
 	"math/rand"
 	"time"
 
@@ -9,20 +10,24 @@ import (
 	"github.com/ericmaustin/dyno"
 )
 
-type testEmbeddedItem struct {
+type TestEmbeddedItem struct {
 	SubID    int
 	SubField string
 }
 
-type testItem struct {
+type TestItem struct {
 	ID        string            `dyno:"id"`
 	TestField string            `dyno:"test_field"`
-	Embedded  *testEmbeddedItem `dyno:",*"`
+	Embedded  *TestEmbeddedItem `dyno:",*"`
+}
+
+type BaseTestSuite struct {
+
 }
 
 var testTableName = ""
 
-func getTestTableName() string {
+func GetTestTableName() string {
 	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
 	if len(testTableName) < 1 {
 		charset := "abcdefghijklmnopqrstuvwxyz" +
@@ -39,7 +44,7 @@ func getTestTableName() string {
 	return testTableName
 }
 
-func createTestSession() *dyno.Session {
+func CreateTestSession() *dyno.Session {
 	// create the session
 	awsSess, err := session.NewSession()
 
@@ -53,10 +58,10 @@ func createTestSession() *dyno.Session {
 	return sess
 }
 
-func createTestTable(sess *dyno.Session) {
+func CreateTestTable(sess *dyno.Session) {
 	// set up the table
 	tblInput := &dynamodb.CreateTableInput{
-		TableName:   dyno.StringPtr(getTestTableName()),
+		TableName:   dyno.StringPtr(GetTestTableName()),
 		BillingMode: dyno.StringPtr("PAY_PER_REQUEST"),
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
@@ -70,16 +75,19 @@ func createTestTable(sess *dyno.Session) {
 				KeyType:       dyno.StringPtr("HASH"),
 			},
 		},
+		GlobalSecondaryIndexes: []*dynamodb.GlobalSecondaryIndex{
+
+		},
 	}
 
-	err := CreateTable(tblInput).SetWait(true).Execute(sess.Request()).Error()
+	err := operation.CreateTable(tblInput).SetWait(true).Execute(sess.Request()).Error()
 	if err != nil {
 		panic(err)
 	}
 }
 
-func destroytestTable(sess *dyno.Session) {
-	err := DeleteTable(getTestTableName()).
+func DestroyTestTable(sess *dyno.Session) {
+	err := operation.DeleteTable(GetTestTableName()).
 		Execute(sess.Request()).
 		Error()
 
@@ -88,13 +96,13 @@ func destroytestTable(sess *dyno.Session) {
 	}
 
 	// wait for table to be deleted
-	err = WaitForTableDeletion(sess.Request(), getTestTableName(), nil)
+	err = operation.WaitForTableDeletion(sess.Request(), GetTestTableName(), nil)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func putTestKeys(items []*testItem) []map[string]string {
+func PutTestKeys(items []*TestItem) []map[string]string {
 	out := make([]map[string]string, len(items))
 	for i, item := range items {
 		out[i] = map[string]string{
@@ -104,12 +112,12 @@ func putTestKeys(items []*testItem) []map[string]string {
 	return out
 }
 
-func putTestRecords(sess *dyno.Session) []*testItem {
-	testRecords := []*testItem{
+func PutTestRecords(sess *dyno.Session) []*TestItem {
+	testRecords := []*TestItem{
 		{
 			ID:        "A",
 			TestField: "A field",
-			Embedded: &testEmbeddedItem{
+			Embedded: &TestEmbeddedItem{
 				SubID:    1,
 				SubField: "SubA",
 			},
@@ -117,7 +125,7 @@ func putTestRecords(sess *dyno.Session) []*testItem {
 		{
 			ID:        "B",
 			TestField: "B field",
-			Embedded: &testEmbeddedItem{
+			Embedded: &TestEmbeddedItem{
 				SubID:    2,
 				SubField: "SubB",
 			},
@@ -125,7 +133,7 @@ func putTestRecords(sess *dyno.Session) []*testItem {
 		{
 			ID:        "C",
 			TestField: "C field",
-			Embedded: &testEmbeddedItem{
+			Embedded: &TestEmbeddedItem{
 				SubID:    3,
 				SubField: "SubC",
 			},
@@ -133,7 +141,7 @@ func putTestRecords(sess *dyno.Session) []*testItem {
 		{
 			ID:        "D",
 			TestField: "D field",
-			Embedded: &testEmbeddedItem{
+			Embedded: &TestEmbeddedItem{
 				SubID:    4,
 				SubField: "SubD",
 			},
@@ -141,15 +149,15 @@ func putTestRecords(sess *dyno.Session) []*testItem {
 		{
 			ID:        "E",
 			TestField: "E field",
-			Embedded: &testEmbeddedItem{
+			Embedded: &TestEmbeddedItem{
 				SubID:    5,
 				SubField: "SubE",
 			},
 		},
 	}
 
-	batchWriteInput := NewBatchWriteBuilder().AddPuts(getTestTableName(), testRecords).Build()
-	err := BatchWrite(batchWriteInput).SetConcurrency(5).Execute(sess.Request()).Error()
+	batchWriteInput := operation.NewBatchWriteBuilder().AddPuts(GetTestTableName(), testRecords).Build()
+	err := operation.BatchWrite(batchWriteInput).SetConcurrency(5).Execute(sess.Request()).Error()
 	if err != nil {
 		panic(err)
 	}

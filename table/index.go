@@ -57,12 +57,12 @@ func (idx *Index) addProjectionColumns(columns []string) {
 // ExtractKey converts a item's key ProjectionColumns to a map of dynamodb attribute ProjectionColumns for a item
 // belonging to this table
 func (idx *Index) ExtractKey(input interface{}) map[string]*dynamodb.AttributeValue {
-	return idx.Key.extract(encoding.MustMarshalItem(input))
+	return idx.Key.ExtractValues(encoding.MustMarshalItem(input))
 }
 
 // ExtractKeys converts a list of records to a list of dynamodb attribute items
 func (idx *Index) ExtractKeys(input interface{}) []map[string]*dynamodb.AttributeValue {
-	return idx.Key.extractAll(encoding.MustMarshalItems(input))
+	return idx.Key.ExtractAllValues(encoding.MustMarshalItems(input))
 }
 
 // Gsi represents a Global Secondary Index

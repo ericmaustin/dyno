@@ -8,9 +8,9 @@ import (
 	"github.com/ericmaustin/dyno/encoding"
 )
 
-// QueryResult is returned by the QueryOperation Execution in a channel when operation completes
+// QueryResult is returned by the QueryOperation Executer in a channel when operation completes
 type QueryResult struct {
-	resultBase
+	ResultBase
 	output []*dynamodb.QueryOutput
 }
 
@@ -26,7 +26,7 @@ func (q *QueryResult) Output() []*dynamodb.QueryOutput {
 
 // OutputError returns the QueryOutput slice and the error from the QueryResult for convenience
 func (q *QueryResult) OutputError() ([]*dynamodb.QueryOutput, error) {
-	return q.Output(), q.err
+	return q.Output(), q.Err
 }
 
 // QueryBuilder dynamically constructs a QueryInput
@@ -200,17 +200,26 @@ func (q *QueryBuilder) BuildCountOperation() *QueryCountOperation {
 	return QueryCount(q.BuildCount())
 }
 
+//QueryFunc is the func that executes the query with a given request and query input
+type QueryFunc func(req *dyno.Request, input *dynamodb.QueryInput) (*dynamodb.QueryOutput, error)
+
+//DefaultQueryFunc is the default query func
+func DefaultQueryFunc(req *dyno.Request, input *dynamodb.QueryInput) (*dynamodb.QueryOutput, error) {
+	return req.Query(input)
+}
+
 // QueryOperation runs query operations and handles their res
 type QueryOperation struct {
-	*baseOperation
-	input   *dynamodb.QueryInput
-	handler ItemSliceHandler
+	*BaseOperation
+	input     *dynamodb.QueryInput
+	handler   ItemSliceHandler
+	queryFunc QueryFunc
 }
 
 // Input returns a ptr to the Input Input
 func (q *QueryOperation) Input() *dynamodb.QueryInput {
-	q.mu.RLock()
-	defer q.mu.RUnlock()
+	q.Mu.RLock()
+	defer q.Mu.RUnlock()
 	return q.input
 }
 
@@ -220,17 +229,31 @@ func (q *QueryOperation) SetInput(input *dynamodb.QueryInput) *QueryOperation {
 	if !q.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	q.Mu.Lock()
+	defer q.Mu.Unlock()
 	q.input = input
+	return q
+}
+
+// SetQueryFunction sets the function used to query the input
+// this can be used to customize how the query is being called
+// panics with an ErrInvalidState error if operation isn't pending
+func (q *QueryOperation) SetQueryFunction(f QueryFunc) *QueryOperation {
+	if !q.IsPending() {
+		panic(&ErrInvalidState{})
+	}
+	q.Mu.Lock()
+	defer q.Mu.Unlock()
+	q.queryFunc = f
 	return q
 }
 
 // Query creates a new input object with the required session request and primary key
 func Query(input *dynamodb.QueryInput) *QueryOperation {
 	return &QueryOperation{
-		baseOperation: newBase(),
+		BaseOperation: NewBase(),
 		input:         input,
+		queryFunc:     DefaultQueryFunc,
 	}
 }
 
@@ -240,8 +263,8 @@ func (q *QueryOperation) SetHandler(handler ItemSliceHandler) *QueryOperation {
 	if !q.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	q.Mu.Lock()
+	defer q.Mu.Unlock()
 	q.handler = handler
 	return q
 }
@@ -251,8 +274,8 @@ func (q *QueryOperation) SetLimit(limit int64) *QueryOperation {
 	if !q.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	q.Mu.Lock()
+	defer q.Mu.Unlock()
 	q.input.SetLimit(limit)
 	return q
 }
@@ -262,8 +285,8 @@ func (q *QueryOperation) SetStartKey(startKey map[string]*dynamodb.AttributeValu
 	if !q.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	q.Mu.Lock()
+	defer q.Mu.Unlock()
 	q.input.ExclusiveStartKey = startKey
 	return q
 }
@@ -273,8 +296,8 @@ func (q *QueryOperation) SetScanIndexForward(indexForward bool) *QueryOperation 
 	if !q.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	q.Mu.Lock()
+	defer q.Mu.Unlock()
 	q.input.SetScanIndexForward(indexForward)
 	return q
 }
@@ -288,8 +311,8 @@ func (q *QueryOperation) ExecuteInBatch(req *dyno.Request) Result {
 // Execute executes the Input
 func (q *QueryOperation) Execute(req *dyno.Request) (out *QueryResult) {
 	out = &QueryResult{}
-	q.setRunning()
-	defer q.setDone(out)
+	q.SetRunning()
+	defer q.SetDone(out)
 
 	out.output = make([]*dynamodb.QueryOutput, 0)
 
@@ -298,9 +321,9 @@ func (q *QueryOperation) Execute(req *dyno.Request) (out *QueryResult) {
 	// start a for loop that keeps scanning as we page through returned ProjectionColumns
 	for {
 		// Execute the input
-		output, out.err = req.Query(q.input)
+		output, out.Err = q.queryFunc(req, q.input)
 
-		if out.err != nil {
+		if out.Err != nil {
 			return
 		}
 
@@ -309,8 +332,8 @@ func (q *QueryOperation) Execute(req *dyno.Request) (out *QueryResult) {
 
 		// if we have items and a handler, Execute the handler
 		if len(output.Items) > 0 && q.handler != nil {
-			out.err = q.handler(output.Items)
-			if out.err != nil {
+			out.Err = q.handler(output.Items)
+			if out.Err != nil {
 				return
 			}
 		}
@@ -338,9 +361,9 @@ func (q *QueryOperation) GoExecute(req *dyno.Request) <-chan *QueryResult {
 	return outCh
 }
 
-// QueryCountResult is returned by the QueryCountOperation Execution in a channel when operation completes
+// QueryCountResult is returned by the QueryCountOperation Executer in a channel when operation completes
 type QueryCountResult struct {
-	resultBase
+	ResultBase
 	output int64
 }
 
@@ -356,20 +379,34 @@ func (qc *QueryCountResult) Output() int64 {
 
 // OutputError returns the QueryOutput slice and the error from the QueryResult for convenience
 func (qc *QueryCountResult) OutputError() (int64, error) {
-	return qc.Output(), qc.err
+	return qc.Output(), qc.Err
 }
 
 // QueryCountOperation runs query operations and handles their res
 type QueryCountOperation struct {
-	*baseOperation
-	input *dynamodb.QueryInput
+	*BaseOperation
+	input     *dynamodb.QueryInput
+	queryFunc QueryFunc
 }
 
 // Input returns a ptr to the Input Input
 func (qc *QueryCountOperation) Input() *dynamodb.QueryInput {
-	qc.mu.RLock()
-	defer qc.mu.RUnlock()
+	qc.Mu.RLock()
+	defer qc.Mu.RUnlock()
 	return qc.input
+}
+
+// SetQueryFunction sets the function used to query the input
+// this can be used to customize how the query is being called
+// panics with an ErrInvalidState error if operation isn't pending
+func (qc *QueryCountOperation) SetQueryFunction(f QueryFunc) *QueryCountOperation {
+	if !qc.IsPending() {
+		panic(&ErrInvalidState{})
+	}
+	qc.Mu.Lock()
+	defer qc.Mu.Unlock()
+	qc.queryFunc = f
+	return qc
 }
 
 // SetInput sets the QueryInput
@@ -378,8 +415,8 @@ func (qc *QueryCountOperation) SetInput(input *dynamodb.QueryInput) *QueryCountO
 	if !qc.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	qc.mu.Lock()
-	defer qc.mu.Unlock()
+	qc.Mu.Lock()
+	defer qc.Mu.Unlock()
 	qc.input = input
 	return qc
 }
@@ -387,8 +424,9 @@ func (qc *QueryCountOperation) SetInput(input *dynamodb.QueryInput) *QueryCountO
 // QueryCount creates a new QueryCountOperation
 func QueryCount(input *dynamodb.QueryInput) *QueryCountOperation {
 	return &QueryCountOperation{
-		baseOperation: newBase(),
+		BaseOperation: NewBase(),
 		input:         input,
+		queryFunc:     DefaultQueryFunc,
 	}
 }
 
@@ -397,8 +435,8 @@ func (qc *QueryCountOperation) SetStartKey(startKey map[string]*dynamodb.Attribu
 	if !qc.IsPending() {
 		panic(&ErrInvalidState{})
 	}
-	qc.mu.Lock()
-	defer qc.mu.Unlock()
+	qc.Mu.Lock()
+	defer qc.Mu.Unlock()
 	qc.input.ExclusiveStartKey = startKey
 	return qc
 }
@@ -412,17 +450,17 @@ func (qc *QueryCountOperation) ExecuteInBatch(req *dyno.Request) Result {
 // Execute executes the QueryCountOperation
 func (qc *QueryCountOperation) Execute(req *dyno.Request) (out *QueryCountResult) {
 	out = &QueryCountResult{}
-	qc.setRunning()
-	defer qc.setDone(out)
+	qc.SetRunning()
+	defer qc.SetDone(out)
 
 	var output *dynamodb.QueryOutput
 
 	// start a for loop that keeps scanning as we page through returned ProjectionColumns
 	for {
 		// Execute the input
-		output, out.err = req.Query(qc.input)
+		output, out.Err = qc.queryFunc(req, qc.input)
 
-		if out.err != nil {
+		if out.Err != nil {
 			return
 		}
 

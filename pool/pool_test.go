@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ericmaustin/dyno"
+	"github.com/ericmaustin/dyno/internal/dynotest"
 	"github.com/stretchr/testify/suite"
 	"sync"
 	"testing"
@@ -13,28 +14,28 @@ import (
 type PoolTestSuite struct {
 	suite.Suite
 	sess    *dyno.Session
-	records []*testItem
+	records []*dynotest.TestItem
 	keys    []map[string]string
 }
 
 func (s *PoolTestSuite) SetupSuite() {
-	s.sess = createTestSession()
-	createTestTable(s.sess)
-	s.records = putTestRecords(s.sess)
-	s.keys = putTestKeys(s.records)
+	s.sess = dynotest.CreateTestSession()
+	dynotest.CreateTestTable(s.sess)
+	s.records = dynotest.PutTestRecords(s.sess)
+	s.keys = dynotest.PutTestKeys(s.records)
 }
 
 func (s *PoolTestSuite) TearDownSuite() {
-	destroytestTable(s.sess)
+	dynotest.DestroyTestTable(s.sess)
 }
 
 func (s *PoolTestSuite) TestBatchGet() {
 
-	pool := NewPool(context.Background(), 3)
+	pool := NewPool(s.sess, 3)
 	defer pool.Stop()
 	mu := &sync.Mutex{}
 
-	var target []*testItem
+	var target []*dynotest.TestItem
 	var outs   []*PoolResult
 
 	timerStart := time.Now()
