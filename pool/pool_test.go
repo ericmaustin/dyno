@@ -1,7 +1,6 @@
 package operation
 
 import (
-	"context"
 	"fmt"
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/internal/dynotest"
@@ -14,13 +13,13 @@ import (
 type PoolTestSuite struct {
 	suite.Suite
 	sess    *dyno.Session
-	records []*dynotest.TestItem
+	records []*dyno.TestItem
 	keys    []map[string]string
 }
 
 func (s *PoolTestSuite) SetupSuite() {
-	s.sess = dynotest.CreateTestSession()
-	dynotest.CreateTestTable(s.sess)
+	s.sess = dyno.CreateTestSession()
+	dyno.CreateTestTable(s.sess)
 	s.records = dynotest.PutTestRecords(s.sess)
 	s.keys = dynotest.PutTestKeys(s.records)
 }
@@ -35,8 +34,8 @@ func (s *PoolTestSuite) TestBatchGet() {
 	defer pool.Stop()
 	mu := &sync.Mutex{}
 
-	var target []*dynotest.TestItem
-	var outs   []*PoolResult
+	var target []*dyno.TestItem
+	var outs []*PoolResult
 
 	timerStart := time.Now()
 	for _, rec := range s.records {
@@ -63,7 +62,6 @@ func (s *PoolTestSuite) TestBatchGet() {
 		fmt.Printf("[%s] -> %s\n", t.ID, t.TestField)
 	}
 }
-
 
 // In order for 'go test' to Execute this suite, we need to create
 // a normal test function and pass our suite to suite.Run

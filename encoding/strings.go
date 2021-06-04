@@ -24,7 +24,7 @@ func ToString(input interface{}) string {
 // ToStringSlice converts an arbitrary input into a slice of strings
 // panics if input is not a slice or does not contain elements that can be converted to a string
 func ToStringSlice(input interface{}) []string {
-	rv := indirect(reflect.ValueOf(input), false)
+	rv := Indirect(reflect.ValueOf(input), false)
 
 	if rv.Kind() != reflect.Slice {
 		panic(fmt.Errorf("cannot covert non-slice kind: %v", rv.Kind()))

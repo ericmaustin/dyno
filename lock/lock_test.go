@@ -50,7 +50,7 @@ func TestLock(t *testing.T) {
 		SetMaxTimeout(time.Minute)
 
 	// set up the table
-	tbl := table.NewTable(getTestTableName(), table.NewKey(table.NewPartitionStringKey("id"), nil))
+	tbl := dyno.NewTable(getTestTableName(), table.NewKey(table.NewPartitionStringKey("id"), nil))
 
 	pubRes := <-tbl.Publish(sess.RequestWithTimeout(time.Minute))
 	_, err = pubRes.OutputError()

@@ -61,7 +61,7 @@ type ScanAllResult struct {
 func (s *ScanAllResult) Output() ([]*dynamodb.ScanOutput, error) {
 	var (
 		merr MultiError
-		err error
+		err  error
 	)
 
 	out := make([]*dynamodb.ScanOutput, len(s.results))
@@ -79,7 +79,6 @@ func ScanFunc(in *dynamodb.ScanInput, handler dyno.ScanHandler) PoolFunc {
 		return req.ScanAll(in, handler)
 	}
 }
-
 
 // ScanCountResult used used as the Scan result from a pool operation
 type ScanCountResult struct {
@@ -107,8 +106,8 @@ type ScanCountAllResult struct {
 // Output waits for the output and the error to be returned
 func (s *ScanCountAllResult) Output() (int64, error) {
 	var (
-		merr MultiError
-		err error
+		merr       MultiError
+		err        error
 		cnt, total int64
 	)
 
@@ -129,13 +128,13 @@ func (s *ScanCountAllResult) Output() (int64, error) {
 //	return out
 //}
 
-// GetResult used used as the Get result from a pool operation
-type GetResult struct {
+// GetItemResult used used as the GetItem result from a pool operation
+type GetItemResult struct {
 	*PoolResult
 }
 
 // Output waits for the output and the error to be returned
-func (r *GetResult) Output() (*dynamodb.GetItemOutput, error) {
+func (r *GetItemResult) Output() (*dynamodb.GetItemOutput, error) {
 	out, err := r.output()
 	return out.(*dynamodb.GetItemOutput), err
 }
@@ -163,7 +162,6 @@ func BatchGetItemFunc(in *dynamodb.BatchGetItemInput, handler dyno.BatchGetItemH
 	}
 }
 
-
 // BatchGetItemAllResult used used as the BatchGetItemAll result from a pool operation
 type BatchGetItemAllResult struct {
 	results []*BatchGetItemResult
@@ -173,7 +171,7 @@ type BatchGetItemAllResult struct {
 func (r *BatchGetItemAllResult) Output() ([]*dynamodb.BatchGetItemOutput, error) {
 	var (
 		merr MultiError
-		err error
+		err  error
 	)
 
 	out := make([]*dynamodb.BatchGetItemOutput, len(r.results))
@@ -184,4 +182,80 @@ func (r *BatchGetItemAllResult) Output() ([]*dynamodb.BatchGetItemOutput, error)
 	}
 
 	return out, merr.Return()
+}
+
+// CreateTableResult used used as the Pool.CreateTable result
+type CreateTableResult struct {
+	*PoolResult
+}
+
+// Output waits for the output and the error to be returned
+func (r *CreateTableResult) Output() (*dynamodb.CreateTableOutput, error) {
+	out, err := r.output()
+	return out.(*dynamodb.CreateTableOutput), err
+}
+
+//CreateTableFunc returns a PoolFunc for executing a Request.CreateTable operation in the Pool
+func CreateTableFunc(in *dynamodb.CreateTableInput, handler dyno.CreateTableHandler) PoolFunc {
+	return func(req *dyno.Request) (interface{}, error) {
+		return req.CreateTable(in, handler)
+	}
+}
+
+// DeleteTableResult used used as the Pool.DeleteTable result
+type DeleteTableResult struct {
+	*PoolResult
+}
+
+// Output waits for the output and the error to be returned
+func (r *DeleteTableResult) Output() (*dynamodb.DeleteTableOutput, error) {
+	out, err := r.output()
+	return out.(*dynamodb.DeleteTableOutput), err
+}
+
+//DeleteTableFunc returns a PoolFunc for executing a Request.DeleteTable operation in the Pool
+func DeleteTableFunc(in *dynamodb.DeleteTableInput, handler dyno.DeleteTableHandler) PoolFunc {
+	return func(req *dyno.Request) (interface{}, error) {
+		return req.DeleteTable(in, handler)
+	}
+}
+
+//ListenForTableReadyResult used used as the Pool.DeleteTable result
+type ListenForTableReadyResult struct {
+	*PoolResult
+}
+
+// Output waits for the dyno.TableReadyOutput returned by Request.ListenForTableReady
+func (r *ListenForTableReadyResult) Output() *dyno.TableReadyOutput {
+	// no error is returned. See: ListenForTableDeletionFunc
+	out, _ := r.output()
+	return out.(*dyno.TableReadyOutput)
+}
+
+//ListenForTableReadyFunc returns a PoolFunc for executing a Request.ListenForTableReady operation in the Pool
+func ListenForTableReadyFunc(tableName string) PoolFunc {
+	return func(req *dyno.Request) (interface{}, error) {
+		// no error returned
+		return req.ListenForTableDeletion(tableName), nil
+	}
+}
+
+// ListenForTableDeletionResult used used as the Pool.DeleteTable result
+type ListenForTableDeletionResult struct {
+	*PoolResult
+}
+
+// Output waits for the error chan returned by Request.ListenForTableDeletion
+func (r *ListenForTableDeletionResult) Output() <-chan error {
+	// no error is returned. See: ListenForTableDeletionFunc
+	out, _ := r.output()
+	return out.(<-chan error)
+}
+
+//ListenForTableDeletionFunc returns a PoolFunc for executing a Request.ListenForTableDeletion operation in the Pool
+func ListenForTableDeletionFunc(tableName string) PoolFunc {
+	return func(req *dyno.Request) (interface{}, error) {
+		// no error returned
+		return req.ListenForTableDeletion(tableName), nil
+	}
 }

@@ -2,12 +2,11 @@ package encoding
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"reflect"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"github.com/ericmaustin/dyno"
 )
 
 //ItemUnmarshaller allows more control over decoding structs from attribute value maps
@@ -26,30 +25,29 @@ func UnmarshalItems(items []map[string]*dynamodb.AttributeValue, input interface
 	rv := reflect.ValueOf(input)
 
 	if rv.Kind() != reflect.Ptr {
-		return &dyno.Error{
-			Code: dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("cannot unmarshal to non-ptr kind: %v. Must be a ptr to a slice",
-				rv.Kind()),
-		}
+		return errors.New("reflect value is not a Ptr")
 	}
 
 	sliceVal := rv.Elem()
 	if sliceVal.Kind() != reflect.Slice {
-		return &dyno.Error{
-			Code: dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("cannot unmarshal to a ptr to a %v. Must be a ptr to a slice",
-				sliceVal.Kind()),
-		}
+		return errors.New("reflect value is not a Slice")
 	}
 
 	// check if unmarshaller
 	if sliceVal.Type().Elem().Implements(itemUnmarshallerReflectType) {
 		for _, item := range items {
+			indirectType, steps := IndirectType(sliceVal.Type().Elem())
 			// create a new value from the slice's element type
-			target := reflect.New(sliceVal.Type().Elem())
+			target := reflect.New(indirectType)
 			// run the unmarshaller
 			if err := target.Interface().(ItemUnmarshaller).UnmarshalItem(item); err != nil {
 				return err
+			}
+			for i := 0; i < steps-1; i++ {
+				//add ptrs till we go back to the same number of ptrs as target should have
+				newTarget := reflect.New(target.Type())
+				newTarget.Elem().Set(target)
+				target = newTarget
 			}
 			sliceVal.Set(reflect.Append(sliceVal, target))
 		}
@@ -61,7 +59,7 @@ func UnmarshalItems(items []map[string]*dynamodb.AttributeValue, input interface
 		for _, item := range items {
 			// create a new value from the slice's element type
 			target := reflect.New(sliceVal.Type().Elem()).Elem()
-			target = reflect.New(indirect(target, false).Type())
+			target = reflect.New(Indirect(target, false).Type())
 			if err := unmarshalItemToValue(item, target); err != nil {
 				return err
 			}
@@ -74,7 +72,7 @@ func UnmarshalItems(items []map[string]*dynamodb.AttributeValue, input interface
 	for _, item := range items {
 		// create a new value from the slice's element type
 		target := reflect.New(sliceVal.Type().Elem())
-		target = reflect.New(indirect(target, false).Type())
+		target = reflect.New(Indirect(target, false).Type())
 		if err := unmarshalItemToValue(item, target); err != nil {
 			return err
 		}
@@ -95,10 +93,7 @@ func UnmarshalItem(item map[string]*dynamodb.AttributeValue, input interface{}) 
 
 func unmarshalItemToValue(rec map[string]*dynamodb.AttributeValue, rv reflect.Value) error {
 	if rv.Kind() != reflect.Ptr {
-		return &dyno.Error{
-			Code:    dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("input is not a ptr, it is a %v", rv.Kind()),
-		}
+		return errors.New("reflect value is not a Ptr")
 	}
 	switch rv.Elem().Kind() {
 	case reflect.Struct:
@@ -110,26 +105,17 @@ func unmarshalItemToValue(rec map[string]*dynamodb.AttributeValue, rv reflect.Va
 			return err
 		}
 	default:
-		return &dyno.Error{
-			Code:    dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("cannot unmarshal input kind %v", rv.Elem().Kind()),
-		}
+		return errors.New("reflect value is not a Struct or Map")
 	}
 	return nil
 }
 
 func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.Value, prepend, append string) error {
 	if rv.Kind() != reflect.Ptr {
-		return &dyno.Error{
-			Code:    dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("input kind is not a ptr, it is a %v", rv.Kind()),
-		}
+		return errors.New("reflect value is not a Ptr")
 	}
 	if rv.Elem().Kind() != reflect.Struct {
-		return &dyno.Error{
-			Code:    dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("input struct is not a struct, it is a %v", rv.Elem().Kind()),
-		}
+		return errors.New("reflect value is not a Struct")
 	}
 	if item == nil {
 		return nil
@@ -152,32 +138,21 @@ func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.
 
 		if fc.Embed {
 			// treat this object as a embedded struct
-			fv := indirect(rv.Elem().Field(i), false)
+			fv := Indirect(rv.Elem().Field(i), false)
 
 			switch fv.Kind() {
 			case reflect.Struct:
 				targetVal := reflect.New(fv.Type())
 				if err := unmarshalItemToStruct(item, targetVal, fc.Prepend, fc.Append); err != nil {
-					return &dyno.Error{
-						Code: dyno.ErrEncodingEmbeddedStructUnmarshalFailed,
-						Message: fmt.Sprintf("could not process embedded struct field '%s' failed with error: %v",
-							ft.Name, err),
-					}
+					return err
 				}
-				fv.Set(indirect(targetVal, false))
+				fv.Set(Indirect(targetVal, false))
 			case reflect.Map:
 				if err := unmarshalItemToEmbededMap(item, fv, fc.Prepend, fc.Append); err != nil {
-					return &dyno.Error{
-						Code: dyno.ErrEncodingEmbeddedMapUnmarshalFailed,
-						Message: fmt.Sprintf("could not process embedded map field '%s' failed with error: %v",
-							ft.Name, err),
-					}
+					return err
 				}
 			default:
-				return &dyno.Error{
-					Code:    dyno.ErrEncodingEmbeddedBadKind,
-					Message: fmt.Sprintf("cannot process embedded value with kind '%v'", fv.Kind()),
-				}
+				return errors.New("reflect value is not a Struct or Map")
 			}
 
 			continue
@@ -201,24 +176,18 @@ func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.
 func unmarshalItemToEmbededMap(item map[string]*dynamodb.AttributeValue, rv reflect.Value, prepend, append string) error {
 
 	if rv.Kind() != reflect.Map {
-		return &dyno.Error{
-			Code:    dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("input map is not a map, it is a %v", rv.Kind()),
-		}
+		return errors.New("reflect value is not a Map")
 	}
 	if item == nil {
 		return nil
 	}
 
 	if rv.Type().Key().Kind() != reflect.String {
-		return &dyno.Error{
-			Code:    dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("map keys are not a string, map keys are %v", rv.Type().Key().Kind()),
-		}
+		return errors.New("reflect value map key is not a String")
 	}
 
 	for _, key := range rv.MapKeys() {
-		keyStr := prepend + ToString(indirect(key, false)) + append
+		keyStr := prepend + ToString(Indirect(key, false)) + append
 
 		if _, ok := item[keyStr]; ok {
 			target := reflect.New(rv.Type().Elem())
@@ -238,7 +207,7 @@ func unmarshalItem(item *dynamodb.AttributeValue, rv reflect.Value, fromJSON boo
 		return nil
 	}
 
-	rv = indirect(rv, false)
+	rv = Indirect(rv, false)
 
 	target := reflect.New(rv.Type())
 
@@ -250,13 +219,13 @@ func unmarshalItem(item *dynamodb.AttributeValue, rv reflect.Value, fromJSON boo
 		if err := json.Unmarshal([]byte(*item.S), target.Interface()); err != nil {
 			return err
 		}
-		rv.Set(indirect(target, false))
+		rv.Set(Indirect(target, false))
 		return nil
 	}
 
 	if err := dynamodbattribute.Unmarshal(item, target.Interface()); err != nil {
 		return err
 	}
-	rv.Set(indirect(target, false))
+	rv.Set(Indirect(target, false))
 	return nil
 }

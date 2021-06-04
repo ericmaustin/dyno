@@ -2,18 +2,17 @@ package encoding
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"reflect"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"github.com/ericmaustin/dyno"
 )
 
 //ItemMarshaller allows more control over encoding structs to attribute value maps
 type ItemMarshaller interface {
-	MarshalItem() (map[string]*dynamodb.AttributeValue, error)
+	MarshalItem(map[string]*dynamodb.AttributeValue) error
 	//UpdateItem(map[string]*dynamodb.AttributeValue) error
 }
 
@@ -22,11 +21,11 @@ var intermMarshallerReflectType = reflect.TypeOf((*ItemMarshaller)(nil)).Elem()
 // MarshalItems marshals an input slice into a slice of attribute value maps
 // panics if the input's kind is not a slice
 func MarshalItems(input interface{}) ([]map[string]*dynamodb.AttributeValue, error) {
+	var records []map[string]*dynamodb.AttributeValue
 	if avMapSlice, ok := input.([]map[string]*dynamodb.AttributeValue); ok {
 		// input is already a slice of attribute value maps
 		return avMapSlice, nil
 	}
-	records := make([]map[string]*dynamodb.AttributeValue, 0)
 	if err := AppendItems(&records, input); err != nil {
 		return nil, err
 	}
@@ -45,23 +44,21 @@ func MustMarshalItems(input interface{}) []map[string]*dynamodb.AttributeValue {
 
 // AppendItems encodes a given input and appends these items to the given slice of items
 func AppendItems(items *[]map[string]*dynamodb.AttributeValue, input interface{}) error {
-	rv := indirect(reflect.ValueOf(input), false)
+	rv := Indirect(reflect.ValueOf(input), false)
 
 	if rv.Kind() != reflect.Slice {
-		return &dyno.Error{
-			Code:    dyno.ErrEncodingEmbeddedBadKind,
-			Message: fmt.Sprintf("cannot marshal non-slice kind: %v", rv.Kind()),
-		}
+		return errors.New("reflect value is not a slice")
 	}
 
 	// if item marshaller then marshal
 	if rv.Type().Elem().Implements(intermMarshallerReflectType) {
 		for i := 0; i < rv.Len(); i++ {
-			av, err := rv.Index(i).Interface().(ItemMarshaller).MarshalItem()
+			avMap := make(map[string]*dynamodb.AttributeValue)
+			err := rv.Index(i).Interface().(ItemMarshaller).MarshalItem(avMap)
 			if err != nil {
 				return err
 			}
-			*items = append(*items, av)
+			*items = append(*items, avMap)
 		}
 		return nil
 	}
@@ -82,7 +79,8 @@ func MarshalItem(input interface{}) (map[string]*dynamodb.AttributeValue, error)
 		return avMap, nil
 	}
 	if marshaller, ok := input.(ItemMarshaller); ok {
-		return marshaller.MarshalItem()
+		avMap := make(map[string]*dynamodb.AttributeValue)
+		return avMap, marshaller.MarshalItem(avMap)
 	}
 	return marshalValueToRecord(reflect.ValueOf(input))
 }
@@ -116,7 +114,7 @@ func AddToRecord(rec map[string]*dynamodb.AttributeValue, inputs ...interface{})
 }
 
 func addValuesToRecord(item map[string]*dynamodb.AttributeValue, rv reflect.Value) error {
-	rv = indirect(rv, false)
+	rv = Indirect(rv, false)
 	switch rv.Kind() {
 	case reflect.Struct:
 		if err := addStructToRecord(rv, item, "", ""); err != nil {
@@ -138,17 +136,14 @@ func addValuesToRecord(item map[string]*dynamodb.AttributeValue, rv reflect.Valu
 			return err
 		}
 	default:
-		return &dyno.Error{
-			Code:    dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("input must be a struct or map, input is a %v", rv.Kind()),
-		}
+		return errors.New("reflect value is not a Struct or Map")
 	}
 	return nil
 }
 
 func structToRecord(input interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	av := map[string]*dynamodb.AttributeValue{}
-	err := addStructToRecord(indirect(reflect.ValueOf(input), false), av, "", "")
+	err := addStructToRecord(Indirect(reflect.ValueOf(input), false), av, "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -173,17 +168,14 @@ func addMapToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValue, 
 
 func mapToIfaceMap(rv reflect.Value, prepend, append string) (map[string]interface{}, error) {
 	if rv.Kind() != reflect.Map {
-		return nil, &dyno.Error{
-			Code:    dyno.ErrEncodingBadKind,
-			Message: fmt.Sprintf("input map is not a map. input is a %v", rv.Kind()),
-		}
+		return nil, errors.New("reflect value is not Map")
 	}
 
 	iter := rv.MapRange()
 	iFaceMap := map[string]interface{}{}
 
 	for iter.Next() {
-		key := indirect(iter.Key(), false)
+		key := Indirect(iter.Key(), false)
 		iFaceMap[prepend+ToString(key.Interface())+append] = iter.Value().Interface()
 	}
 	return iFaceMap, nil
@@ -195,7 +187,7 @@ func marshalAv(rv reflect.Value, omitZero, omitNil, toJSON bool) (*dynamodb.Attr
 		return nil, nil
 	}
 
-	rv = indirect(rv, false)
+	rv = Indirect(rv, false)
 
 	if toJSON {
 		// we're encoding to json to marshal value with json marshaller and set value to string
@@ -234,15 +226,11 @@ func addStructToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValu
 
 		if fc.Embed {
 			// treat this object as a embedded struct or map
-			fv := indirect(val, false)
+			fv := Indirect(val, false)
 			switch fv.Kind() {
 			case reflect.Struct:
-				if err := addStructToRecord(fv, item, fc.Prepend, fc.Append); err != nil {
-					return &dyno.Error{
-						Code: dyno.ErrEncodingEmbeddedStructMarshalFailed,
-						Message: fmt.Sprintf("addStructToRecord on embedded struct field '%s' failed with error: %v",
-							ft.Name, err),
-					}
+				if err = addStructToRecord(fv, item, fc.Prepend, fc.Append); err != nil {
+					return err
 				}
 			case reflect.Map:
 				if fc.OmitNil && fv.IsNil() {
@@ -251,18 +239,11 @@ func addStructToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValu
 				if fc.OmitZero && fv.IsZero() {
 					continue
 				}
-				if err := addMapToRecord(fv, item, fc.Prepend, fc.Append); err != nil {
-					return &dyno.Error{
-						Code: dyno.ErrEncodingEmbeddedMapMarshalFailed,
-						Message: fmt.Sprintf("addStructToRecord on embedded map field '%s' failed with error: %v",
-							ft.Name, err),
-					}
+				if err = addMapToRecord(fv, item, fc.Prepend, fc.Append); err != nil {
+					return err
 				}
 			default:
-				return &dyno.Error{
-					Code:    dyno.ErrEncodingEmbeddedBadKind,
-					Message: fmt.Sprintf("embedded kind %v is not suported", fv.Kind()),
-				}
+				return errors.New("embedded value is not a Struct or Map")
 			}
 			continue
 		}
@@ -304,9 +285,9 @@ func addMapToAv(input map[string]interface{}, item map[string]*dynamodb.Attribut
 	return nil
 }
 
-// Based on the enoding/JSON type reflect value type indirection in GoExec Stdlib
+// Indirect is Based on the enoding/JSON type reflect value type indirection in GoExec Stdlib
 // https://golang.org/src/encoding/json/decode.go Indirect func.
-func indirect(rv reflect.Value, decodingNil bool) reflect.Value {
+func Indirect(rv reflect.Value, decodingNil bool) reflect.Value {
 	v0 := rv
 	haveAddr := false
 
@@ -353,6 +334,49 @@ func indirect(rv reflect.Value, decodingNil bool) reflect.Value {
 	return rv
 }
 
+// IndirectType Based on the enoding/JSON type reflect value type indirection in GoExec Stdlib except
+// used for reflect.Type
+// https://golang.org/src/encoding/json/decode.go Indirect func.
+func IndirectType(rt reflect.Type) (reflect.Type, int) {
+	v0 := rt
+	haveAddr := false
+	steps := 0
+
+	if rt.Kind() != reflect.Ptr && rt.Name() != "" {
+		haveAddr = true
+	}
+	for {
+		// Load value from interface, but only if the result will be
+		// usefully addressable.
+		if rt.Kind() == reflect.Interface {
+			e := rt.Elem()
+			if e.Kind() == reflect.Ptr && e.Elem().Kind() == reflect.Ptr {
+				haveAddr = false
+				rt = e
+				steps++
+				continue
+			}
+		}
+		if rt.Kind() != reflect.Ptr {
+			break
+		}
+		if rt.Elem().Kind() == reflect.Interface && rt.Elem().Elem() == rt {
+			rt = rt.Elem()
+			steps++
+			break
+		}
+		if haveAddr {
+			rt = v0 // restore original value after round-trip Value.Addr().Elem()
+			haveAddr = false
+		} else {
+			rt = rt.Elem()
+			steps++
+		}
+	}
+
+	return rt, steps
+}
+
 func reflectValueIsNil(rv reflect.Value) bool {
 	for {
 		if (rv.Kind() == reflect.Interface ||
@@ -374,7 +398,7 @@ func reflectValueIsNil(rv reflect.Value) bool {
 }
 
 func reflectValueIsZero(v reflect.Value) bool {
-	ind := indirect(v, false)
+	ind := Indirect(v, false)
 	return reflect.DeepEqual(ind.Interface(), reflect.Zero(ind.Type()).Interface())
 }
 
@@ -392,7 +416,7 @@ func FieldNames(input interface{}) (names []string, err error) {
 }
 
 func appendFieldNames(names []string, rv reflect.Value) (out []string, err error) {
-	rv = indirect(rv, false)
+	rv = Indirect(rv, false)
 	switch rv.Kind() {
 	case reflect.Struct:
 		out, err = appendStructFieldNames(names, rv, "", "")
@@ -403,10 +427,7 @@ func appendFieldNames(names []string, rv reflect.Value) (out []string, err error
 		// if the map is already a map of dynamodb attribute values, add them as is
 		out = appendMapFieldNames(names, rv, "", "")
 	default:
-		return nil, &dyno.Error{
-			Code:    dyno.ErrEncodingEmbeddedBadKind,
-			Message: fmt.Sprintf("input must be a struct or map, input is a %v", rv.Kind()),
-		}
+		return nil, errors.New("reflect value is not a Map or Struct")
 	}
 	return
 }
@@ -431,7 +452,7 @@ func appendStructFieldNames(names []string, rv reflect.Value, prependStr, append
 		val := rv.Field(i)
 
 		if fc.Embed {
-			fv := indirect(val, false)
+			fv := Indirect(val, false)
 			subNames = []string{}
 
 			switch fv.Kind() {
@@ -439,19 +460,12 @@ func appendStructFieldNames(names []string, rv reflect.Value, prependStr, append
 				// treat this object as a embedded struct
 				subNames, err = appendStructFieldNames(subNames, fv, fc.Prepend, fc.Append)
 				if err != nil {
-					return nil, &dyno.Error{
-						Code: dyno.ErrEncodingEmbeddedStructMarshalFailed,
-						Message: fmt.Sprintf("addStructFieldNames on embedded field '%s' failed with error: %v",
-							ft.Name, err),
-					}
+					return nil, err
 				}
 			case reflect.Map:
 				subNames = appendMapFieldNames(subNames, fv, fc.Prepend, fc.Append)
 			default:
-				return nil, &dyno.Error{
-					Code:    dyno.ErrEncodingEmbeddedBadKind,
-					Message: fmt.Sprintf("embedded kind %v is not suported", fv.Kind()),
-				}
+				return nil, errors.New("reflect value is not a Struct or Map")
 			}
 
 			names = append(names, subNames...)
@@ -465,7 +479,7 @@ func appendStructFieldNames(names []string, rv reflect.Value, prependStr, append
 func appendMapFieldNames(names []string, rv reflect.Value, appendStr, prependStr string) []string {
 	iter := rv.MapRange()
 	for iter.Next() {
-		key := indirect(iter.Key(), false)
+		key := Indirect(iter.Key(), false)
 		keyStr := ToString(key.Interface())
 		names = append(names, appendStr+keyStr+prependStr)
 	}

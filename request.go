@@ -3,12 +3,13 @@ package dyno
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno/timer"
 	"github.com/google/uuid"
-	"sync"
-	"time"
 )
 
 // ExecutionFunction is a function that can be executed by a Request
@@ -150,7 +151,7 @@ func (r *Request) Scan(in *dynamodb.ScanInput, handler ScanHandler) (out *dynamo
 		if err != nil {
 			return err
 		}
-		if handler == nil {
+		if handler != nil {
 			return handler(out)
 		}
 		return err
@@ -169,8 +170,10 @@ func (r *Request) ScanAll(in *dynamodb.ScanInput, handler ScanHandler) (out []*d
 			if err != nil {
 				return err
 			}
-			if err = handler(o); err != nil {
-				return err
+			if handler != nil {
+				if err = handler(o); err != nil {
+					return err
+				}
 			}
 			if o.LastEvaluatedKey == nil {
 				// no more work
@@ -184,19 +187,58 @@ func (r *Request) ScanAll(in *dynamodb.ScanInput, handler ScanHandler) (out []*d
 }
 
 // Query executes a query api call with a dynamodb.QueryInput
-func (r *Request) Query(in *dynamodb.QueryInput) (out *dynamodb.QueryOutput, err error) {
+func (r *Request) Query(in *dynamodb.QueryInput, handler QueryHandler) (out *dynamodb.QueryOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().QueryWithContext(ctx, in)
+		if err != nil {
+			return err
+		}
+		if handler != nil {
+			return handler(out)
+		}
+		return err
+	})
+	return
+}
+
+// QueryAll executes a query api call with a dynamodb.QueryInput and keeps querying until there are no more
+// LastEvaluatedKey values
+func (r *Request) QueryAll(in *dynamodb.QueryInput, handler QueryHandler) (out []*dynamodb.QueryOutput, err error) {
+	var o *dynamodb.QueryOutput
+	err = r.Execute(func(ctx context.Context) error {
+		for {
+			o, err = r.DynamoClient().QueryWithContext(ctx, in)
+			out = append(out, o)
+			if err != nil {
+				return err
+			}
+			if handler != nil {
+				if err = handler(o); err != nil {
+					return err
+				}
+			}
+			if o.LastEvaluatedKey == nil {
+				// no more work
+				break
+			}
+			in.ExclusiveStartKey = o.LastEvaluatedKey
+		}
 		return err
 	})
 	return
 }
 
 // PutItem runs a put item api call with a dynamodb.PutItemInput
-func (r *Request) PutItem(in *dynamodb.PutItemInput) (out *dynamodb.PutItemOutput, err error) {
+func (r *Request) PutItem(in *dynamodb.PutItemInput, handler PutItemHandler) (out *dynamodb.PutItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().PutItemWithContext(ctx, in)
-		return err
+		if err != nil {
+			return err
+		}
+		if handler != nil {
+			return handler(out)
+		}
+		return nil
 	})
 	return
 }
@@ -208,28 +250,40 @@ func (r *Request) GetItem(in *dynamodb.GetItemInput, handler GetItemHandler) (ou
 		if err != nil {
 			return err
 		}
-		if handler == nil {
+		if handler != nil {
 			return handler(out)
 		}
-		return err
+		return nil
 	})
 	return
 }
 
 // UpdateItem runs an update item api call with a dynamodb.UpdateItemInput
-func (r *Request) UpdateItem(in *dynamodb.UpdateItemInput) (out *dynamodb.UpdateItemOutput, err error) {
+func (r *Request) UpdateItem(in *dynamodb.UpdateItemInput, handler UpdateItemHandler) (out *dynamodb.UpdateItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().UpdateItemWithContext(ctx, in)
-		return err
+		if err != nil {
+			return err
+		}
+		if handler == nil {
+			return handler(out)
+		}
+		return nil
 	})
 	return
 }
 
 // DeleteItem runs a delete item api call with a dynamodb.DeleteItemInput
-func (r *Request) DeleteItem(in *dynamodb.DeleteItemInput) (out *dynamodb.DeleteItemOutput, err error) {
+func (r *Request) DeleteItem(in *dynamodb.DeleteItemInput, handler DeleteItemHandler) (out *dynamodb.DeleteItemOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().DeleteItemWithContext(ctx, in)
-		return err
+		if err != nil {
+			return err
+		}
+		if handler == nil {
+			return handler(out)
+		}
+		return nil
 	})
 	return
 }
@@ -285,28 +339,46 @@ func (r *Request) BatchWriteItem(in *dynamodb.BatchWriteItemInput) (out *dynamod
 }
 
 //CreateTable runs a create table api call with a dynamodb.CreateTableInput
-func (r *Request) CreateTable(in *dynamodb.CreateTableInput) (out *dynamodb.CreateTableOutput, err error) {
+func (r *Request) CreateTable(in *dynamodb.CreateTableInput, handler CreateTableHandler) (out *dynamodb.CreateTableOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().CreateTableWithContext(ctx, in)
-		return err
+		if err != nil {
+			return err
+		}
+		if handler != nil {
+			return handler(out)
+		}
+		return nil
 	})
 	return
 }
 
 //CreateGlobalTable runs a create global table api call with a dynamodb.CreateGlobalTableInput
-func (r *Request) CreateGlobalTable(in *dynamodb.CreateGlobalTableInput) (out *dynamodb.CreateGlobalTableOutput, err error) {
+func (r *Request) CreateGlobalTable(in *dynamodb.CreateGlobalTableInput, handler CreateGlobalTableHandler) (out *dynamodb.CreateGlobalTableOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().CreateGlobalTableWithContext(ctx, in)
-		return err
+		if err != nil {
+			return err
+		}
+		if handler != nil {
+			return handler(out)
+		}
+		return nil
 	})
 	return
 }
 
 //DescribeTable runs a describe table api call with a dynamodb.DescribeTableInput
-func (r *Request) DescribeTable(in *dynamodb.DescribeTableInput) (out *dynamodb.DescribeTableOutput, err error) {
+func (r *Request) DescribeTable(in *dynamodb.DescribeTableInput, handler DescribeTableHandler) (out *dynamodb.DescribeTableOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().DescribeTableWithContext(ctx, in)
-		return err
+		if err != nil {
+			return err
+		}
+		if handler != nil {
+			return handler(out)
+		}
+		return nil
 	})
 	return
 }
@@ -330,19 +402,31 @@ func (r *Request) ListTables(in *dynamodb.ListTablesInput) (out *dynamodb.ListTa
 }
 
 //CreateBackup runs a create table backup api call with a dynamodb.CreateBackupInput
-func (r *Request) CreateBackup(in *dynamodb.CreateBackupInput) (out *dynamodb.CreateBackupOutput, err error) {
+func (r *Request) CreateBackup(in *dynamodb.CreateBackupInput, handler CreateBackupHandler) (out *dynamodb.CreateBackupOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().CreateBackupWithContext(ctx, in)
-		return err
+		if err != nil {
+			return err
+		}
+		if handler != nil {
+			return handler(out)
+		}
+		return nil
 	})
 	return
 }
 
 //DescribeBackup runs a describe table backup api call with a dynamodb.DescribeBackupInput
-func (r *Request) DescribeBackup(in *dynamodb.DescribeBackupInput) (out *dynamodb.DescribeBackupOutput, err error) {
+func (r *Request) DescribeBackup(in *dynamodb.DescribeBackupInput, handler DescribeBackupHandler) (out *dynamodb.DescribeBackupOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().DescribeBackupWithContext(ctx, in)
-		return err
+		if err != nil {
+			return err
+		}
+		if handler != nil {
+			return handler(out)
+		}
+		return nil
 	})
 	return
 }
@@ -366,10 +450,16 @@ func (r *Request) ListBackups(in *dynamodb.ListBackupsInput) (out *dynamodb.List
 }
 
 //DeleteTable runs a delete table api call with a dynamodb.DeleteTableInput
-func (r *Request) DeleteTable(in *dynamodb.DeleteTableInput) (out *dynamodb.DeleteTableOutput, err error) {
+func (r *Request) DeleteTable(in *dynamodb.DeleteTableInput, handler DeleteTableHandler) (out *dynamodb.DeleteTableOutput, err error) {
 	err = r.Execute(func(ctx context.Context) error {
 		out, err = r.DynamoClient().DeleteTableWithContext(ctx, in)
-		return err
+		if err != nil {
+			return err
+		}
+		if handler != nil {
+			return handler(out)
+		}
+		return nil
 	})
 	return
 }
@@ -407,7 +497,7 @@ func (r *Request) ListenForTableDeletion(tableName string) <-chan error {
 			case <-ticker.C:
 				tableDescription, apiErr = r.DescribeTable(&dynamodb.DescribeTableInput{
 					TableName: &tableName,
-				})
+				}, nil)
 
 				// set the error if there was one
 				if apiErr != nil {
@@ -435,15 +525,15 @@ func (r *Request) ListenForTableDeletion(tableName string) <-chan error {
 	return out
 }
 
-//TableReadyOutput used as output for ListenForTableReady
-// will hold an error value in Err if ListenForTableReady failed
+//TableReadyOutput used as output for Request.ListenForTableReady
+// will hold an error value in Err if Request.ListenForTableReady failed or timed out
 type TableReadyOutput struct {
 	*dynamodb.DescribeTableOutput
 	Err error
 }
 
-//ListenForTableReady returns a channel that will be passed an error when
-// the table is either ready (will return nil) or errors during waiting
+//ListenForTableReady returns a channel that will be passed a TableReadyOutput when listener is triggered
+// or encounters an error
 func (r *Request) ListenForTableReady(tableName string) <-chan *TableReadyOutput {
 	outCh := make(chan *TableReadyOutput)
 
@@ -451,7 +541,7 @@ func (r *Request) ListenForTableReady(tableName string) <-chan *TableReadyOutput
 
 	go func() {
 		var (
-			apiErr      error
+			apiErr           error
 			tableDescription *dynamodb.DescribeTableOutput
 		)
 		out := new(TableReadyOutput)
@@ -466,7 +556,7 @@ func (r *Request) ListenForTableReady(tableName string) <-chan *TableReadyOutput
 			case <-ticker.C:
 				tableDescription, apiErr = r.DescribeTable(&dynamodb.DescribeTableInput{
 					TableName: &tableName,
-				})
+				}, nil)
 
 				if apiErr != nil {
 					if !IsAwsErrorCode(apiErr, dynamodb.ErrCodeResourceNotFoundException) {
@@ -495,61 +585,66 @@ func (r *Request) ListenForTableReady(tableName string) <-chan *TableReadyOutput
 	return outCh
 }
 
-////
-//type BackupCompletionOutput struct {
-//	*dynamodb.DescribeTableOutput
-//	Err error
-//}
-//
-//
-////ListenForBackupCompleted returns...
-//func (r *Request) ListenForBackupCompleted(backupArn string) <-chan *BackupCompletionOutput {
-//	outCh := make(chan *BackupCompletionOutput)
-//
-//	ticker := time.NewTicker(time.Millisecond * 100)
-//
-//	go func() {
-//		var (
-//			apiErr      error
-//			tableDescription *dynamodb.DescribeTableOutput
-//		)
-//		out := new(TableReadyOutput)
-//		defer func() {
-//			outCh <- out
-//			close(outCh)
-//		}()
-//		for {
-//			select {
-//			case <-r.ctx.Done():
-//				out.Err = fmt.Errorf("timed out listening for table %s ready state", tableName)
-//			case <-ticker.C:
-//				tableDescription, apiErr = r.DescribeTable(&dynamodb.DescribeTableInput{
-//					TableName: &tableName,
-//				})
-//
-//				if apiErr != nil {
-//					if !IsAwsErrorCode(apiErr, dynamodb.ErrCodeResourceNotFoundException) {
-//						// not found is fine, but anything else is a problem
-//						out.Err = apiErr
-//						return
-//					}
-//					continue
-//				}
-//
-//				if tableDescription.Table != nil {
-//					switch *tableDescription.Table.TableStatus {
-//					case dynamodb.TableStatusActive:
-//						out.DescribeTableOutput = tableDescription
-//						return
-//					case dynamodb.TableStatusCreating:
-//						continue
-//					default:
-//						out.Err = fmt.Errorf("table %s is in an invalid state: '%v'", tableName, *tableDescription.Table.TableStatus)
-//						return
-//					}
-//				}
-//			}
-//		}
-//	}()
-//	return outCh
-//}
+// BackupCompletionOutput used as output for Request.ListenForBackupCompleted
+// will hold an error value in Err if Request.ListenForBackupCompleted failed or timed out
+type BackupCompletionOutput struct {
+	*dynamodb.DescribeBackupOutput
+	Err error
+}
+
+//ListenForBackupCompleted returns a channel that will be passed a BackupCompletionOutput when listener is triggered
+// or encounters an error
+func (r *Request) ListenForBackupCompleted(backupArn string) <-chan *BackupCompletionOutput {
+	outCh := make(chan *BackupCompletionOutput)
+
+	ticker := time.NewTicker(time.Millisecond * 100)
+
+	go func() {
+		var (
+			err        error
+			backupDesc *dynamodb.DescribeBackupOutput
+		)
+		out := new(BackupCompletionOutput)
+		defer func() {
+			outCh <- out
+			close(outCh)
+		}()
+		for {
+			select {
+			case <-r.ctx.Done():
+				out.Err = fmt.Errorf("timed out listening for backup %s completion", backupArn)
+			case <-ticker.C:
+				backupDesc, err = r.DescribeBackup(&dynamodb.DescribeBackupInput{
+					BackupArn: &backupArn,
+				}, nil)
+
+				if err != nil {
+					if !IsAwsErrorCode(err, dynamodb.ErrCodeBackupNotFoundException) {
+						// not found is fine, but anything else is a problem
+						out.Err = err
+						return
+					}
+					// not found, backup hasn't been created yet. so keep looping
+					continue
+				}
+
+				if backupDesc.BackupDescription != nil {
+					switch *backupDesc.BackupDescription.BackupDetails.BackupStatus {
+					case dynamodb.BackupStatusAvailable:
+						// backup is ready
+						out.DescribeBackupOutput = backupDesc
+						return
+					case dynamodb.BackupStatusCreating:
+						// backup being create. keep looping...
+						continue
+					default:
+						out.Err = fmt.Errorf("backup %s is in an invalid state: '%v'", backupArn,
+							*backupDesc.BackupDescription.BackupDetails.BackupStatus)
+						return
+					}
+				}
+			}
+		}
+	}()
+	return outCh
+}

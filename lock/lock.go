@@ -10,7 +10,6 @@ import (
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/condition"
 	"github.com/ericmaustin/dyno/operation"
-	"github.com/ericmaustin/dyno/table"
 	"github.com/google/uuid"
 )
 
@@ -41,7 +40,7 @@ type (
 	Lock struct {
 		Session                *dyno.Session
 		Item                   interface{}   // the item that is being locked
-		Table                  *table.Table  // the table that this lock belongs to
+		Table                  *dyno.Table   // the table that this lock belongs to
 		SessionID              *uuid.UUID    // this lock sessionId
 		HasLock                bool          // whether or not we have a lock
 		LockTimeout            time.Duration // the lock timeout
@@ -79,7 +78,7 @@ func (dl *Lock) Acquire() (err error) {
 	dyKey := dl.Table.ExtractKey(dl.Item)
 
 	updateInput := operation.NewUpdateItemBuilder().
-		// Set the table name
+		// Builder the table name
 		SetTable(dl.Table.Name()).
 		// set the key
 		SetKey(dyKey).
@@ -295,8 +294,8 @@ func (dl *Lock) clear() {
 //	HeartbeatFreq: the freq of the heartbeat to renew the lock lease
 //	LeaseDuration: the duration of the lease as a DurationNano
 type Opts struct {
-	Table              *table.Table `validate:"required"`
-	Item               interface{}  `validate:"required"`
+	Table              *dyno.Table `validate:"required"`
+	Item               interface{} `validate:"required"`
 	Timeout            time.Duration
 	HeartbeatFrequency time.Duration
 	LeaseDuration      time.Duration
@@ -337,7 +336,7 @@ func OptContext(ctx context.Context) Opt {
 /*
 Acquire acquires a lock for a given table with a given map of key fields
 */
-func Acquire(tbl *table.Table, item interface{}, sess *dyno.Session, opts ...Opt) (lock *Lock, err error) {
+func Acquire(tbl *dyno.Table, item interface{}, sess *dyno.Session, opts ...Opt) (lock *Lock, err error) {
 
 	var (
 		ctx    context.Context
@@ -392,7 +391,7 @@ func Acquire(tbl *table.Table, item interface{}, sess *dyno.Session, opts ...Opt
 }
 
 // MustAcquire acquires a lock or panics
-func MustAcquire(tbl *table.Table, item interface{}, sess *dyno.Session, opts ...Opt) *Lock {
+func MustAcquire(tbl *dyno.Table, item interface{}, sess *dyno.Session, opts ...Opt) *Lock {
 	lock, err := Acquire(tbl, item, sess, opts...)
 	if err != nil {
 		panic(err)
