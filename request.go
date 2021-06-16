@@ -2,649 +2,553 @@ package dyno
 
 import (
 	"context"
-	"fmt"
-	"sync"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/ericmaustin/dyno/timer"
-	"github.com/google/uuid"
 )
 
+//Execute executes a given Executable with provided context.Context and dynamodb.DynamoDB client and returns a *Promise
+func Execute(ctx context.Context, db *dynamodb.Client, exe Executable) *Promise {
+	promise := NewPromise(ctx)
+	go execute(ctx, db, exe, promise)
+	return promise
+}
+
+//execute executes a given Executable with provided context.Context and dynamodb.DynamoDB client
+func execute(ctx context.Context, db *dynamodb.Client, exe Executable, promise *Promise) {
+	promise.SetResponse(exe.DynoExecute(ctx, db))
+}
+
 // ExecutionFunction is a function that can be executed by a Request
-type ExecutionFunction func(ctx context.Context) error
+type ExecutionFunction func(ctx context.Context, db *dynamodb.Client) (interface{}, error)
 
-type execution struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	sleeper *timer.Sleeper
+//DynoExecute implements the Executable interface
+func (e ExecutionFunction) DynoExecute(ctx context.Context, db *dynamodb.Client) (interface{}, error) {
+	return e(ctx, db)
 }
 
-func (e *execution) checkError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if awsErr, ok := err.(awserr.Error); ok {
-
-		switch awsErr.Code() {
-		case dynamodb.ErrCodeProvisionedThroughputExceededException,
-			dynamodb.ErrCodeRequestLimitExceeded,
-			dynamodb.ErrCodeTransactionConflictException:
-			return true
-		default:
-			// unknown error, return here
-			return false
-		}
-	}
-	return false
+//Executable should be implemented for types that can be executed in a Request
+type Executable interface {
+	DynoExecute(ctx context.Context, db *dynamodb.Client) (interface{}, error)
 }
 
-func (e *execution) do(execFunc ExecutionFunction) error {
-	// if context was cancelled then context cancelled error
-	select {
-	case <-e.ctx.Done():
-		return Error{
-			Code:    ErrRequestExecutionContextCancelled,
-			Message: "context cancelled",
-		}
-	default:
-		// exec nothing
-	}
-	err := execFunc(e.ctx)
-	retry := e.checkError(err)
-	if retry {
-		if err = <-e.sleeper.Sleep(); err != nil {
-			return err
-		}
-		return execFunc(e.ctx)
-	}
-	return err
-}
-
-const initialSleepTime = time.Millisecond * 50
-
-// Request is a Session that has a context and a cancel function
-type Request struct {
-	*Session
-	requestID string
-	ctx       context.Context
-	cancel    context.CancelFunc
-	mu        *sync.RWMutex
-}
-
-// newRequest creates a new request
-func newRequest(ctx context.Context, cancel context.CancelFunc, s *Session) *Request {
-	r := &Request{
-		mu:        &sync.RWMutex{},
-		Session:   s,
-		requestID: uuid.New().String(),
-		ctx:       ctx,
-		cancel:    cancel,
-	}
-	return r
-}
-
-// Cancel the request
-func (r *Request) Cancel() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.cancel()
-}
-
-// Context returns the context for this request
-func (r *Request) Context() context.Context {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.ctx
-}
-
-// SetTimeout sets a timeout on the context
-// This does not replace any existing timeouts as it uses the existing context if there is one
-func (r *Request) SetTimeout(timeout time.Duration) *Request {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.ctx == nil {
-		r.ctx = context.Background()
-	}
-	r.ctx, r.cancel = context.WithTimeout(r.ctx, timeout)
-	return r
-}
-
-// SetContext sets the request context
-func (r *Request) SetContext(ctx context.Context) *Request {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.ctx = ctx
-	return r
-}
-
-// Execute executes a given execution function with exponential back-off on dynamodb error
-func (r *Request) Execute(execFunc ExecutionFunction) error {
-	var (
-		ctx    context.Context
-		cancel context.CancelFunc
-	)
-	r.mu.RLock()
-	if _, ok := r.ctx.Deadline(); !ok {
-		// no deadline set, so use max timeout
-		ctx, cancel = context.WithTimeout(r.Context(), r.MaxTimeout())
-	} else {
-		ctx, cancel = r.ctx, r.cancel
-	}
-	r.mu.RUnlock()
-	exec := &execution{
-		ctx:    ctx,
-		cancel: cancel,
-		sleeper: timer.NewExponentialSleeper(initialSleepTime).
-			WithContext(ctx).
-			WithTimeout(r.MaxTimeout()).
-			WithAddRandom(time.Millisecond * 100),
-	}
-	return exec.do(execFunc)
-}
-
-// Scan executes a scan api call with a dynamodb.ScanInput
-func (r *Request) Scan(in *dynamodb.ScanInput, handler ScanHandler) (out *dynamodb.ScanOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().ScanWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler != nil {
-			return handler(out)
-		}
-		return err
-	})
-	return
-}
-
-// ScanAll executes a scan api call with a dynamodb.ScanInput and keeps scanning until there are no more
-// LastEvaluatedKey values
-func (r *Request) ScanAll(in *dynamodb.ScanInput, handler ScanHandler) (out []*dynamodb.ScanOutput, err error) {
-	var o *dynamodb.ScanOutput
-	err = r.Execute(func(ctx context.Context) error {
-		for {
-			o, err = r.DynamoClient().ScanWithContext(ctx, in)
-			out = append(out, o)
-			if err != nil {
-				return err
+//ScanFunc returns an ExecutionFunction that executes a Scan api call
+func ScanFunc(input *ScanInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.Client) (interface{}, error) {
+		var (
+			out *dynamodb.ScanOutput
+			err error
+		)
+		if input.InputCallback != nil {
+			if out, err = input.InputCallback(ctx, input.ScanInput); out != nil || err != nil {
+				return out, err
 			}
-			if handler != nil {
-				if err = handler(o); err != nil {
-					return err
+		}
+		if out, err = db.ScanWithContext(ctx, input.ScanInput); err != nil {
+			return out, err
+		}
+		if input.OutputCallback != nil {
+			err = input.OutputCallback(ctx, out)
+		}
+		return out, err
+	}
+}
+
+//ScanAllFunc returns an ExecutionFunction that executes a Scan api call
+// and keeps executing until there are no more LastEvaluatedKey left
+func ScanAllFunc(input *ScanInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			outs []*dynamodb.ScanOutput
+			out  *dynamodb.ScanOutput
+			err  error
+		)
+		for {
+			if input.InputCallback != nil {
+				if out, err = input.InputCallback(ctx, input.ScanInput); out != nil || err != nil {
+					if out != nil {
+						outs = append(outs, out)
+					}
+					return outs, err
 				}
 			}
-			if o.LastEvaluatedKey == nil {
+			if out, err = db.ScanWithContext(ctx, input.ScanInput); err != nil {
+				return nil, err
+			}
+			if input.OutputCallback != nil {
+				if err = input.OutputCallback(ctx, out); err != nil {
+					return nil, err
+				}
+			}
+			outs = append(outs, out)
+			if out.LastEvaluatedKey == nil {
 				// no more work
 				break
 			}
-			in.ExclusiveStartKey = o.LastEvaluatedKey
+			input.ExclusiveStartKey = out.LastEvaluatedKey
 		}
-		return err
-	})
-	return
+		return outs, err
+	}
 }
 
-// Query executes a query api call with a dynamodb.QueryInput
-func (r *Request) Query(in *dynamodb.QueryInput, handler QueryHandler) (out *dynamodb.QueryOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().QueryWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler != nil {
-			return handler(out)
-		}
-		return err
-	})
-	return
-}
-
-// QueryAll executes a query api call with a dynamodb.QueryInput and keeps querying until there are no more
-// LastEvaluatedKey values
-func (r *Request) QueryAll(in *dynamodb.QueryInput, handler QueryHandler) (out []*dynamodb.QueryOutput, err error) {
-	var o *dynamodb.QueryOutput
-	err = r.Execute(func(ctx context.Context) error {
-		for {
-			o, err = r.DynamoClient().QueryWithContext(ctx, in)
-			out = append(out, o)
-			if err != nil {
-				return err
+//QueryFunc returns an ExecutionFunction that executes a Query api call
+func QueryFunc(input *QueryInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			out *dynamodb.QueryOutput
+			err error
+		)
+		if input.InputCallback != nil {
+			if out, err = input.InputCallback(ctx, input.QueryInput); out != nil || err != nil {
+				return out, err
 			}
-			if handler != nil {
-				if err = handler(o); err != nil {
-					return err
+		}
+		if out, err = db.QueryWithContext(ctx, input.QueryInput); err != nil {
+			return out, err
+		}
+		if input.OutputCallback != nil {
+			err = input.OutputCallback(ctx, out)
+		}
+		return out, err
+	}
+}
+
+//QueryAllFunc returns an ExecutionFunction that executes a Query api call
+// and keeps executing until there are no more LastEvaluatedKey left
+func QueryAllFunc(input *QueryInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			outs []*dynamodb.QueryOutput
+			out  *dynamodb.QueryOutput
+			err  error
+		)
+		for {
+			if input.InputCallback != nil {
+				if out, err = input.InputCallback(ctx, input.QueryInput); out != nil || err != nil {
+					if out != nil {
+						outs = append(outs, out)
+					}
+					return outs, err
 				}
 			}
-			if o.LastEvaluatedKey == nil {
+			if out, err = db.QueryWithContext(ctx, input.QueryInput); err != nil {
+				return nil, err
+			}
+			if input.OutputCallback != nil {
+				if err = input.OutputCallback(ctx, out); err != nil {
+					return nil, err
+				}
+			}
+			outs = append(outs, out)
+			if out.LastEvaluatedKey == nil {
 				// no more work
 				break
 			}
-			in.ExclusiveStartKey = o.LastEvaluatedKey
+			input.ExclusiveStartKey = out.LastEvaluatedKey
 		}
-		return err
-	})
-	return
+		return outs, err
+	}
 }
 
-// PutItem runs a put item api call with a dynamodb.PutItemInput
-func (r *Request) PutItem(in *dynamodb.PutItemInput, handler PutItemHandler) (out *dynamodb.PutItemOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().PutItemWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler != nil {
-			return handler(out)
-		}
-		return nil
-	})
-	return
-}
-
-//GetItem runs a GetItem dynamodb operation with a dynamodb.GetItemInput
-func (r *Request) GetItem(in *dynamodb.GetItemInput, handler GetItemHandler) (out *dynamodb.GetItemOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().GetItemWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler != nil {
-			return handler(out)
-		}
-		return nil
-	})
-	return
-}
-
-// UpdateItem runs an update item api call with a dynamodb.UpdateItemInput
-func (r *Request) UpdateItem(in *dynamodb.UpdateItemInput, handler UpdateItemHandler) (out *dynamodb.UpdateItemOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().UpdateItemWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler == nil {
-			return handler(out)
-		}
-		return nil
-	})
-	return
-}
-
-// DeleteItem runs a delete item api call with a dynamodb.DeleteItemInput
-func (r *Request) DeleteItem(in *dynamodb.DeleteItemInput, handler DeleteItemHandler) (out *dynamodb.DeleteItemOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().DeleteItemWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler == nil {
-			return handler(out)
-		}
-		return nil
-	})
-	return
-}
-
-// BatchGetItem runs a batch get item api call with a dynamodb.BatchGetItemInput
-func (r *Request) BatchGetItem(in *dynamodb.BatchGetItemInput, handler BatchGetItemHandler) (out *dynamodb.BatchGetItemOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().BatchGetItemWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler == nil {
-			return handler(out)
-		}
-		return err
-	})
-	return
-}
-
-// BatchGetItemAll runs a batch get item api call with a dynamodb.BatchGetItemInput
-// and continues to run batch get item requests until no unprocessed keys remain
-func (r *Request) BatchGetItemAll(in *dynamodb.BatchGetItemInput, handler BatchGetItemHandler) (out []*dynamodb.BatchGetItemOutput, err error) {
-	var o *dynamodb.BatchGetItemOutput
-	err = r.Execute(func(ctx context.Context) error {
-		for {
-			o, err = r.DynamoClient().BatchGetItemWithContext(ctx, in)
-			out = append(out, o)
-			if err != nil {
-				return err
+//PutItemFunc returns an ExecutionFunction that executes a PutItem api call
+func PutItemFunc(input *PutItemInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			out *dynamodb.PutItemOutput
+			err error
+		)
+		if input.InputCallback != nil {
+			if out, err = input.InputCallback(ctx, input.PutItemInput); out != nil || err != nil {
+				return out, err
 			}
-			if handler != nil {
-				if err = handler(o); err != nil {
-					return err
+		}
+		if out, err = db.PutItemWithContext(ctx, input.PutItemInput); err != nil {
+			return out, err
+		}
+		if input.OutputCallback != nil {
+			err = input.OutputCallback(ctx, out)
+		}
+		return out, err
+	}
+}
+
+//GetItemFunc returns an ExecutionFunction that executes a PutItem api call
+func GetItemFunc(input *GetItemInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			out *dynamodb.GetItemOutput
+			err error
+		)
+		if input.InputCallback != nil {
+			if out, err = input.InputCallback(ctx, input.GetItemInput); out != nil || err != nil {
+				return out, err
+			}
+		}
+		if out, err = db.GetItemWithContext(ctx, input.GetItemInput); err != nil {
+			return out, err
+		}
+		if input.OutputCallback != nil {
+			err = input.OutputCallback(ctx, out)
+		}
+		return out, err
+	}
+}
+
+//UpdateItemFunc returns an ExecutionFunction that executes an UpdateItem api call
+func UpdateItemFunc(input *UpdateItemInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			out *dynamodb.UpdateItemOutput
+			err error
+		)
+		if input.InputCallback != nil {
+			if out, err = input.InputCallback(ctx, input.UpdateItemInput); out != nil || err != nil {
+				return out, err
+			}
+		}
+		if out, err = db.UpdateItemWithContext(ctx, input.UpdateItemInput); err != nil {
+			return out, err
+		}
+		if input.OutputCallback != nil {
+			err = input.OutputCallback(ctx, out)
+		}
+		return out, err
+	}
+}
+
+//DeleteItemFunc returns an ExecutionFunction that executes an DeleteItem api call
+func DeleteItemFunc(input *DeleteItemInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			out *dynamodb.DeleteItemOutput
+			err error
+		)
+		if input.InputCallback != nil {
+			if out, err = input.InputCallback(ctx, input.DeleteItemInput); out != nil || err != nil {
+				return out, err
+			}
+		}
+		if out, err = db.DeleteItemWithContext(ctx, input.DeleteItemInput); err != nil {
+			return out, err
+		}
+		if input.OutputCallback != nil {
+			err = input.OutputCallback(ctx, out)
+		}
+		return out, err
+	}
+}
+
+//BatchGetItemFunc returns an ExecutionFunction that executes a BatchGetItem api call
+func BatchGetItemFunc(input *BatchGetItemBuilder) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			out *dynamodb.BatchGetItemOutput
+			err error
+		)
+		if input.InputCallback != nil {
+			if out, err = input.InputCallback(ctx, input.BatchGetItemInput); out != nil || err != nil {
+				return out, err
+			}
+		}
+
+		if out, err = db.BatchGetItemWithContext(ctx, input.BatchGetItemInput); err != nil {
+			return out, err
+		}
+		if input.OutputCallback != nil {
+			err = input.OutputCallback(ctx, out)
+		}
+		return out, err
+	}
+}
+
+//BatchGetItemAllFunc returns an ExecutionFunction that executes a Query api call
+// and keeps executing until there are no more LastEvaluatedKey left
+func BatchGetItemAllFunc(input *BatchGetItemBuilder) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			outs []*dynamodb.BatchGetItemOutput
+			out  *dynamodb.BatchGetItemOutput
+			err  error
+		)
+		for {
+			if input.InputCallback != nil {
+				if out, err = input.InputCallback(ctx, input.BatchGetItemInput); out != nil || err != nil {
+					if out != nil {
+						outs = append(outs, out)
+					}
+					return outs, err
 				}
 			}
-			if o.UnprocessedKeys == nil || len(o.UnprocessedKeys) < 1 {
+
+			if out, err = db.BatchGetItemWithContext(ctx, input.BatchGetItemInput); err != nil {
+				return nil, err
+			}
+			if input.OutputCallback != nil {
+				if err = input.OutputCallback(ctx, out); err != nil {
+					return nil, err
+				}
+			}
+			outs = append(outs, out)
+			if out.UnprocessedKeys == nil {
+				// no more work
 				break
 			}
-			in.RequestItems = o.UnprocessedKeys
+			input.RequestItems = out.UnprocessedKeys
 		}
-		return err
-	})
-	return
+		return outs, err
+	}
 }
 
-//BatchWriteItem runs a batch write item api call with a dynamodb.BatchWriteItemInput
-func (r *Request) BatchWriteItem(in *dynamodb.BatchWriteItemInput) (out *dynamodb.BatchWriteItemOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().BatchWriteItemWithContext(ctx, in)
-		return err
-	})
-	return
-}
-
-//CreateTable runs a create table api call with a dynamodb.CreateTableInput
-func (r *Request) CreateTable(in *dynamodb.CreateTableInput, handler CreateTableHandler) (out *dynamodb.CreateTableOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().CreateTableWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler != nil {
-			return handler(out)
-		}
-		return nil
-	})
-	return
-}
-
-//CreateGlobalTable runs a create global table api call with a dynamodb.CreateGlobalTableInput
-func (r *Request) CreateGlobalTable(in *dynamodb.CreateGlobalTableInput, handler CreateGlobalTableHandler) (out *dynamodb.CreateGlobalTableOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().CreateGlobalTableWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler != nil {
-			return handler(out)
-		}
-		return nil
-	})
-	return
-}
-
-//DescribeTable runs a describe table api call with a dynamodb.DescribeTableInput
-func (r *Request) DescribeTable(in *dynamodb.DescribeTableInput, handler DescribeTableHandler) (out *dynamodb.DescribeTableOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().DescribeTableWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler != nil {
-			return handler(out)
-		}
-		return nil
-	})
-	return
-}
-
-//UpdateTable runs an update table api call with a dynamodb.UpdateTableInput
-func (r *Request) UpdateTable(in *dynamodb.UpdateTableInput) (out *dynamodb.UpdateTableOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().UpdateTableWithContext(ctx, in)
-		return err
-	})
-	return
-}
-
-//ListTables runs a list table api call with a dynamodb.ListTablesInput
-func (r *Request) ListTables(in *dynamodb.ListTablesInput) (out *dynamodb.ListTablesOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().ListTablesWithContext(ctx, in)
-		return err
-	})
-	return
-}
-
-//CreateBackup runs a create table backup api call with a dynamodb.CreateBackupInput
-func (r *Request) CreateBackup(in *dynamodb.CreateBackupInput, handler CreateBackupHandler) (out *dynamodb.CreateBackupOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().CreateBackupWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler != nil {
-			return handler(out)
-		}
-		return nil
-	})
-	return
-}
-
-//DescribeBackup runs a describe table backup api call with a dynamodb.DescribeBackupInput
-func (r *Request) DescribeBackup(in *dynamodb.DescribeBackupInput, handler DescribeBackupHandler) (out *dynamodb.DescribeBackupOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().DescribeBackupWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler != nil {
-			return handler(out)
-		}
-		return nil
-	})
-	return
-}
-
-//DeleteBackup runs a delete table backup api call with a dynamodb.DeleteBackupInput
-func (r *Request) DeleteBackup(in *dynamodb.DeleteBackupInput) (out *dynamodb.DeleteBackupOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().DeleteBackupWithContext(ctx, in)
-		return err
-	})
-	return
-}
-
-//ListBackups runs a delete list backups api call with a dynamodb.ListBackupsInput
-func (r *Request) ListBackups(in *dynamodb.ListBackupsInput) (out *dynamodb.ListBackupsOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().ListBackupsWithContext(ctx, in)
-		return err
-	})
-	return
-}
-
-//DeleteTable runs a delete table api call with a dynamodb.DeleteTableInput
-func (r *Request) DeleteTable(in *dynamodb.DeleteTableInput, handler DeleteTableHandler) (out *dynamodb.DeleteTableOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().DeleteTableWithContext(ctx, in)
-		if err != nil {
-			return err
-		}
-		if handler != nil {
-			return handler(out)
-		}
-		return nil
-	})
-	return
-}
-
-//RestoreTableFromBackup runs a restore table from backup api call with a dynamodb.RestoreTableFromBackupInput
-func (r *Request) RestoreTableFromBackup(in *dynamodb.RestoreTableFromBackupInput) (out *dynamodb.RestoreTableFromBackupOutput, err error) {
-	err = r.Execute(func(ctx context.Context) error {
-		out, err = r.DynamoClient().RestoreTableFromBackupWithContext(ctx, in)
-		return err
-	})
-	return
-}
-
-//ListenForTableDeletion returns a channel that will be passed an error when
-// the table is either deleted (will return nil) or errors during waiting
-// The table must be already deleted or either active or being deleted or else an error will be returned
-func (r *Request) ListenForTableDeletion(tableName string) <-chan error {
-	out := make(chan error)
-
-	ticker := time.NewTicker(time.Millisecond * 100)
-
-	go func() {
+//BatchWriteItemFunc returns an ExecutionFunction that
+func BatchWriteItemFunc(input *BatchWriteItemInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
 		var (
-			err, apiErr      error
-			tableDescription *dynamodb.DescribeTableOutput
+			out *dynamodb.BatchWriteItemOutput
+			err error
 		)
-		defer func() {
-			out <- err
-			close(out)
-		}()
-		for {
-			select {
-			case <-r.ctx.Done():
-				err = fmt.Errorf("timed out listening for table %s ready state", tableName)
-			case <-ticker.C:
-				tableDescription, apiErr = r.DescribeTable(&dynamodb.DescribeTableInput{
-					TableName: &tableName,
-				}, nil)
-
-				// set the error if there was one
-				if apiErr != nil {
-					if IsAwsErrorCode(apiErr, dynamodb.ErrCodeResourceNotFoundException) {
-						// this error means successful deletion
-						return
-					}
-					// all other errors are a problem
-					err = apiErr
-					return
-				}
-
-				if tableDescription.Table != nil {
-					switch *tableDescription.Table.TableStatus {
-					case dynamodb.TableStatusDeleting, dynamodb.TableStatusActive:
-						continue
-					default:
-						err = fmt.Errorf("table %s is in an invalid state: '%v'", tableName, *tableDescription.Table.TableStatus)
-						return
-					}
-				}
+		if input.InputCallback != nil {
+			if out, err = input.InputCallback(ctx, input.BatchWriteItemInput); out != nil || err != nil {
+				return out, err
 			}
 		}
-	}()
-	return out
+		if out, err = db.BatchWriteItemWithContext(ctx, input.BatchWriteItemInput); err != nil {
+			return nil, err
+		}
+		if input.OutputCallback != nil {
+			err = input.OutputCallback(ctx, out)
+		}
+		return out, err
+	}
 }
 
-//TableReadyOutput used as output for Request.ListenForTableReady
-// will hold an error value in Err if Request.ListenForTableReady failed or timed out
-type TableReadyOutput struct {
-	*dynamodb.DescribeTableOutput
-	Err error
-}
-
-//ListenForTableReady returns a channel that will be passed a TableReadyOutput when listener is triggered
-// or encounters an error
-func (r *Request) ListenForTableReady(tableName string) <-chan *TableReadyOutput {
-	outCh := make(chan *TableReadyOutput)
-
-	ticker := time.NewTicker(time.Millisecond * 100)
-
-	go func() {
+//BatchWriteItemAllFunc returns an ExecutionFunction that runs a BatchWriteItemInput api call
+func BatchWriteItemAllFunc(input *BatchWriteItemInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
 		var (
-			apiErr           error
-			tableDescription *dynamodb.DescribeTableOutput
+			outs []*dynamodb.BatchWriteItemOutput
+			out  *dynamodb.BatchWriteItemOutput
+			err  error
 		)
-		out := new(TableReadyOutput)
-		defer func() {
-			outCh <- out
-			close(outCh)
-		}()
 		for {
-			select {
-			case <-r.ctx.Done():
-				out.Err = fmt.Errorf("timed out listening for table %s ready state", tableName)
-			case <-ticker.C:
-				tableDescription, apiErr = r.DescribeTable(&dynamodb.DescribeTableInput{
-					TableName: &tableName,
-				}, nil)
-
-				if apiErr != nil {
-					if !IsAwsErrorCode(apiErr, dynamodb.ErrCodeResourceNotFoundException) {
-						// not found is fine, but anything else is a problem
-						out.Err = apiErr
-						return
+			if input.InputCallback != nil {
+				if out, err = input.InputCallback(ctx, input.BatchWriteItemInput); out != nil || err != nil {
+					if out != nil {
+						outs = append(outs, out)
 					}
-					continue
-				}
-
-				if tableDescription.Table != nil {
-					switch *tableDescription.Table.TableStatus {
-					case dynamodb.TableStatusActive:
-						out.DescribeTableOutput = tableDescription
-						return
-					case dynamodb.TableStatusCreating:
-						continue
-					default:
-						out.Err = fmt.Errorf("table %s is in an invalid state: '%v'", tableName, *tableDescription.Table.TableStatus)
-						return
-					}
+					return outs, err
 				}
 			}
-		}
-	}()
-	return outCh
-}
+			if out, err = db.BatchWriteItemWithContext(ctx, input.BatchWriteItemInput); err != nil {
+				return nil, err
+			}
 
-// BackupCompletionOutput used as output for Request.ListenForBackupCompleted
-// will hold an error value in Err if Request.ListenForBackupCompleted failed or timed out
-type BackupCompletionOutput struct {
-	*dynamodb.DescribeBackupOutput
-	Err error
-}
-
-//ListenForBackupCompleted returns a channel that will be passed a BackupCompletionOutput when listener is triggered
-// or encounters an error
-func (r *Request) ListenForBackupCompleted(backupArn string) <-chan *BackupCompletionOutput {
-	outCh := make(chan *BackupCompletionOutput)
-
-	ticker := time.NewTicker(time.Millisecond * 100)
-
-	go func() {
-		var (
-			err        error
-			backupDesc *dynamodb.DescribeBackupOutput
-		)
-		out := new(BackupCompletionOutput)
-		defer func() {
-			outCh <- out
-			close(outCh)
-		}()
-		for {
-			select {
-			case <-r.ctx.Done():
-				out.Err = fmt.Errorf("timed out listening for backup %s completion", backupArn)
-			case <-ticker.C:
-				backupDesc, err = r.DescribeBackup(&dynamodb.DescribeBackupInput{
-					BackupArn: &backupArn,
-				}, nil)
-
-				if err != nil {
-					if !IsAwsErrorCode(err, dynamodb.ErrCodeBackupNotFoundException) {
-						// not found is fine, but anything else is a problem
-						out.Err = err
-						return
-					}
-					// not found, backup hasn't been created yet. so keep looping
-					continue
-				}
-
-				if backupDesc.BackupDescription != nil {
-					switch *backupDesc.BackupDescription.BackupDetails.BackupStatus {
-					case dynamodb.BackupStatusAvailable:
-						// backup is ready
-						out.DescribeBackupOutput = backupDesc
-						return
-					case dynamodb.BackupStatusCreating:
-						// backup being create. keep looping...
-						continue
-					default:
-						out.Err = fmt.Errorf("backup %s is in an invalid state: '%v'", backupArn,
-							*backupDesc.BackupDescription.BackupDetails.BackupStatus)
-						return
-					}
+			if input.OutputCallback != nil {
+				if err = input.OutputCallback(ctx, out); err != nil {
+					return nil, err
 				}
 			}
+			outs = append(outs, out)
+			if len(out.UnprocessedItems) < 1 {
+				break
+			}
+			input.RequestItems = out.UnprocessedItems
 		}
-	}()
-	return outCh
+		return outs, err
+	}
+}
+
+//CreateTableFunc returns an ExecutionFunction that creates a table
+func CreateTableFunc(input *CreateTableBuilder) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			out *dynamodb.CreateTableOutput
+			err error
+		)
+		if input.InputCallback != nil {
+			if out, err = input.InputCallback(ctx, input.CreateTableInput); out != nil || err != nil {
+				return out, err
+			}
+		}
+		if out, err = db.CreateTableWithContext(ctx, input.CreateTableInput); err != nil {
+			return nil, err
+		}
+		if input.OutputCallback != nil {
+			err = input.OutputCallback(ctx, nil)
+		}
+		return out, err
+	}
+}
+
+//CreateBackupFunc returns an ExecutionFunction that creates a table backup
+func CreateBackupFunc(input *CreateBackupInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			out *dynamodb.CreateBackupOutput
+			err error
+		)
+		if input.InputCallback != nil {
+			if out, err = input.InputCallback(ctx, input.CreateBackupInput); out != nil || err != nil {
+				return out, err
+			}
+		}
+		if out, err = db.CreateBackupWithContext(ctx, input.CreateBackupInput); err != nil {
+			return nil, err
+		}
+		if input.OutputCallback != nil {
+			err = input.OutputCallback(ctx, nil)
+		}
+		return out, err
+	}
+}
+
+//DescribeTableFunc returns an ExecutionFunction that runs a DescribeTable api call
+func DescribeTableFunc(input *DescribeTableInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			out *dynamodb.DescribeTableOutput
+			err error
+		)
+		if input.InputCallback != nil {
+			if out, err = input.InputCallback(ctx, input.DescribeTableInput); out != nil || err != nil {
+				return out, err
+			}
+		}
+		if out, err = db.DescribeTableWithContext(ctx, input.DescribeTableInput); err != nil {
+			return nil, err
+		}
+		if input.OutputCallback != nil {
+			err = input.OutputCallback(ctx, nil)
+		}
+		return out, err
+	}
+}
+
+//DeleteTableFunc returns an ExecutionFunction that runs a DeleteTableFunc api call
+func DeleteTableFunc(input *DeleteTableInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		var (
+			out *dynamodb.DeleteTableOutput
+			err error
+		)
+		if input.InputCallback != nil {
+			if out, err = input.InputCallback(ctx, input.DeleteTableInput); out != nil || err != nil {
+				return out, err
+			}
+		}
+		if out, err = db.DeleteTableWithContext(ctx, input.DeleteTableInput); err != nil {
+			return nil, err
+		}
+		if input.OutputCallback != nil {
+			err = input.OutputCallback(ctx, nil)
+		}
+		return out, err
+	}
+}
+
+//WaitUntilTableNotExistsFunc returns an ExecutionFunction that waits for a table to no longer exist
+func WaitUntilTableNotExistsFunc(input *DescribeTableInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		//var out *dynamodb.DescribeTableOutput
+		w := request.Waiter{
+			Name:        "WaitUntilTableNotExistsFunc",
+			MaxAttempts: 360,
+			Delay:       request.ConstantWaiterDelay(time.Second),
+			Acceptors: []request.WaiterAcceptor{
+				{
+					State:    request.SuccessWaiterState,
+					Matcher:  request.ErrorWaiterMatch,
+					Expected: dynamodb.ErrCodeResourceNotFoundException,
+				},
+			},
+			Logger: db.Config.Logger,
+			NewRequest: func(opts []request.Option) (*request.Request, error) {
+				var inCpy *dynamodb.DescribeTableInput
+				if input != nil {
+					tmp := *input.DescribeTableInput
+					inCpy = &tmp
+				}
+				req, _ := db.DescribeTableRequest(inCpy)
+				req.SetContext(ctx)
+				req.ApplyOptions(opts...)
+				return req, nil
+			},
+		}
+		return nil, w.WaitWithContext(ctx)
+	}
+}
+
+//WaitUntilTableExistsFunc returns an ExecutionFunction that waits for a table to be ready
+func WaitUntilTableExistsFunc(input *DescribeTableInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		//var out *dynamodb.DescribeTableOutput
+		w := request.Waiter{
+			Name:        "WaitUntilTableExistsFunc",
+			MaxAttempts: 360,
+			Delay:       request.ConstantWaiterDelay(time.Second),
+			Acceptors: []request.WaiterAcceptor{
+				{
+					State:    request.SuccessWaiterState,
+					Matcher:  request.PathWaiterMatch,
+					Argument: "Table.TableStatus",
+					Expected: dynamodb.TableStatusActive,
+				},
+				{
+					State:    request.RetryWaiterState,
+					Matcher:  request.ErrorWaiterMatch,
+					Expected: dynamodb.ErrCodeResourceNotFoundException,
+				},
+			},
+			Logger: db.Config.Logger,
+			NewRequest: func(opts []request.Option) (*request.Request, error) {
+				var inCpy *dynamodb.DescribeTableInput
+				if input != nil {
+					tmp := *input.DescribeTableInput
+					inCpy = &tmp
+				}
+				req, _ := db.DescribeTableRequest(inCpy)
+				req.SetContext(ctx)
+				req.ApplyOptions(opts...)
+				return req, nil
+			},
+		}
+		return nil, w.WaitWithContext(ctx)
+	}
+}
+
+//WaitUntilBackupExists returns an ExecutionFunction that waits for a backup to be completed
+func WaitUntilBackupExists(input *DescribeBackupInput) ExecutionFunction {
+	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
+		//var out *dynamodb.DescribeTableOutput
+		w := request.Waiter{
+			Name:        "WaitUntilTableExistsFunc",
+			MaxAttempts: 360,
+			Delay:       request.ConstantWaiterDelay(time.Second),
+			Acceptors: []request.WaiterAcceptor{
+				{
+					State:    request.SuccessWaiterState,
+					Matcher:  request.PathWaiterMatch,
+					Argument: "BackupDescription.BackupStatus",
+					Expected: dynamodb.BackupStatusAvailable,
+				},
+				{
+					State:    request.RetryWaiterState,
+					Matcher:  request.ErrorWaiterMatch,
+					Expected: dynamodb.ErrCodeResourceNotFoundException,
+				},
+			},
+			Logger: db.Config.Logger,
+			NewRequest: func(opts []request.Option) (*request.Request, error) {
+				var inCpy *dynamodb.DescribeBackupInput
+				if input != nil {
+					tmp := *input.DescribeBackupInput
+					inCpy = &tmp
+				}
+				req, _ := db.DescribeBackupRequest(inCpy)
+				req.SetContext(ctx)
+				req.ApplyOptions(opts...)
+				return req, nil
+			},
+		}
+		return nil, w.WaitWithContext(ctx)
+	}
 }

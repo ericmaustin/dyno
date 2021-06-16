@@ -20,7 +20,6 @@ type NextSleepDuration func(sleepDuration time.Duration, count int) time.Duratio
 
 // Sleeper is a more complex version of the base timer
 type Sleeper struct {
-	timeout       time.Duration
 	sleepDuration time.Duration
 	count         int
 	mu            sync.Mutex
@@ -39,14 +38,6 @@ func (s *Sleeper) WithAddRandom(add time.Duration) *Sleeper {
 	return s
 }
 
-// WithTimeout adds a timeout to this sleeper
-func (s *Sleeper) WithTimeout(to time.Duration) *Sleeper {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.timeout = to
-	return s
-}
-
 // WithContext adds an external context to this sleeper
 func (s *Sleeper) WithContext(ctx context.Context) *Sleeper {
 	s.mu.Lock()
@@ -59,7 +50,6 @@ func (s *Sleeper) WithContext(ctx context.Context) *Sleeper {
 func NewSleeper(sleepDuration time.Duration) *Sleeper {
 	return &Sleeper{
 		sleepDuration: sleepDuration,
-		mu:            sync.Mutex{},
 		durationFunc: func(lastDuration time.Duration, count int) time.Duration {
 			return lastDuration
 		},
@@ -84,11 +74,7 @@ func (s *Sleeper) Sleep() <-chan error {
 		if s.ctx == nil {
 			s.ctx = context.Background()
 		}
-		if s.timeout > 0 {
-			s.ctx, s.done = context.WithTimeout(s.ctx, s.timeout)
-		} else {
-			s.ctx, s.done = context.WithCancel(s.ctx)
-		}
+		s.ctx, s.done = context.WithCancel(s.ctx)
 		s.started = true
 	}
 	nextSleep := s.durationFunc(s.sleepDuration, s.count)
@@ -118,7 +104,6 @@ func (s *Sleeper) Sleep() <-chan error {
 func NewExponentialSleeper(sleepDuration time.Duration) *Sleeper {
 	return &Sleeper{
 		sleepDuration: sleepDuration,
-		mu:            sync.Mutex{},
 		durationFunc: func(sleepDuration time.Duration, count int) time.Duration {
 			return time.Duration(math.Pow(2, float64(count))) * sleepDuration
 		},
@@ -130,7 +115,6 @@ func NewExponentialSleeper(sleepDuration time.Duration) *Sleeper {
 func NewLinearSleeper(sleepDuration time.Duration, alpha int) *Sleeper {
 	return &Sleeper{
 		sleepDuration: sleepDuration,
-		mu:            sync.Mutex{},
 		durationFunc: func(sleepDuration time.Duration, count int) time.Duration {
 			return time.Duration(alpha*count) * sleepDuration
 		},
@@ -141,7 +125,6 @@ func NewLinearSleeper(sleepDuration time.Duration, alpha int) *Sleeper {
 func NewCustomSleeper(sleepDuration time.Duration, sleepFunc NextSleepDuration) *Sleeper {
 	return &Sleeper{
 		sleepDuration: sleepDuration,
-		mu:            sync.Mutex{},
 		durationFunc:  sleepFunc,
 	}
 }

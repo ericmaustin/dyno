@@ -92,11 +92,8 @@ const (
 	ErrBatchOutputContextCancelled
 
 	//
-	// Request Errors
+	// NewRequest Errors
 	//
-
-	// ErrRequestExecutionContextCancelled raised when context is cancelled before a request execution completes
-	ErrRequestExecutionContextCancelled
 )
 
 //ErrSet is a generic collection of errors

@@ -3,21 +3,22 @@ package encoding
 import (
 	"encoding/json"
 	"errors"
+	"gopkg.in/yaml.v2"
 	"reflect"
 
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-//ItemUnmarshaller allows more control over decoding structs from attribute value maps
-type ItemUnmarshaller interface {
-	UnmarshalItem(avMap map[string]*dynamodb.AttributeValue) error
+//MapUnmarshaller allows more control over decoding structs from attribute value maps
+type MapUnmarshaller interface {
+	UnmarshalMap(avMap map[string]ddb.AttributeValue) error
 }
 
-var itemUnmarshallerReflectType = reflect.TypeOf((*ItemUnmarshaller)(nil)).Elem()
+var itemUnmarshallerReflectType = reflect.TypeOf((*MapUnmarshaller)(nil)).Elem()
 
-// UnmarshalItems decodes a slice of items into the given input that must be a ptr to a slice
-func UnmarshalItems(items []map[string]*dynamodb.AttributeValue, input interface{}) error {
+// UnmarshalMaps decodes a slice of AttributeValue maps into the given input that must be a ptr to a slice
+func UnmarshalMaps(items []map[string]ddb.AttributeValue, input interface{}) error {
 	if len(items) < 1 {
 		return nil
 	}
@@ -40,7 +41,7 @@ func UnmarshalItems(items []map[string]*dynamodb.AttributeValue, input interface
 			// create a new value from the slice's element type
 			target := reflect.New(indirectType)
 			// run the unmarshaller
-			if err := target.Interface().(ItemUnmarshaller).UnmarshalItem(item); err != nil {
+			if err := target.Interface().(MapUnmarshaller).UnmarshalMap(item); err != nil {
 				return err
 			}
 			for i := 0; i < steps-1; i++ {
@@ -60,7 +61,7 @@ func UnmarshalItems(items []map[string]*dynamodb.AttributeValue, input interface
 			// create a new value from the slice's element type
 			target := reflect.New(sliceVal.Type().Elem()).Elem()
 			target = reflect.New(Indirect(target, false).Type())
-			if err := unmarshalItemToValue(item, target); err != nil {
+			if err := unmarshalMapToValue(item, target); err != nil {
 				return err
 			}
 			sliceVal.Set(reflect.Append(sliceVal, target))
@@ -73,7 +74,7 @@ func UnmarshalItems(items []map[string]*dynamodb.AttributeValue, input interface
 		// create a new value from the slice's element type
 		target := reflect.New(sliceVal.Type().Elem())
 		target = reflect.New(Indirect(target, false).Type())
-		if err := unmarshalItemToValue(item, target); err != nil {
+		if err := unmarshalMapToValue(item, target); err != nil {
 			return err
 		}
 		sliceVal.Set(reflect.Append(sliceVal, target))
@@ -82,26 +83,26 @@ func UnmarshalItems(items []map[string]*dynamodb.AttributeValue, input interface
 	return nil
 }
 
-// UnmarshalItem unmarshals a map of dynamodb attribute values into given input struct or map
+// UnmarshalMap unmarshals a map of dynamodb attribute values into given input struct or map
 // if the item is a map, the map must have the keys already set in the map
-func UnmarshalItem(item map[string]*dynamodb.AttributeValue, input interface{}) error {
-	if unmarshaller, ok := input.(ItemUnmarshaller); ok {
-		return unmarshaller.UnmarshalItem(item)
+func UnmarshalMap(item map[string]ddb.AttributeValue, input interface{}) error {
+	if unmarshaller, ok := input.(MapUnmarshaller); ok {
+		return unmarshaller.UnmarshalMap(item)
 	}
-	return unmarshalItemToValue(item, reflect.ValueOf(input))
+	return unmarshalMapToValue(item, reflect.ValueOf(input))
 }
 
-func unmarshalItemToValue(rec map[string]*dynamodb.AttributeValue, rv reflect.Value) error {
-	if rv.Kind() != reflect.Ptr {
-		return errors.New("reflect value is not a Ptr")
+func unmarshalMapToValue(rec map[string]ddb.AttributeValue, rv reflect.Value) error {
+	if rv.Kind() != reflect.Ptr || rv.IsNil() || !rv.IsValid() {
+		return errors.New("reflect value is not valid")
 	}
 	switch rv.Elem().Kind() {
 	case reflect.Struct:
-		if err := unmarshalItemToStruct(rec, rv, "", ""); err != nil {
+		if err := unmarshalMapToStruct(rec, rv, "", ""); err != nil {
 			return err
 		}
 	case reflect.Map:
-		if err := unmarshalItemToEmbededMap(rec, rv, "", ""); err != nil {
+		if err := unmarshalMapToEmbededMap(rec, rv, "", ""); err != nil {
 			return err
 		}
 	default:
@@ -110,7 +111,7 @@ func unmarshalItemToValue(rec map[string]*dynamodb.AttributeValue, rv reflect.Va
 	return nil
 }
 
-func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.Value, prepend, append string) error {
+func unmarshalMapToStruct(item map[string]ddb.AttributeValue, rv reflect.Value, prepend, append string) error {
 	if rv.Kind() != reflect.Ptr {
 		return errors.New("reflect value is not a Ptr")
 	}
@@ -121,13 +122,21 @@ func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.
 		return nil
 	}
 
+	var (
+		ft  reflect.StructField
+		fc  *fieldConfig
+		err error
+	)
+
 	typ := rv.Elem().Type()
 
 	for i := 0; i < rv.Elem().NumField(); i++ {
 
 		// gets us the struct field
-		ft := typ.Field(i)
-		fc := parseTag(ft.Tag.Get(FieldStructTagName))
+		ft = typ.Field(i)
+		if fc, err = parseTag(ft.Tag.Get(FieldStructTagName)); err != nil {
+			return err
+		}
 
 		// skip unexported or explicitly ignored fields
 		if len(ft.PkgPath) != 0 || fc.Skip {
@@ -143,12 +152,12 @@ func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.
 			switch fv.Kind() {
 			case reflect.Struct:
 				targetVal := reflect.New(fv.Type())
-				if err := unmarshalItemToStruct(item, targetVal, fc.Prepend, fc.Append); err != nil {
+				if err = unmarshalMapToStruct(item, targetVal, fc.Prepend, fc.Append); err != nil {
 					return err
 				}
 				fv.Set(Indirect(targetVal, false))
 			case reflect.Map:
-				if err := unmarshalItemToEmbededMap(item, fv, fc.Prepend, fc.Append); err != nil {
+				if err = unmarshalMapToEmbededMap(item, fv, fc.Prepend, fc.Append); err != nil {
 					return err
 				}
 			default:
@@ -165,15 +174,15 @@ func unmarshalItemToStruct(item map[string]*dynamodb.AttributeValue, rv reflect.
 
 		av := item[fn]
 
-		if err := unmarshalItem(av, rv.Elem().Field(i), fc.JSON); err != nil {
+		if err = unmarshalMap(av, rv.Elem().Field(i), fc); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// unmarshalItemToEmbededMap rv must be a map and must have index keys set that match the avMap
-func unmarshalItemToEmbededMap(item map[string]*dynamodb.AttributeValue, rv reflect.Value, prepend, append string) error {
+// unmarshalMapToEmbededMap rv must be a map and must have index keys set that match the avMap
+func unmarshalMapToEmbededMap(item map[string]ddb.AttributeValue, rv reflect.Value, prepend, append string) error {
 
 	if rv.Kind() != reflect.Map {
 		return errors.New("reflect value is not a Map")
@@ -191,7 +200,7 @@ func unmarshalItemToEmbededMap(item map[string]*dynamodb.AttributeValue, rv refl
 
 		if _, ok := item[keyStr]; ok {
 			target := reflect.New(rv.Type().Elem())
-			if err := unmarshalItem(item[keyStr], target, false); err != nil {
+			if err := unmarshalMap(item[keyStr], target, new(fieldConfig)); err != nil {
 				return err
 			}
 			rv.SetMapIndex(key, target.Elem())
@@ -201,9 +210,12 @@ func unmarshalItemToEmbededMap(item map[string]*dynamodb.AttributeValue, rv refl
 	return nil
 }
 
-func unmarshalItem(item *dynamodb.AttributeValue, rv reflect.Value, fromJSON bool) error {
-	if item.NULL != nil && *item.NULL {
-		// ignore nil values
+func unmarshalMap(item ddb.AttributeValue, rv reflect.Value, conf *fieldConfig) error {
+	if item == nil {
+		return nil
+	}
+	if _, ok := item.(*ddb.AttributeValueMemberNULL); ok {
+		// skip null types
 		return nil
 	}
 
@@ -211,19 +223,32 @@ func unmarshalItem(item *dynamodb.AttributeValue, rv reflect.Value, fromJSON boo
 
 	target := reflect.New(rv.Type())
 
-	if fromJSON {
-		if item.S == nil || len(*item.S) < 1 {
+	switch conf.MarshalAs {
+	case MarshalAsJSON:
+		sMember, ok := item.(*ddb.AttributeValueMemberS)
+		if !ok || len(sMember.Value) < 1 {
 			// string is empty, no json data to unmarshal
 			return nil
 		}
-		if err := json.Unmarshal([]byte(*item.S), target.Interface()); err != nil {
+		if err := json.Unmarshal([]byte(sMember.Value), target.Interface()); err != nil {
+			return err
+		}
+		rv.Set(Indirect(target, false))
+		return nil
+	case MarshalAsYAML:
+		sMember, ok := item.(*ddb.AttributeValueMemberS)
+		if !ok || len(sMember.Value) < 1 {
+			// string is empty, no json data to unmarshal
+			return nil
+		}
+		if err := yaml.Unmarshal([]byte(sMember.Value), target.Interface()); err != nil {
 			return err
 		}
 		rv.Set(Indirect(target, false))
 		return nil
 	}
 
-	if err := dynamodbattribute.Unmarshal(item, target.Interface()); err != nil {
+	if err := attributevalue.Unmarshal(item, target.Interface()); err != nil {
 		return err
 	}
 	rv.Set(Indirect(target, false))

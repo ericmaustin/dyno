@@ -2,15 +2,16 @@ package lock
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/ericmaustin/dyno/encoding"
+	"github.com/segmentio/ksuid"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/condition"
-	"github.com/ericmaustin/dyno/operation"
-	"github.com/google/uuid"
 )
 
 const (
@@ -31,6 +32,15 @@ const (
 	DefaultHeartbeatFrequency = time.Millisecond * 100
 )
 
+var (
+	//ErrLockFailedToAcquire returned by Lock.Acquire if lock could not be acquired
+	ErrLockFailedToAcquire = errors.New("lock failed to be acquired")
+	//ErrLockFailedLeaseRenewal returned by Lock if lock lease could not be renewed
+	ErrLockFailedLeaseRenewal = errors.New("lock failed to renew its lease")
+	//ErrCodeConditionalCheckFailedException returned when lock fails a conditional check
+	ErrCodeConditionalCheckFailedException = errors.New("lock failed on conditional check")
+)
+
 type (
 	stopHeartBeatAck struct {
 		err error
@@ -38,10 +48,10 @@ type (
 
 	// Lock is a representation of a lock on a specific record in a table
 	Lock struct {
-		Session                *dyno.Session
-		Item                   interface{}   // the item that is being locked
-		Table                  *dyno.Table   // the table that this lock belongs to
-		SessionID              *uuid.UUID    // this lock sessionId
+		DB                     *dyno.Client
+		Key                    map[string]*dynamodb.AttributeValue // the item that is being locked
+		TableName              string
+		SessionID              *string       // this lock sessionId
 		HasLock                bool          // whether or not we have a lock
 		LockTimeout            time.Duration // the lock timeout
 		LockHeartbeatFrequency time.Duration // the lock heartbeat frequency. We will update the lock expiration with every heartbeat
@@ -59,7 +69,9 @@ Acquire the lock by attempting to update release the lock.
  will wait for a given time duration to acquire the lock
 */
 func (dl *Lock) Acquire() (err error) {
-
+	var (
+		updateInput *dyno.UpdateItemInput
+	)
 	// create a ticker for the lock request
 	ticker := time.NewTicker(100 * time.Millisecond)
 	timer := time.NewTimer(dl.LockTimeout)
@@ -71,33 +83,29 @@ func (dl *Lock) Acquire() (err error) {
 
 	timeNow := time.Now()
 	// create a new sessionID this is the ID that we will check for when we upsert
-	sessionID := uuid.New()
+	sessionID := ksuid.New().String()
 	// set the value of the current lease expiration to now + lease duration
 	dl.currentLeaseExpires = timeNow.Add(dl.LeaseDuration)
 
-	dyKey := dl.Table.ExtractKey(dl.Item)
-
-	updateInput := operation.NewUpdateItemBuilder().
-		// Builder the table name
-		SetTable(dl.Table.Name()).
-		// set the key
-		SetKey(dyKey).
+	updateInput, err = dl.getUpdateBuilder().
 		// return all new values
-		SetReturnValues(operation.UpdateReturnUpdatedNew).
 		Set(LeaseFieldName, dl.LeaseDuration).
 		// set the lock expiration to = lock expiration time
-		Set(ExpiresFieldName, UnixTime(dl.currentLeaseExpires)).
+		Set(ExpiresFieldName, dl.currentLeaseExpires.UnixNano()).
 		// set the lock version to the sessionId
-		Set(VersionFieldName, UUID(sessionID)).
-		// create the condition update Expression to make sure another process has not
-		//  already locked this record.
-		//  We can lock the record if the lock Expiration < Now or lock Expiration is Nil
+		Set(VersionFieldName, sessionID).
 		AddCondition(condition.Or(
 			condition.NotExists(ExpiresFieldName),
 			// MapLock Expiration must be < Now
-			condition.LessThan(ExpiresFieldName, UnixTime(timeNow)),
-			condition.Equal(ExpiresFieldName, UnixTime(time.Time{})))).Build()
+			condition.LessThan(ExpiresFieldName, timeNow.UnixNano()),
+			condition.Equal(ExpiresFieldName, 0))).Build()
 
+	if err != nil {
+		return err
+	}
+
+	ctx, done := context.WithTimeout(dl.Context, dl.LockHeartbeatFrequency)
+	defer done()
 	// loop until we acquire the lock or timeout is hit
 	for {
 		select {
@@ -105,10 +113,7 @@ func (dl *Lock) Acquire() (err error) {
 			return &dyno.Error{Code: dyno.ErrLockTimeout}
 		case <-ticker.C:
 
-			req := dl.Session.RequestWithTimeout(dl.LockHeartbeatFrequency)
-
-			updateOutput, err := req.UpdateItem(updateInput)
-
+			updateOutput, err := dl.DB.UpdateItemWithContext(ctx, updateInput).Await()
 			if err != nil {
 				if dyno.IsAwsErrorCode(err, dynamodb.ErrCodeConditionalCheckFailedException) {
 					// conditional check failed... another process/routine holds the lock
@@ -117,10 +122,7 @@ func (dl *Lock) Acquire() (err error) {
 					select {
 					case <-dl.Context.Done():
 						// outer context cancelled, return now
-						return &dyno.Error{
-							Code:    dyno.ErrLockFailedToAcquire,
-							Message: "context cancelled before lock was acquired",
-						}
+						return ErrLockFailedToAcquire
 					default:
 						// don't block
 					}
@@ -133,7 +135,7 @@ func (dl *Lock) Acquire() (err error) {
 			//  update went through
 			if _, ok := updateOutput.Attributes[VersionFieldName]; ok {
 				// double check against expected ID string
-				if *updateOutput.Attributes[VersionFieldName].S == sessionID.String() {
+				if *updateOutput.Attributes[VersionFieldName].S == sessionID {
 					// if sessionID is the current session id then we've got the lock
 					// start the heartbeat check
 					dl.HasLock = true
@@ -172,8 +174,8 @@ func (dl *Lock) StartHeartbeat() {
 		// create the heartbeat ack channel
 		dl.stopHeartBeatAckChan = make(chan *stopHeartBeatAck)
 		defer func() {
-
 			var ack stopHeartBeatAck
+			dl.clear()
 
 			// stop ticker when func exits
 			ticker.Stop()
@@ -182,18 +184,7 @@ func (dl *Lock) StartHeartbeat() {
 			dl.SessionID = nil
 
 			if r := recover(); r != nil {
-				switch r.(type) {
-				case error:
-					ack = stopHeartBeatAck{&dyno.Error{
-						Code:    dyno.ErrLockFailedLeaseRenewal,
-						Message: fmt.Sprintf("%v", r),
-					}}
-				default:
-					ack = stopHeartBeatAck{&dyno.Error{
-						Code:    dyno.ErrLockFailedLeaseRenewal,
-						Message: fmt.Sprintf("%v", r),
-					}}
-				}
+				ack = stopHeartBeatAck{ErrLockFailedLeaseRenewal}
 			} else {
 				ack = stopHeartBeatAck{}
 			}
@@ -207,7 +198,6 @@ func (dl *Lock) StartHeartbeat() {
 			select {
 			case <-dl.Context.Done():
 				// clear the lock and return
-				dl.clear()
 				return
 			// create the update Expression to set the fields for our lock fields
 			case <-ticker.C:
@@ -217,27 +207,33 @@ func (dl *Lock) StartHeartbeat() {
 	}()
 }
 
+func (dl *Lock) getUpdateBuilder() *dyno.UpdateItemBuilder {
+	return dyno.NewUpdateItemBuilder().
+		SetTableName(dl.TableName).
+		SetKey(dl.Key).
+		SetReturnValues(dynamodb.ReturnValueUpdatedNew)
+}
+
 // renew renews the lease for this lock
 func (dl *Lock) renew() {
 	dl.mu.Lock()
 	defer dl.mu.Unlock()
 
-	dyKey := dl.Table.ExtractKey(dl.Item)
-
-	// extend the lease by now + lease duration
 	dl.currentLeaseExpires = time.Now().Add(dl.LeaseDuration)
 
-	updateInput := operation.NewUpdateItemBuilder().
-		SetTable(dl.Table.Name()).
-		SetKey(dyKey).
-		SetReturnValues(operation.UpdateReturnUpdatedNew).
-		Set(ExpiresFieldName, UnixTime(dl.currentLeaseExpires)).
-		AddCondition(condition.Equal(VersionFieldName, UUID(*dl.SessionID))).
+	updateInput, err := dl.getUpdateBuilder().
+		AddCondition(condition.Equal(VersionFieldName, *dl.SessionID)).
+		Set(ExpiresFieldName, dl.currentLeaseExpires.UnixNano()).
 		Build()
 
-	req := dl.Session.RequestWithTimeout(time.Minute)
+	if err != nil {
+		panic(err)
+	}
 
-	output, err := req.UpdateItem(updateInput)
+	ctx, done := context.WithTimeout(dl.Context, dl.LeaseDuration)
+	defer done()
+
+	output, err := dl.DB.UpdateItemWithContext(ctx, updateInput).Await()
 
 	select {
 	case <-dl.Context.Done():
@@ -249,10 +245,10 @@ func (dl *Lock) renew() {
 	// panic if we got an error trying to update the record.
 	if err != nil {
 		panic(fmt.Errorf("got error when attempting to update %s lock '%s' lease duration. Error: %v",
-			dl.Table.Name(), *dl.SessionID, err))
+			dl.TableName, *dl.SessionID, err))
 	}
 	if _, ok := output.Attributes[ExpiresFieldName]; !ok {
-		panic(&dyno.Error{Code: dyno.ErrLockFailedLeaseRenewal})
+		panic(ErrLockFailedLeaseRenewal)
 	}
 }
 
@@ -261,26 +257,18 @@ func (dl *Lock) clear() {
 	dl.mu.Lock()
 	defer dl.mu.Unlock()
 
-	// lease expires updated to "zero" time
-	dl.currentLeaseExpires = time.Time{}
-
-	dyKey := dl.Table.ExtractKey(dl.Item)
-
-	updateInput := operation.NewUpdateItemBuilder().
-		SetTable(dl.Table.Name()).
-		SetKey(dyKey).
-		SetReturnValues(operation.UpdateReturnUpdatedNew).
-		Set(ExpiresFieldName, UnixTime(dl.currentLeaseExpires)).
-		AddCondition(condition.Equal(VersionFieldName, UUID(*dl.SessionID))).
+	updateInput, err := dyno.NewUpdateItemBuilder(
+		dyno.UpdateItemWithTableName(dl.TableName),
+		dyno.UpdateItemWithKey(dl.Key),
+	).
+		SetReturnValues(dynamodb.ReturnValueUpdatedNew).
+		Set(ExpiresFieldName, 0).
+		AddCondition(condition.Equal(VersionFieldName, *dl.SessionID)).
 		Build()
 
-	_, err := dl.Session.RequestWithTimeout(time.Minute).UpdateItem(updateInput)
-
-	// panic if we got an error trying to update the record.
-	if err != nil {
+	if _, err = dl.DB.UpdateItem(updateInput).Await(); err != nil {
 		if !dyno.IsAwsErrorCode(err, dynamodb.ErrCodeConditionalCheckFailedException) {
-			panic(fmt.Errorf("got error when attempting to clear lock '%s' session: %v",
-				err, *dl.SessionID))
+			panic(ErrCodeConditionalCheckFailedException)
 		}
 	}
 }
@@ -336,7 +324,7 @@ func OptContext(ctx context.Context) Opt {
 /*
 Acquire acquires a lock for a given table with a given map of key fields
 */
-func Acquire(tbl *dyno.Table, item interface{}, sess *dyno.Session, opts ...Opt) (lock *Lock, err error) {
+func Acquire(tableName string, itemKey interface{}, db *dyno.Client, opts ...Opt) (lock *Lock, err error) {
 
 	var (
 		ctx    context.Context
@@ -349,6 +337,12 @@ func Acquire(tbl *dyno.Table, item interface{}, sess *dyno.Session, opts ...Opt)
 		o(options)
 	}
 
+	// marshal the item
+	itemMap, err := encoding.MarshalMap(itemKey)
+	if err != nil {
+		return nil, err
+	}
+
 	if options.Context == nil {
 		ctx, cancel = context.WithCancel(context.Background())
 	} else {
@@ -357,16 +351,15 @@ func Acquire(tbl *dyno.Table, item interface{}, sess *dyno.Session, opts ...Opt)
 
 	// create default lock
 	lock = &Lock{
-		Session:                sess,
-		Item:                   item,
-		Table:                  tbl,
+		DB:                     db,
+		Key:                    itemMap,
+		TableName:              tableName,
 		HasLock:                false,
 		LockTimeout:            DefaultTimeout,
 		LeaseDuration:          DefaultLeaseDuration,
 		LockHeartbeatFrequency: DefaultHeartbeatFrequency,
 		Context:                ctx,
 		cancel:                 cancel,
-		mu:                     sync.Mutex{},
 	}
 
 	// apply options to lock object
@@ -391,8 +384,8 @@ func Acquire(tbl *dyno.Table, item interface{}, sess *dyno.Session, opts ...Opt)
 }
 
 // MustAcquire acquires a lock or panics
-func MustAcquire(tbl *dyno.Table, item interface{}, sess *dyno.Session, opts ...Opt) *Lock {
-	lock, err := Acquire(tbl, item, sess, opts...)
+func MustAcquire(tableName string, itemKey interface{}, sess *dyno.Client, opts ...Opt) *Lock {
+	lock, err := Acquire(tableName, itemKey, sess, opts...)
 	if err != nil {
 		panic(err)
 	}

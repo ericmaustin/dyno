@@ -2,8 +2,7 @@ package encoding
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/ericmaustin/dyno"
+	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"testing"
 	"time"
 
@@ -14,7 +13,9 @@ func TestUnmarshalRecord(t *testing.T) {
 
 	s := getTestStruct()
 	av, err := structToRecord(s)
-	assert.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 
 	target := &testStruct{
 		StringMap: map[string]string{
@@ -27,7 +28,7 @@ func TestUnmarshalRecord(t *testing.T) {
 		},
 	}
 
-	err = UnmarshalItem(av, target)
+	err = UnmarshalMap(av, target)
 	if err != nil {
 		panic(err)
 	}
@@ -50,7 +51,7 @@ func TestUnmarshalRecord(t *testing.T) {
 func TestUnmarshalRecords(t *testing.T) {
 	tm := time.Now()
 
-	records, err := MarshalItems([]*testStruct{
+	records, err := MarshalMaps([]*testStruct{
 		{
 			String:           "A",
 			Time:             tm,
@@ -88,7 +89,7 @@ func TestUnmarshalRecords(t *testing.T) {
 
 	target := make([]*testStruct, 0)
 
-	err = UnmarshalItems(records, &target)
+	err = UnmarshalMaps(records, &target)
 	assert.NoError(t, err)
 	fmt.Printf("%s", target[0].Time)
 	assert.True(t, tm.Equal(target[0].Time))
@@ -98,22 +99,23 @@ type UnMarshalStruct struct {
 	Foo *string
 }
 
-func (u *UnMarshalStruct) UnmarshalItem(av map[string]*dynamodb.AttributeValue) error {
+func (u *UnMarshalStruct) UnmarshalMap(av map[string]ddb.AttributeValue) error {
 	u.Foo = new(string)
-	*u.Foo = *av["Foo"].S
-	return nil
+	if v, ok := av["Foo"].(*ddb.AttributeValueMemberS); ok {
+		*u.Foo = v.Value
+		return nil
+	}
+	return fmt.Errorf("not a string value")
 }
 
 func TestItemUnmarshaller(t *testing.T) {
 
-	av := map[string]*dynamodb.AttributeValue{
-		"Foo": {
-			S: dyno.StringPtr("Bar"),
-		},
+	av := map[string]ddb.AttributeValue{
+		"Foo": &ddb.AttributeValueMemberS{Value: "Bar"},
 	}
 
 	newFoo := new(UnMarshalStruct)
-	err := UnmarshalItem(av, newFoo)
+	err := UnmarshalMap(av, newFoo)
 	assert.NoError(t, err)
 	assert.Equal(t, *newFoo.Foo, "Bar")
 }

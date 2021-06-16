@@ -1,7 +1,7 @@
 package condition
 
 import (
-	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/ericmaustin/dyno/encoding"
 )
 

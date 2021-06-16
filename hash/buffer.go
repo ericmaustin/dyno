@@ -30,8 +30,8 @@ func (b *Buffer) SHA256String() string {
 	return hex.EncodeToString(sha[:])
 }
 
-//WriteAttributeValueMap writes the attribute value map to the Buffer
-func (b *Buffer) WriteAttributeValueMap(avm map[string]*dynamodb.AttributeValue) {
+//WriteMapOfAttributeValues writes the attribute value map to the Buffer
+func (b *Buffer) WriteMapOfAttributeValues(avm map[string]*dynamodb.AttributeValue) {
 	if avm == nil {
 		return
 	}
@@ -44,7 +44,7 @@ func (b *Buffer) WriteAttributeValueMap(avm map[string]*dynamodb.AttributeValue)
 	sort.Strings(avKeys)
 	end := len(avKeys) - 1
 	for i, k := range avKeys {
-		b.WriteString(k+":")
+		b.WriteString(k + ":")
 		b.WriteAttributeValue(avm[k])
 		if i < end {
 			b.WriteString(",")
@@ -53,7 +53,7 @@ func (b *Buffer) WriteAttributeValueMap(avm map[string]*dynamodb.AttributeValue)
 }
 
 //WriteConditionMap inserts encoded bytes for a dynamodb.Condition to the Buffer
-func (b *Buffer)WriteConditionMap(cnds map[string]*dynamodb.Condition) {
+func (b *Buffer) WriteConditionMap(cnds map[string]*dynamodb.Condition) {
 	if cnds == nil {
 		return
 	}
@@ -66,8 +66,62 @@ func (b *Buffer)WriteConditionMap(cnds map[string]*dynamodb.Condition) {
 	sort.Strings(cndKeys)
 	end := len(cndKeys) - 1
 	for i, k := range cndKeys {
-		b.WriteString(k+":")
+		b.WriteString(k + ":")
 		b.WriteCondition(cnds[k])
+		if i < end {
+			b.WriteString(",")
+		}
+	}
+}
+
+//WriteKeysAndAttributes writes the dynamodb.KeysAndAttributes value to the Buffer
+func (b *Buffer) WriteKeysAndAttributes(ka *dynamodb.KeysAndAttributes) {
+	if ka.AttributesToGet != nil {
+		b.WriteString("AttributesToGet:{")
+		for i, a := range ka.AttributesToGet {
+			b.WriteStringPtr(a)
+			if i < len(ka.AttributesToGet)-1 {
+				b.WriteString(",")
+			}
+		}
+		b.WriteString("}")
+	}
+	if ka.ExpressionAttributeNames != nil {
+		b.WriteString("ExpressionAttributeNames:{")
+		b.WriteMapOfStringPtrs(ka.ExpressionAttributeNames)
+		b.WriteString("}")
+	}
+	if ka.Keys != nil {
+		b.WriteString("Keys:{")
+		b.WriteSliceOfAttributeValues(ka.Keys)
+		b.WriteString("}")
+	}
+	if ka.ProjectionExpression != nil {
+		fmt.Fprintf(b, "ProjectionExpression{%s}", *ka.ProjectionExpression)
+	}
+}
+
+func (b *Buffer) WriteStringPtr(str *string) {
+	if str == nil {
+		b.WriteString("<NULL>")
+		return
+	}
+	b.WriteString(*str)
+}
+
+//WriteMapOfKeysAndAttributes writes a map of dynamodb.KeysAndAttributes value to the Buffer
+func (b *Buffer) WriteMapOfKeysAndAttributes(km map[string]*dynamodb.KeysAndAttributes) {
+	end := len(km) - 1
+	keys := make([]string, len(km))
+	i := 0
+	for k := range km {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+	for i, k := range keys {
+		b.WriteString(k + ":")
+		b.WriteKeysAndAttributes(km[k])
 		if i < end {
 			b.WriteString(",")
 		}
@@ -101,10 +155,21 @@ func (b *Buffer) WriteCondition(c *dynamodb.Condition) {
 func (b *Buffer) WriteSliceOfStringPtrs(ss []*string) {
 	end := len(ss) - 1
 	for i, s := range ss {
-		if s == nil {
+		b.WriteStringPtr(s)
+		if i < end {
+			b.WriteString(",")
+		}
+	}
+}
+
+//WriteSliceOfAttributeValues writes a []map[string]*dynamodb.AttributeValue to the Buffer
+func (b *Buffer) WriteSliceOfAttributeValues(avs []map[string]*dynamodb.AttributeValue) {
+	end := len(avs) - 1
+	for i, av := range avs {
+		if av == nil {
 			b.WriteString("<NULL>")
 		} else {
-			b.WriteString(*s)
+			b.WriteMapOfAttributeValues(av)
 		}
 		if i < end {
 			b.WriteString(",")
@@ -114,6 +179,9 @@ func (b *Buffer) WriteSliceOfStringPtrs(ss []*string) {
 
 //WriteMapOfStringPtrs writes a map[string]*string to the Buffer
 func (b *Buffer) WriteMapOfStringPtrs(ms map[string]*string) {
+	if ms == nil {
+		return
+	}
 	end := len(ms) - 1
 	keys := make([]string, len(ms))
 	i := 0
@@ -122,30 +190,140 @@ func (b *Buffer) WriteMapOfStringPtrs(ms map[string]*string) {
 		i++
 	}
 	sort.Strings(keys)
-
-	for i, s := range keys {
-		b.WriteString("k:")
-		if ms[s] == nil {
-			b.WriteString("<NULL>")
-		} else {
-			b.WriteString(*ms[s])
-		}
+	for i, k := range keys {
+		b.WriteString(k + ":")
+		b.WriteStringPtr(ms[k])
 		if i < end {
 			b.WriteString(",")
 		}
 	}
 }
 
+func (b *Buffer) WriteExpressionAttributeNames(v map[string]*string) {
+	if v == nil {
+		return
+	}
+	b.WriteString("ExpressionAttributeNames:{")
+	b.WriteMapOfStringPtrs(v)
+	b.WriteString("}")
+}
+
+func (b *Buffer) WriteExpressionAttributeValues(v map[string]*dynamodb.AttributeValue) {
+	if v == nil {
+		return
+	}
+	b.WriteString("ExpressionAttributeValues:{")
+	b.WriteMapOfAttributeValues(v)
+	b.WriteString("}")
+}
+
+func (b *Buffer) WriteExclusiveStartKey(v map[string]*dynamodb.AttributeValue) {
+	if v == nil {
+		return
+	}
+	b.WriteString("ExclusiveStartKey:{")
+	b.WriteMapOfAttributeValues(v)
+	b.WriteString("}")
+}
+
+func (b *Buffer) WriteConsistentRead(v *bool) {
+	if v == nil {
+		return
+	}
+	fmt.Fprintf(b, "ConsistentRead:{%v}", *v)
+}
+
+func (b *Buffer) WriteScanIndexForward(v *bool) {
+	if v == nil {
+		return
+	}
+	fmt.Fprintf(b, "ScanIndexForward:{%v}", *v)
+}
+
+func (b *Buffer) WriteTableName(v *string) {
+	if v == nil {
+		return
+	}
+	fmt.Fprintf(b, "TableName:{%s}", *v)
+}
+
+func (b *Buffer) WriteFilterExpression(v *string) {
+	if v == nil {
+		return
+	}
+	fmt.Fprintf(b, "FilterExpression:{%s}", *v)
+}
+
+func (b *Buffer) WriteReturnConsumedCapacity(v *string) {
+	if v == nil {
+		return
+	}
+	fmt.Fprintf(b, "ReturnConsumedCapacity:{%s}", *v)
+}
+
+func (b *Buffer) WriteSelect(v *string) {
+	if v == nil {
+		return
+	}
+	fmt.Fprintf(b, "Select:{%s}", *v)
+}
+
+func (b *Buffer) WriteProjectionExpression(v *string) {
+	if v == nil {
+		return
+	}
+	fmt.Fprintf(b, "ProjectionExpression:{%s}", *v)
+}
+
+func (b *Buffer) WriteIndexName(v *string) {
+	if v == nil {
+		return
+	}
+	fmt.Fprintf(b, "IndexName:{%s}", *v)
+}
+
+func (b *Buffer) WriteKeyConditionExpression(v *string) {
+	if v == nil {
+		return
+	}
+	fmt.Fprintf(b, "KeyConditionExpression:{%s}", *v)
+}
+
+func (b *Buffer) WriteLimit(v *int64) {
+	if v == nil {
+		return
+	}
+	fmt.Fprintf(b, "Limit:{%d}", *v)
+}
+
+func (b *Buffer) WriteKeyConditions(v map[string]*dynamodb.Condition) {
+	if v == nil {
+		return
+	}
+	b.WriteString("KeyConditions:{")
+	b.WriteConditionMap(v)
+	b.WriteString("}")
+}
+
+func (b *Buffer) WriteRequestItems(v map[string]*dynamodb.KeysAndAttributes) {
+	if v == nil {
+		return
+	}
+	b.WriteString("RequestItems:{")
+	b.WriteMapOfKeysAndAttributes(v)
+	b.WriteString("}")
+}
+
 //WriteAttributeValue converts an attribute value to a simple hash string that will be the same for the same values of a given
 // attribute value
 func (b *Buffer) WriteAttributeValue(av *dynamodb.AttributeValue) {
-	if av.B != nil && len(av.B) > 0{
+	if av.B != nil && len(av.B) > 0 {
 		fmt.Fprintf(b, "B:{%s}", av.B)
 	}
-	if av.BOOL != nil{
+	if av.BOOL != nil {
 		fmt.Fprintf(b, "BOOL:{%v}", *av.BOOL)
 	}
-	if av.BS != nil{
+	if av.BS != nil {
 		end := len(av.BS) - 1
 		for i, bs := range av.BS {
 			b.Write(bs)
@@ -154,18 +332,18 @@ func (b *Buffer) WriteAttributeValue(av *dynamodb.AttributeValue) {
 			}
 		}
 	}
-	if av.L != nil{
+	if av.L != nil {
 		b.WriteString("L:{")
 		b.WriteAttributeValueSlice(av.L)
 		b.WriteString("}")
 	}
 	if av.M != nil {
 		b.Buffer.WriteString("M:{")
-		b.WriteAttributeValueMap(av.M)
+		b.WriteMapOfAttributeValues(av.M)
 		b.Buffer.WriteString("}")
 	}
 	if av.N != nil {
-		fmt.Fprintf(b,"N:{%s}", *av.N)
+		fmt.Fprintf(b, "N:{%s}", *av.N)
 	}
 	if av.NS != nil {
 		b.WriteString("NS:{")
@@ -173,10 +351,10 @@ func (b *Buffer) WriteAttributeValue(av *dynamodb.AttributeValue) {
 		b.WriteString("}")
 	}
 	if av.NULL != nil {
-		fmt.Fprintf(b,"NULL:{%v}", *av.NULL)
+		fmt.Fprintf(b, "NULL:{%v}", *av.NULL)
 	}
 	if av.S != nil {
-		fmt.Fprintf(b,"S:{%s}", *av.S)
+		fmt.Fprintf(b, "S:{%s}", *av.S)
 	}
 	if av.SS != nil {
 		b.WriteString("SS:{")
@@ -187,77 +365,69 @@ func (b *Buffer) WriteAttributeValue(av *dynamodb.AttributeValue) {
 
 //WriteQueryInput writes a dynamodb.QueryInput to the Buffer
 func (b *Buffer) WriteQueryInput(in *dynamodb.QueryInput) {
-
-	if in.ConsistentRead != nil {
-		fmt.Fprintf(b, "ConsistentRead:{%v}", *in.ConsistentRead)
-	}
-
-	if in.ExclusiveStartKey != nil {
-		b.WriteString("ExclusiveStartKey:{")
-		b.WriteAttributeValueMap(in.ExclusiveStartKey)
-		b.WriteString("}")
-	}
-
-	if in.ExpressionAttributeNames != nil {
-		b.WriteString("ExpressionAttributeNames:{")
-		b.WriteMapOfStringPtrs(in.ExpressionAttributeNames)
-		b.WriteString("}")
-
-	}
-
-	if in.ExpressionAttributeValues != nil {
-		b.WriteString("ExpressionAttributeValues:{")
-		b.WriteAttributeValueMap(in.ExpressionAttributeValues)
-		b.WriteString("}")
-	}
-
-	if in.FilterExpression != nil {
-		fmt.Fprintf(b, "FilterExpression:{%s}", *in.FilterExpression)
-	}
-
-	if in.IndexName != nil {
-		fmt.Fprintf(b, "IndexName:{%s}", *in.IndexName)
-	}
-
-	if in.KeyConditionExpression != nil {
-		fmt.Fprintf(b, "KeyConditionExpression:{%s}", *in.KeyConditionExpression)
-	}
-
-	if in.KeyConditions != nil {
-		b.WriteString("KeyConditions:{")
-		b.WriteConditionMap(in.KeyConditions)
-		b.WriteString("}")
-	}
-
-	if in.Limit != nil {
-		fmt.Fprintf(b, "Limit:{%d}", *in.Limit)
-	}
-
-	if in.ProjectionExpression != nil {
-		fmt.Fprintf(b, "ProjectionExpression:{%s}", *in.ProjectionExpression)
-	}
-
+	b.WriteConsistentRead(in.ConsistentRead)
+	b.WriteExclusiveStartKey(in.ExclusiveStartKey)
+	b.WriteExpressionAttributeNames(in.ExpressionAttributeNames)
+	b.WriteExpressionAttributeValues(in.ExpressionAttributeValues)
+	b.WriteFilterExpression(in.FilterExpression)
+	b.WriteIndexName(in.IndexName)
+	b.WriteKeyConditionExpression(in.KeyConditionExpression)
+	b.WriteKeyConditions(in.KeyConditions)
+	b.WriteLimit(in.Limit)
+	b.WriteProjectionExpression(in.ProjectionExpression)
 	if in.QueryFilter != nil {
 		b.WriteString("QueryFilter:{")
 		b.WriteConditionMap(in.KeyConditions)
 		b.WriteString("}")
 	}
+	b.WriteReturnConsumedCapacity(in.ReturnConsumedCapacity)
+	b.WriteScanIndexForward(in.ScanIndexForward)
+	b.WriteSelect(in.Select)
+	b.WriteTableName(in.TableName)
+}
 
-	if in.ReturnConsumedCapacity != nil {
-		fmt.Fprintf(b, "ReturnConsumedCapacity:{%s}", *in.ReturnConsumedCapacity)
+//WriteScanInput writes a dynamodb.ScanInput to the Buffer
+func (b *Buffer) WriteScanInput(in *dynamodb.ScanInput) {
+	b.WriteConsistentRead(in.ConsistentRead)
+	b.WriteExclusiveStartKey(in.ExclusiveStartKey)
+	b.WriteExpressionAttributeNames(in.ExpressionAttributeNames)
+	b.WriteExpressionAttributeValues(in.ExpressionAttributeValues)
+	b.WriteFilterExpression(in.FilterExpression)
+	b.WriteIndexName(in.IndexName)
+	b.WriteLimit(in.Limit)
+	b.WriteProjectionExpression(in.ProjectionExpression)
+	b.WriteReturnConsumedCapacity(in.ReturnConsumedCapacity)
+	if in.ScanFilter != nil {
+		b.WriteString("ScanFilter:{")
+		b.WriteConditionMap(in.ScanFilter)
+		b.WriteString("}")
 	}
-
-	if in.ScanIndexForward != nil {
-		fmt.Fprintf(b, "ScanIndexForward:{%v}", in.ScanIndexForward)
+	if in.Segment != nil {
+		fmt.Fprintf(b, "Segment:{%d}", *in.Segment)
 	}
-
-	if in.Select != nil {
-		fmt.Fprintf(b, "Select:{%s}", *in.Select)
-	}
-
-	if in.TableName != nil {
-		fmt.Fprintf(b, "TableName:{%s}", *in.TableName)
+	b.WriteSelect(in.Select)
+	b.WriteTableName(in.TableName)
+	if in.TotalSegments != nil {
+		fmt.Fprintf(b, "TotalSegments:{%d}", *in.TotalSegments)
 	}
 }
 
+//WriteGetItemInput writes a dynamodb.GetItemInput to the Buffer
+func (b *Buffer) WriteGetItemInput(in *dynamodb.GetItemInput) {
+	b.WriteConsistentRead(in.ConsistentRead)
+	b.WriteExpressionAttributeNames(in.ExpressionAttributeNames)
+	if in.Key != nil {
+		b.WriteString("Key:{")
+		b.WriteMapOfAttributeValues(in.Key)
+		b.WriteString("}")
+	}
+	b.WriteProjectionExpression(in.ProjectionExpression)
+	b.WriteReturnConsumedCapacity(in.ReturnConsumedCapacity)
+	b.WriteTableName(in.TableName)
+}
 
+//WriteBatchGetItemInput writes a dynamodb.BatchGetItemInput to the Buffer
+func (b *Buffer) WriteBatchGetItemInput(in *dynamodb.BatchGetItemInput) {
+	b.WriteRequestItems(in.RequestItems)
+	b.WriteReturnConsumedCapacity(in.ReturnConsumedCapacity)
+}

@@ -3,26 +3,25 @@ package encoding
 import (
 	"encoding/json"
 	"errors"
+	"gopkg.in/yaml.v2"
 	"reflect"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-//ItemMarshaller allows more control over encoding structs to attribute value maps
-type ItemMarshaller interface {
-	MarshalItem(map[string]*dynamodb.AttributeValue) error
-	//UpdateItem(map[string]*dynamodb.AttributeValue) error
+//MapMarshaller allows more control over encoding types to attribute value maps
+type MapMarshaller interface {
+	MarshalMap(map[string]types.AttributeValue) error
 }
 
-var intermMarshallerReflectType = reflect.TypeOf((*ItemMarshaller)(nil)).Elem()
+var mapMarshallerReflectType = reflect.TypeOf((*MapMarshaller)(nil)).Elem()
 
-// MarshalItems marshals an input slice into a slice of attribute value maps
+// MarshalMaps marshals an input slice into a slice of attribute value maps
 // panics if the input's kind is not a slice
-func MarshalItems(input interface{}) ([]map[string]*dynamodb.AttributeValue, error) {
-	var records []map[string]*dynamodb.AttributeValue
-	if avMapSlice, ok := input.([]map[string]*dynamodb.AttributeValue); ok {
+func MarshalMaps(input interface{}) ([]map[string]types.AttributeValue, error) {
+	var records []map[string]types.AttributeValue
+	if avMapSlice, ok := input.([]map[string]types.AttributeValue); ok {
 		// input is already a slice of attribute value maps
 		return avMapSlice, nil
 	}
@@ -32,10 +31,10 @@ func MarshalItems(input interface{}) ([]map[string]*dynamodb.AttributeValue, err
 	return records, nil
 }
 
-// MustMarshalItems marshals an input slice into a slice of attribute value maps
+// MustMarshalMaps marshals an input slice into a slice of attribute value maps
 // panics on error
-func MustMarshalItems(input interface{}) []map[string]*dynamodb.AttributeValue {
-	records := make([]map[string]*dynamodb.AttributeValue, 0)
+func MustMarshalMaps(input interface{}) []map[string]types.AttributeValue {
+	records := make([]map[string]types.AttributeValue, 0)
 	if err := AppendItems(&records, input); err != nil {
 		panic(err)
 	}
@@ -43,7 +42,7 @@ func MustMarshalItems(input interface{}) []map[string]*dynamodb.AttributeValue {
 }
 
 // AppendItems encodes a given input and appends these items to the given slice of items
-func AppendItems(items *[]map[string]*dynamodb.AttributeValue, input interface{}) error {
+func AppendItems(items *[]map[string]types.AttributeValue, input interface{}) error {
 	rv := Indirect(reflect.ValueOf(input), false)
 
 	if rv.Kind() != reflect.Slice {
@@ -51,10 +50,10 @@ func AppendItems(items *[]map[string]*dynamodb.AttributeValue, input interface{}
 	}
 
 	// if item marshaller then marshal
-	if rv.Type().Elem().Implements(intermMarshallerReflectType) {
+	if rv.Type().Elem().Implements(mapMarshallerReflectType) {
 		for i := 0; i < rv.Len(); i++ {
-			avMap := make(map[string]*dynamodb.AttributeValue)
-			err := rv.Index(i).Interface().(ItemMarshaller).MarshalItem(avMap)
+			avMap := make(map[string]types.AttributeValue)
+			err := rv.Index(i).Interface().(MapMarshaller).MarshalMap(avMap)
 			if err != nil {
 				return err
 			}
@@ -73,47 +72,37 @@ func AppendItems(items *[]map[string]*dynamodb.AttributeValue, input interface{}
 	return nil
 }
 
-// MarshalItem marshals a given input that is a map or a struct into an attribute value map
-func MarshalItem(input interface{}) (map[string]*dynamodb.AttributeValue, error) {
-	if avMap, ok := input.(map[string]*dynamodb.AttributeValue); ok {
+// MarshalMap marshals a given input that is a map or a struct into an attribute value map
+func MarshalMap(input interface{}) (map[string]types.AttributeValue, error) {
+	if avMap, ok := input.(map[string]types.AttributeValue); ok {
 		return avMap, nil
 	}
-	if marshaller, ok := input.(ItemMarshaller); ok {
-		avMap := make(map[string]*dynamodb.AttributeValue)
-		return avMap, marshaller.MarshalItem(avMap)
+	if marshaller, ok := input.(MapMarshaller); ok {
+		avMap := make(map[string]types.AttributeValue)
+		return avMap, marshaller.MarshalMap(avMap)
 	}
 	return marshalValueToRecord(reflect.ValueOf(input))
 }
 
-// MustMarshalItem marshals a given input that is a map or a struct into an attribute value map
+// MustMarshalMap marshals a given input that is a map or a struct into an attribute value map
 // panics on error
-func MustMarshalItem(input interface{}) map[string]*dynamodb.AttributeValue {
-	itemMap, err := MarshalItem(input)
+func MustMarshalMap(input interface{}) map[string]types.AttributeValue {
+	itemMap, err := MarshalMap(input)
 	if err != nil {
 		panic(err)
 	}
 	return itemMap
 }
 
-func marshalValueToRecord(rv reflect.Value) (map[string]*dynamodb.AttributeValue, error) {
-	avMap := map[string]*dynamodb.AttributeValue{}
+func marshalValueToRecord(rv reflect.Value) (map[string]types.AttributeValue, error) {
+	avMap := make(map[string]types.AttributeValue)
 	if err := addValuesToRecord(avMap, rv); err != nil {
 		return nil, err
 	}
 	return avMap, nil
 }
 
-// AddToRecord adds given inputs that is a map or a struct to a attribute value map
-func AddToRecord(rec map[string]*dynamodb.AttributeValue, inputs ...interface{}) error {
-	for _, in := range inputs {
-		if err := addValuesToRecord(rec, reflect.ValueOf(in)); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func addValuesToRecord(item map[string]*dynamodb.AttributeValue, rv reflect.Value) error {
+func addValuesToRecord(item map[string]types.AttributeValue, rv reflect.Value) error {
 	rv = Indirect(rv, false)
 	switch rv.Kind() {
 	case reflect.Struct:
@@ -124,7 +113,7 @@ func addValuesToRecord(item map[string]*dynamodb.AttributeValue, rv reflect.Valu
 		// if the map is already a map of dynamodb attribute values, add them as is
 		if rv.Type() == reflect.TypeOf(item) {
 			for _, key := range rv.MapKeys() {
-				item[key.Interface().(string)] = rv.MapIndex(key).Interface().(*dynamodb.AttributeValue)
+				item[key.Interface().(string)] = rv.MapIndex(key).Interface().(types.AttributeValue)
 			}
 			return nil
 		}
@@ -141,8 +130,8 @@ func addValuesToRecord(item map[string]*dynamodb.AttributeValue, rv reflect.Valu
 	return nil
 }
 
-func structToRecord(input interface{}) (map[string]*dynamodb.AttributeValue, error) {
-	av := map[string]*dynamodb.AttributeValue{}
+func structToRecord(input interface{}) (map[string]types.AttributeValue, error) {
+	av := make(map[string]types.AttributeValue)
 	err := addStructToRecord(Indirect(reflect.ValueOf(input), false), av, "", "")
 	if err != nil {
 		return nil, err
@@ -151,10 +140,10 @@ func structToRecord(input interface{}) (map[string]*dynamodb.AttributeValue, err
 }
 
 // addMapToRecord adds any map indexed by a string to the given attribute value map
-func addMapToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValue, prepend, append string) error {
+func addMapToRecord(rv reflect.Value, item map[string]types.AttributeValue, prepend, append string) error {
 	// if the map is already a map of dynamodb attribute values, add them as is
 	if rv.Type() == reflect.TypeOf(item) {
-		for k, v := range rv.Interface().(map[string]*dynamodb.AttributeValue) {
+		for k, v := range rv.Interface().(map[string]types.AttributeValue) {
 			item[k] = v
 		}
 		return nil
@@ -181,44 +170,46 @@ func mapToIfaceMap(rv reflect.Value, prepend, append string) (map[string]interfa
 	return iFaceMap, nil
 }
 
-func marshalAv(rv reflect.Value, omitZero, omitNil, toJSON bool) (*dynamodb.AttributeValue, error) {
-
-	if shouldOmit(rv, omitZero, omitNil) {
-		return nil, nil
-	}
-
-	rv = Indirect(rv, false)
-
-	if toJSON {
+func marshalAv(rv reflect.Value, config *fieldConfig) (types.AttributeValue, error) {
+	switch config.MarshalAs {
+	case MarshalAsJSON:
 		// we're encoding to json to marshal value with json marshaller and set value to string
-		av := &dynamodb.AttributeValue{}
 		jsonBytes, err := json.Marshal(rv.Interface())
 		if err != nil {
 			return nil, err
 		}
-		av.S = aws.String(string(jsonBytes))
-		return av, nil
+		return &types.AttributeValueMemberS{Value: string(jsonBytes)}, nil
+	case MarshalAsYAML:
+		yamlBytes, err := yaml.Marshal(rv.Interface())
+		if err != nil {
+			return nil, err
+		}
+		return &types.AttributeValueMemberS{Value: string(yamlBytes)}, nil
 	}
-
-	return dynamodbattribute.Marshal(rv.Interface())
+	encoder := attributevalue.NewEncoder()
+	return encoder.Encode(rv.Interface())
 }
 
-func addStructToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValue, prepend, append string) error {
+func addStructToRecord(rv reflect.Value, item map[string]types.AttributeValue, prepend, append string) error {
 
 	var (
-		av  *dynamodb.AttributeValue
+		av  types.AttributeValue
 		err error
+		fc  *fieldConfig
+		ft  reflect.StructField
 	)
 
 	typ := rv.Type()
 
 	for i := 0; i < rv.NumField(); i++ {
 		// gets us the struct field
-		ft := typ.Field(i)
-		fc := parseTag(ft.Tag.Get(FieldStructTagName))
+		ft = typ.Field(i)
+		if fc, err = parseTag(ft.Tag.Get(FieldStructTagName)); err != nil {
+			return err
+		}
 
 		// skip unexported or explicitly ignored fields
-		if len(ft.PkgPath) != 0 || fc.Skip || shouldOmit(rv, fc.OmitZero, fc.OmitNil) {
+		if len(ft.PkgPath) != 0 || fc.Skip {
 			continue
 		}
 
@@ -233,12 +224,6 @@ func addStructToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValu
 					return err
 				}
 			case reflect.Map:
-				if fc.OmitNil && fv.IsNil() {
-					continue
-				}
-				if fc.OmitZero && fv.IsZero() {
-					continue
-				}
 				if err = addMapToRecord(fv, item, fc.Prepend, fc.Append); err != nil {
 					return err
 				}
@@ -247,9 +232,9 @@ func addStructToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValu
 			}
 			continue
 		}
+
 		// marshal value as normal
-		av, err = marshalAv(val, fc.OmitZero, fc.OmitNil, fc.JSON)
-		if err != nil {
+		if av, err = marshalAv(val, fc); err != nil {
 			return err
 		}
 		if av != nil {
@@ -260,13 +245,6 @@ func addStructToRecord(rv reflect.Value, item map[string]*dynamodb.AttributeValu
 	return nil
 }
 
-func shouldOmit(rv reflect.Value, omitZero, omitNil bool) bool {
-	if omitZero {
-		omitNil = true
-	}
-	return (omitNil && reflectValueIsNil(rv)) || (omitZero && reflectValueIsZero(rv))
-}
-
 func fieldName(name, fieldName, prepend, append string) string {
 	if len(name) < 1 {
 		name = fieldName
@@ -274,9 +252,9 @@ func fieldName(name, fieldName, prepend, append string) string {
 	return prepend + name + append
 }
 
-func addMapToAv(input map[string]interface{}, item map[string]*dynamodb.AttributeValue) error {
+func addMapToAv(input map[string]interface{}, item map[string]types.AttributeValue) error {
 	for name, val := range input {
-		_av, err := marshalAv(reflect.ValueOf(val), false, false, false)
+		_av, err := marshalAv(reflect.ValueOf(val), new(fieldConfig))
 		if err != nil {
 			return err
 		}
@@ -377,31 +355,6 @@ func IndirectType(rt reflect.Type) (reflect.Type, int) {
 	return rt, steps
 }
 
-func reflectValueIsNil(rv reflect.Value) bool {
-	for {
-		if (rv.Kind() == reflect.Interface ||
-			rv.Kind() == reflect.Ptr ||
-			rv.Kind() == reflect.Map ||
-			rv.Kind() == reflect.Slice) && rv.IsNil() {
-			return true
-		}
-		if rv.Kind() != reflect.Ptr ||
-			rv.Kind() != reflect.Interface ||
-			rv.Kind() != reflect.Slice ||
-			rv.Kind() != reflect.Map {
-			break
-		}
-		rv = rv.Elem()
-	}
-
-	return false
-}
-
-func reflectValueIsZero(v reflect.Value) bool {
-	ind := Indirect(v, false)
-	return reflect.DeepEqual(ind.Interface(), reflect.Zero(ind.Type()).Interface())
-}
-
 // FieldNames returns a string slice with the field names for the given input
 func FieldNames(input interface{}) (names []string, err error) {
 	names = make([]string, 0)
@@ -436,14 +389,18 @@ func appendStructFieldNames(names []string, rv reflect.Value, prependStr, append
 	var (
 		err      error
 		subNames []string
+		fc       *fieldConfig
+		ft       reflect.StructField
 	)
 
 	typ := rv.Type()
 
 	for i := 0; i < rv.NumField(); i++ {
 		// gets us the struct field
-		ft := typ.Field(i)
-		fc := parseTag(ft.Tag.Get(FieldStructTagName))
+		ft = typ.Field(i)
+		if fc, err = parseTag(ft.Tag.Get(FieldStructTagName)); err != nil {
+			return nil, err
+		}
 		if fc.Skip {
 			// field is ignored
 			continue
@@ -465,7 +422,7 @@ func appendStructFieldNames(names []string, rv reflect.Value, prependStr, append
 			case reflect.Map:
 				subNames = appendMapFieldNames(subNames, fv, fc.Prepend, fc.Append)
 			default:
-				return nil, errors.New("reflect value is not a Struct or Map")
+				return nil, errors.New("embedded reflect value is not a Struct or Map")
 			}
 
 			names = append(names, subNames...)

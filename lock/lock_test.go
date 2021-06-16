@@ -1,15 +1,13 @@
 package lock
 
 import (
-	"fmt"
-	"math/rand"
+	"context"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/ericmaustin/dyno/encoding"
 	"testing"
 	"time"
 
-	awsSession "github.com/aws/aws-sdk-go/aws/session"
 	"github.com/ericmaustin/dyno"
-	"github.com/ericmaustin/dyno/operation"
-	"github.com/ericmaustin/dyno/table"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,43 +16,26 @@ type testItem struct {
 	TestField string `dyno:"test_field"`
 }
 
-var testTableName = ""
-
-func getTestTableName() string {
-	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
-	if len(testTableName) < 1 {
-		charset := "abcdefghijklmnopqrstuvwxyz" +
-			"ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
-			"0123456789_"
-
-		// random string
-		b := make([]byte, 50)
-		for i := range b {
-			b[i] = charset[seededRand.Intn(len(charset))]
-		}
-		testTableName = "__dyno_test_locks__" + string(b)
-	}
-	return testTableName
-}
-
 // TestLock tests locking functionality
 func TestLock(t *testing.T) {
 
 	// create the session
 	// create the session
-	awsSess, err := awsSession.NewSession()
-	assert.NoError(t, err)
-
-	/* get a session */
-	sess := dyno.New(awsSess).
-		SetMaxTimeout(time.Minute)
+	db := dyno.CreateTestSession()
 
 	// set up the table
-	tbl := dyno.NewTable(getTestTableName(), table.NewKey(table.NewPartitionStringKey("id"), nil))
+	tbl := dyno.NewTable(dyno.TestTableName()).
+		SetPartitionKey("id", "S")
 
-	pubRes := <-tbl.Publish(sess.RequestWithTimeout(time.Minute))
-	_, err = pubRes.OutputError()
-	assert.NoError(t, err)
+	if err := tbl.Create(db); err != nil {
+		panic(err)
+	}
+
+	defer func() {
+		if err := tbl.Delete(db); err != nil {
+			panic(err)
+		}
+	}()
 
 	items := []*testItem{
 		{
@@ -67,33 +48,48 @@ func TestLock(t *testing.T) {
 		},
 	}
 
-	writeBatchInput := operation.NewBatchWriteBuilder().
-		AddPuts(tbl.Name(), items).
-		Build()
+	writeBatchInput := dyno.NewBatchWriteItemInput()
+	for _, item := range items {
+		writeBatchInput.AddPuts(tbl.Name(), encoding.MustMarshalMap(item))
+	}
 
-	_, err = operation.BatchWrite(writeBatchInput).
-		Execute(sess.RequestWithTimeout(time.Minute)).
-		OutputError()
+	if _, err := db.BatchWriteItem(writeBatchInput).Await(); err != nil {
+		panic(err)
+	}
 
+	var resultItems []*testItem
+
+	queryBuilder := dyno.NewQueryBuilder().
+		SetTableName(tbl.Name()).
+		AddKeyEquals(tbl.PartitionKeyName(), items[0].ID)
+
+	queryBuilder.SetOutputCallback(func(ctx context.Context, output *dynamodb.QueryOutput) error {
+		if len(output.Items) < 0 {
+			return nil
+		}
+		for _, item := range output.Items {
+			target := new(testItem)
+			if err := encoding.UnmarshalMap(item, target); err != nil {
+				return err
+			}
+			resultItems = append(resultItems, target)
+		}
+		return nil
+	})
+
+	queryInput, err := queryBuilder.Build()
+	if err != nil {
+		panic(err)
+	}
+	queryOutput, err := db.Query(queryInput).Await()
 	assert.NoError(t, err)
+	assert.NotZero(t, len(queryOutput.Items))
 
-	queryInput := operation.NewQueryBuilder().
-		SetTable(tbl.Name()).
-		AddKeyEquals(tbl.PartitionKeyName(), items[0].ID).
-		Build()
-
-	resultItems := make([]*testItem, 0)
-
-	queryOut, err := operation.Query(queryInput).
-		SetHandler(operation.LoadSlice(&resultItems, nil)).
-		Execute(sess.RequestWithTimeout(time.Minute)).
-		OutputError()
-
-	assert.NoError(t, err)
-	assert.NotZero(t, len(queryOut))
+	itemMap := encoding.MustMarshalMap(items[0])
+	key := tbl.ExtractKeys(itemMap)
 
 	/* Test locking a record */
-	lock, err := Acquire(tbl, items[0], sess,
+	lock := MustAcquire(tbl.Name(), key, db,
 		OptHeartbeatFrequency(time.Millisecond*200),
 		OptTimeout(time.Second),
 		OptLeaseDuration(time.Second))
@@ -101,12 +97,12 @@ func TestLock(t *testing.T) {
 	assert.NoError(t, err)
 
 	/* Test locking the same record - this should fail */
-	_, err2 := Acquire(tbl, items[0], sess,
+	_, err = Acquire(tbl.Name(), key, db,
 		OptHeartbeatFrequency(time.Millisecond*200),
 		OptTimeout(time.Second*5),
 		OptLeaseDuration(time.Second))
 
-	assert.Error(t, err2)
+	assert.Error(t, err)
 
 	// release
 	err = lock.Release()
@@ -115,9 +111,4 @@ func TestLock(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-
-	/* TEAR DOWN */
-	delRes, err := (<-tbl.Delete(sess.Request(), nil)).OutputError()
-	assert.NoError(t, err)
-	fmt.Printf("DeleteTable output: %v", delRes)
 }

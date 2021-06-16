@@ -8,8 +8,9 @@ import (
 func TestCreateNewTableDeleteTable(t *testing.T) {
 	sess := CreateTestSession()
 	tbl := CreateTestTable(sess)
+	sess.WaitUntilTableExists(NewDescribeTableInput(DescribeTableWithTableName(tbl.Name())))
 	// delete the table
-	err := <-tbl.Delete(sess.Request())
+	err := tbl.Delete(sess)
 	if err != nil {
 		panic(err)
 	}

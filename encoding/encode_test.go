@@ -2,8 +2,7 @@ package encoding
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/ericmaustin/dyno"
+	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
@@ -19,24 +18,24 @@ type testStruct struct {
 	String             string
 	Int                int
 	Time               time.Time
-	TimeZero           time.Time `dyno:",omitempty"`
-	IntNamed           int       `dyno:"named_int"`
-	StringOmitZero     string    `dyno:",omitzero"`
-	IntOmitZero        int       `dyno:",omitzero"`
-	StringPtrOmitNil   *string   `dyno:",omitnil"`
-	IntPtrOmitNil      *int      `dyno:",omitnil"`
-	IntPtrOmitZero     *int      `dyno:",omitzero"`
+	TimeZero           time.Time `dynamodbav:",omitempty"`
+	IntNamed           int       `dynamodbav:"named_int"`
+	StringOmitZero     string    `dynamodbav:",omitzero"`
+	IntOmitZero        int       `dynamodbav:",omitzero"`
+	StringPtrOmitNil   *string   `dynamodbav:",omitnil"`
+	IntPtrOmitNil      *int      `dynamodbav:",omitnil"`
+	IntPtrOmitZero     *int      `dynamodbav:",omitzero"`
 	SubStruct          testSubStruct
-	SubStructPtr       *testSubStruct `dyno:"*"`
-	SubStructOmitEmpty *testSubStruct `dyno:",omitempty"`
-	SubStructOmitNil   *testSubStruct `dyno:",omitnil"`
-	SubStructAppend    *testSubStruct `dyno:"*,append=append"`
-	SubStructPrepend   *testSubStruct `dyno:"*,prepend=prepend"`
-	SubStructJSON      *testSubStruct `dyno:",json"`
-	SubStringSkip      *testSubStruct `dyno:"-"`
+	SubStructPtr       *testSubStruct `dynamodbav:"*"`
+	SubStructOmitEmpty *testSubStruct `dynamodbav:",omitempty"`
+	SubStructOmitNil   *testSubStruct `dynamodbav:",omitnil"`
+	SubStructAppend    *testSubStruct `dynamodbav:"*,append=append"`
+	SubStructPrepend   *testSubStruct `dynamodbav:"*,prepend=prepend"`
+	SubStructJSON      *testSubStruct `dynamodbav:",json"`
+	SubStringSkip      *testSubStruct `dynamodbav:"-"`
 	StringMap          map[string]string
-	StringMapJSON      map[string]string `dyno:",json"`
-	EmbeddedMap        map[string]string `dyno:"*,prepend=prepend_"`
+	StringMapJSON      map[string]string `dynamodbav:",json"`
+	EmbeddedMap        map[string]string `dynamodbav:"*,prepend=prepend_"`
 }
 
 func getTestStruct() *testStruct {
@@ -94,10 +93,17 @@ func getTestStruct() *testStruct {
 	}
 }
 
+func MustBeInt(i int, err error) int {
+	if err != nil {
+		panic(err)
+	}
+	return i
+}
+
 func TestStructToAttributeValueMap(t *testing.T) {
 
 	s := getTestStruct()
-	av, err := MarshalItem(s)
+	av, err := MarshalMap(s)
 	fmt.Printf("err = %v", err)
 	assert.NoError(t, err)
 	fmt.Printf("av = %+v\n", av)
@@ -108,26 +114,12 @@ func TestStructToAttributeValueMap(t *testing.T) {
 		reflect.ValueOf(s.IntPtrOmitNil).IsZero(),
 		reflect.ValueOf(s.IntPtrOmitNil).IsNil())
 
-	_, ok := av["SubStructOmitEmpty"]
-	assert.False(t, ok)
-	_, ok = av["SubStructOmitNil"]
-	assert.False(t, ok)
-	_, ok = av["SubStringSkip"]
-	assert.False(t, ok)
-	_, ok = av["StringOmitZero"]
-	assert.False(t, ok)
-	_, ok = av["StringPtrOmitNil"]
-	assert.False(t, ok)
-	_, ok = av["IntPtrOmitZero"]
-	assert.False(t, ok)
-	_, ok = av["TimeZero"]
-	assert.False(t, ok)
-
-	assert.Equal(t, *av["prependSubInt"].N, fmt.Sprintf("%d", s.SubStructPrepend.SubInt))
-	assert.Equal(t, *av["SubIntappend"].N, fmt.Sprintf("%d", s.SubStructAppend.SubInt))
-	assert.Equal(t, *av["IntPtrOmitNil"].N, fmt.Sprintf("%d", *s.IntPtrOmitNil))
-	assert.Equal(t, *av["StringMap"].M["stringMap1"].S, s.StringMap["stringMap1"])
-	assert.Equal(t, *av["prepend_embededMap1"].S, s.EmbeddedMap["embededMap1"])
+	assert.Equal(t, av["prependSubInt"].(*ddb.AttributeValueMemberN).Value, fmt.Sprintf("%d", s.SubStructPrepend.SubInt))
+	assert.Equal(t, av["SubIntappend"].(*ddb.AttributeValueMemberN).Value, fmt.Sprintf("%d", s.SubStructAppend.SubInt))
+	assert.Equal(t, av["IntPtrOmitNil"].(*ddb.AttributeValueMemberN).Value, fmt.Sprintf("%d", *s.IntPtrOmitNil))
+	// todo: wtf this is so long, is there a way to see if we can shorten a reference like this?
+	assert.Equal(t, av["StringMap"].(*ddb.AttributeValueMemberM).Value["stringMap1"].(*ddb.AttributeValueMemberS).Value, s.StringMap["stringMap1"])
+	assert.Equal(t, av["prepend_embededMap1"].(*ddb.AttributeValueMemberS).Value, s.EmbeddedMap["embededMap1"])
 }
 
 func TestMapToAttributeValueMap(t *testing.T) {
@@ -136,12 +128,12 @@ func TestMapToAttributeValueMap(t *testing.T) {
 		"b": "value 2",
 	}
 
-	avMap := make(map[string]*dynamodb.AttributeValue)
+	avMap := make(map[string]ddb.AttributeValue)
 
 	err := addMapToRecord(reflect.ValueOf(stringMap), avMap, "", "")
 	assert.NoError(t, err)
 
-	assert.Equal(t, *avMap["a"].S, stringMap["a"])
+	assert.Equal(t, avMap["a"].(*ddb.AttributeValueMemberS).Value, stringMap["a"])
 
 	intMap := map[string]int{
 		"a": 1,
@@ -151,26 +143,7 @@ func TestMapToAttributeValueMap(t *testing.T) {
 	err = addMapToRecord(reflect.ValueOf(intMap), avMap, "", "")
 	assert.NoError(t, err)
 
-	assert.Equal(t, *avMap["a"].N, fmt.Sprintf("%d", intMap["a"]))
-}
-
-func TestAddToAttributeValueMap(t *testing.T) {
-	mapA := map[string]string{
-		"one": "1",
-		"two": "2",
-	}
-	mapB := map[string]string{
-		"three": "3",
-		"four":  "4",
-	}
-
-	avMap := map[string]*dynamodb.AttributeValue{}
-
-	err := AddToRecord(avMap, mapA, mapB)
-	assert.NoError(t, err)
-
-	assert.Equal(t, mapA["one"], *avMap["one"].S)
-	assert.Equal(t, mapB["three"], *avMap["three"].S)
+	assert.Equal(t, avMap["a"].(*ddb.AttributeValueMemberN).Value, fmt.Sprintf("%d", intMap["a"]))
 }
 
 func TestFieldNames(t *testing.T) {
@@ -206,17 +179,16 @@ type MarshalStruct struct {
 	Foo *string
 }
 
-func (m *MarshalStruct) MarshalItem() (map[string]*dynamodb.AttributeValue, error) {
-	return map[string]*dynamodb.AttributeValue{
-		"Foo": {
-			S: m.Foo,
-		},
+func (m *MarshalStruct) MarshalItem() (map[string]ddb.AttributeValue, error) {
+	return map[string]ddb.AttributeValue{
+		"Foo": &ddb.AttributeValueMemberS{Value: *m.Foo},
 	}, nil
 }
 
 func TestItemMarshaller(t *testing.T) {
-	newFoo := &MarshalStruct{Foo: dyno.StringPtr("Bar")}
-	av, err := MarshalItem(newFoo)
+	v := "Bar"
+	newFoo := &MarshalStruct{Foo: &v}
+	av, err := MarshalMap(newFoo)
 	assert.NoError(t, err)
-	assert.Equal(t, *av["Foo"].S, "Bar")
+	assert.Equal(t, av["Foo"].(*ddb.AttributeValueMemberS).Value, "Bar")
 }

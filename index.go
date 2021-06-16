@@ -106,7 +106,7 @@ func (g *GSI) AddProjectionNames(names ...string) *GSI {
 	cnt := 0
 
 	for _, n := range names {
-		if (skn != nil && n != *skn) && (pkn != nil && n != *pkn) { // do not add the key names
+		if (skn != nil && n != *skn) && (pkn != nil && n != *pkn) { // execute not add the key names
 			cnt++
 			g.Projection.NonKeyAttributes = append(g.Projection.NonKeyAttributes, &n)
 		}
@@ -231,7 +231,7 @@ func (l *LSI) AddProjectionNames(names ...string) *LSI {
 	cnt := 0
 
 	for _, n := range names {
-		if (skn != nil && n != *skn) && (pkn != nil && n != *pkn) { // do not add the key names
+		if (skn != nil && n != *skn) && (pkn != nil && n != *pkn) { // execute not add the key names
 			cnt++
 			l.Projection.NonKeyAttributes = append(l.Projection.NonKeyAttributes, &n)
 		}

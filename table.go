@@ -1,7 +1,9 @@
 package dyno
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
@@ -20,16 +22,22 @@ type Table struct {
 	PartitionKeyAttributeDefinition *dynamodb.AttributeDefinition
 	SortKeyAttributeDefinition      *dynamodb.AttributeDefinition
 	Tags                            []*dynamodb.Tag
+	mu                              sync.RWMutex
 }
 
 // Name returns this table's name as a string
 // will panic if name is nil
 func (t *Table) Name() string {
-	return *t.TableName
+	t.mu.RLock()
+	name := *t.TableName
+	t.mu.RUnlock()
+	return name
 }
 
 //IsOnDemand returns true if the table is set to On Demand pricing
 func (t *Table) IsOnDemand() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	if t.BillingModeSummary == nil {
 		// default to pay per request
 		t.BillingModeSummary = new(dynamodb.BillingModeSummary)
@@ -40,6 +48,8 @@ func (t *Table) IsOnDemand() bool {
 
 // RCUs returns the read cost units for this table
 func (t *Table) RCUs() int64 {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	if t.IsOnDemand() || t.ProvisionedThroughput.ReadCapacityUnits == nil {
 		return 0
 	}
@@ -48,6 +58,8 @@ func (t *Table) RCUs() int64 {
 
 // WCUs returns the write cost units for this table
 func (t *Table) WCUs() int64 {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	if t.IsOnDemand() || t.ProvisionedThroughput.WriteCapacityUnits == nil {
 		return 0
 	}
@@ -56,47 +68,118 @@ func (t *Table) WCUs() int64 {
 
 // Description returns the table description
 func (t *Table) Description() *dynamodb.TableDescription {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	return t.TableDescription
 }
 
+//DescribeTableInput gets the DescribeTableInput for this table
+func (t *Table) DescribeTableInput() *DescribeTableInput {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return NewDescribeTableInput().SetTableName(*t.TableName)
+}
+
+//WaitUntilExists returns a WaitPromise that will wait for the table to exist
+func (t *Table) WaitUntilExists(db *Client) error {
+	return db.WaitUntilTableExists(NewDescribeTableInput().
+		SetTableName(*t.TableName)).Await()
+}
+
+//WaitUntilExistsWithContext returns an error that will be nil if table exists
+func (t *Table) WaitUntilExistsWithContext(ctx context.Context, db *Client) error {
+	return db.WaitUntilTableExistsWithContext(ctx, NewDescribeTableInput().
+		SetTableName(*t.TableName)).Await()
+}
+
+//WaitUntilNotExists returns an error that will be nil if table no longer exists
+func (t *Table) WaitUntilNotExists(db *Client) error {
+	return db.WaitUntilTableNotExists(NewDescribeTableInput().
+		SetTableName(*t.TableName)).Await()
+}
+
+//WaitUntilNotExistsWithContext returns  an error that will be nil if table no longer exists
+func (t *Table) WaitUntilNotExistsWithContext(ctx context.Context, db *Client) error {
+	return db.WaitUntilTableNotExistsWithContext(ctx, NewDescribeTableInput().
+		SetTableName(*t.TableName)).Await()
+}
+
 // Sync updates this table's description with the remote dynamodb table
-func (t *Table) Sync(req *Request) error {
-	out, err := req.DescribeTable(&dynamodb.DescribeTableInput{TableName: t.TableName}, nil)
+func (t *Table) Sync(db *Client) error {
+	return t.SyncWithContext(context.Background(), db)
+}
+
+// SyncWithContext updates this table's description with the remote dynamodb table
+// calls Table.syncWithContext after locking the table for writing
+func (t *Table) SyncWithContext(ctx context.Context, db *Client) error {
+	t.mu.Lock()
+	err := t.syncWithContext(ctx, db)
+	t.mu.Unlock()
+	return err
+}
+
+// SyncWithContext updates this table's description with the remote dynamodb table
+func (t *Table) syncWithContext(ctx context.Context, db *Client) error {
+	// wait for table if it was just created
+	if err := t.WaitUntilExistsWithContext(ctx, db); err != nil {
+		return err
+	}
+	out, err := db.DescribeTableWithContext(ctx, NewDescribeTableInput().
+		SetTableName(*t.TableName)).Await()
 	if err != nil {
 		return err
 	}
-
 	if out.Table != nil {
-		t.Set(out.Table)
+		t.setTableDescription(out.Table)
 	}
-
 	return nil
 }
 
-// Set sets the table description to the input value
-func (t *Table) Set(input *dynamodb.TableDescription) {
+// setTableDescription sets the table description to the input value
+func (t *Table) setTableDescription(input *dynamodb.TableDescription) {
 	t.LastSync = time.Now()
 	*t.TableDescription = *input
 }
 
+// UpdateWithTableDescription sets the table description to the input value
+func (t *Table) UpdateWithTableDescription(input *dynamodb.TableDescription) {
+	t.mu.Lock()
+	t.setTableDescription(input)
+	t.mu.Unlock()
+}
+
 // SortKeyName returns the table's sort key
-func (t *Table) SortKeyName() *string {
+func (t *Table) SortKeyName() string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	if len(t.KeySchema) == 0 {
-		return nil
+		return ""
 	}
-	return getSortKeyNameFromKeySchema(t.KeySchema)
+	name := getSortKeyNameFromKeySchema(t.KeySchema)
+	if name == nil {
+		return ""
+	}
+	return *name
 }
 
 // PartitionKeyName returns the partition key name
-func (t *Table) PartitionKeyName() *string {
+func (t *Table) PartitionKeyName() string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	if len(t.KeySchema) == 0 {
-		return nil
+		return ""
 	}
-	return getPartitionKeyNameFromKeySchema(t.KeySchema)
+	name := getPartitionKeyNameFromKeySchema(t.KeySchema)
+	if name == nil {
+		return ""
+	}
+	return *name
 }
 
 // SetPartitionKey sets the partition key for this table
 func (t *Table) SetPartitionKey(pkName string, attributeType string) *Table {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if _, ok := validAttributeTypes[attributeType]; !ok {
 		panic(fmt.Errorf("attribute type %s is not valid", attributeType))
 	}
@@ -112,6 +195,8 @@ func (t *Table) SetPartitionKey(pkName string, attributeType string) *Table {
 
 // SetSortKey sets the sortKey key for this table
 func (t *Table) SetSortKey(skName string, attributeType string) *Table {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if _, ok := validAttributeTypes[attributeType]; !ok {
 		panic(fmt.Errorf("attribute type %s is not valid", attributeType))
 	}
@@ -128,7 +213,8 @@ func (t *Table) SetSortKey(skName string, attributeType string) *Table {
 // AddGSI adds a new GSI for this table
 // provided GSI must have an IndexName or this func will panic
 func (t *Table) AddGSI(gsi ...*GSI) *Table {
-
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	for _, g := range gsi {
 		gsiDesc := &dynamodb.GlobalSecondaryIndexDescription{
 			IndexName:  g.IndexName,
@@ -165,7 +251,8 @@ func (t *Table) AddGSI(gsi ...*GSI) *Table {
 // AddLSI adds a new LSI attached to this table
 // provided LSI must have an IndexName or this func will panic
 func (t *Table) AddLSI(lsi ...*LSI) {
-
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	for _, l := range lsi {
 		lsiDesc := &dynamodb.LocalSecondaryIndexDescription{
 			IndexName:  l.IndexName,
@@ -189,28 +276,38 @@ func (t *Table) AddLSI(lsi ...*LSI) {
 
 // ExtractKeys extracts key values from a dynamodb.AttributeValue map
 func (t *Table) ExtractKeys(avMap map[string]*dynamodb.AttributeValue) map[string]*dynamodb.AttributeValue {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	return extractKeyAttributeValuesFromKeySchema(t.KeySchema, avMap)
 }
 
 // ExtractAllKeys extracts all key values from a slice of dynamodb.AttributeValue maps
 func (t *Table) ExtractAllKeys(avMaps []map[string]*dynamodb.AttributeValue) []map[string]*dynamodb.AttributeValue {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	return extractAllKeyAttributeValuesFromKeySchema(t.KeySchema, avMaps)
 }
 
 // ExtractPartitionKeyValue extracts this table's partition key attribute value from a given input
 // panics if this table does not have a partition key
 func (t *Table) ExtractPartitionKeyValue(avMap map[string]*dynamodb.AttributeValue) *dynamodb.AttributeValue {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	return extractPartitionKeyAttributeValueFromKeySchema(t.KeySchema, avMap)
 }
 
 // ExtractSortKeyValue extracts this table's sort key attribute value from a given input
 // panics if this table does not have a partition key
 func (t *Table) ExtractSortKeyValue(avMap map[string]*dynamodb.AttributeValue) *dynamodb.AttributeValue {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	return extractSortKeyAttributeValueFromKeySchema(t.KeySchema, avMap)
 }
 
 //AddTag adds a tag with given key and value to the Table
 func (t *Table) AddTag(key, value string) *Table {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.Tags = append(t.Tags, &dynamodb.Tag{
 		Key:   &key,
 		Value: &value,
@@ -220,7 +317,8 @@ func (t *Table) AddTag(key, value string) *Table {
 
 // GetCreateTableInput returns the table builder for this table
 func (t *Table) GetCreateTableInput() (*dynamodb.CreateTableInput, error) {
-
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	if t.PartitionKeyAttributeDefinition == nil {
 		return nil, fmt.Errorf("PartitionKeyAttributeDefinition must not be nil")
 	}
@@ -271,13 +369,6 @@ func (t *Table) GetCreateTableInput() (*dynamodb.CreateTableInput, error) {
 	return in, nil
 }
 
-// PublishTableOutput is returned by the TimeSpanMapper Publish method
-type PublishTableOutput struct {
-	CreateTableOutput *dynamodb.CreateTableOutput
-	TableDescription  *dynamodb.TableDescription
-	TableExists       bool
-}
-
 // NewTable creates new table with provided table name, table key, and and options
 // Mapper key is required
 func NewTable(name string) *Table {
@@ -293,26 +384,18 @@ func NewTable(name string) *Table {
 	}
 }
 
-// UpdateCostUnitsOutput is the output of the update cost units operation
-type UpdateCostUnitsOutput struct {
-	Changed bool
-}
-
-// GsiCostUpdate used as input to SetCostUnits when updating cost units for GSI's
-type GsiCostUpdate struct {
-	IndexName string
-	Wcu       int64
-	Rcu       int64
-}
-
 // SetName sets the name for this table
 func (t *Table) SetName(name string) *Table {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.TableName = &name
 	return t
 }
 
 //SetOnDemand sets the table to On Demand billling mode
 func (t *Table) SetOnDemand() *Table {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if t.BillingModeSummary == nil {
 		t.BillingModeSummary = new(dynamodb.BillingModeSummary)
 	}
@@ -322,6 +405,8 @@ func (t *Table) SetOnDemand() *Table {
 
 // SetReadCostUnits sets the read cost units for this table
 func (t *Table) SetReadCostUnits(costUnits int64) *Table {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if t.BillingModeSummary == nil {
 		t.BillingModeSummary = new(dynamodb.BillingModeSummary)
 	}
@@ -335,6 +420,8 @@ func (t *Table) SetReadCostUnits(costUnits int64) *Table {
 
 // SetWriteCostUnits sets the write cost units for this table
 func (t *Table) SetWriteCostUnits(costUnits int64) *Table {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if t.BillingModeSummary == nil {
 		t.BillingModeSummary = new(dynamodb.BillingModeSummary)
 	}
@@ -348,6 +435,8 @@ func (t *Table) SetWriteCostUnits(costUnits int64) *Table {
 
 // SetCostUnits sets both the read and write cost units
 func (t *Table) SetCostUnits(rcus, wcus int64) *Table {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if rcus == 0 && wcus == 0 {
 		t.SetOnDemand()
 		return t
@@ -366,6 +455,8 @@ func (t *Table) SetCostUnits(rcus, wcus int64) *Table {
 
 // UniqueKeyCondition returns a Builder that represents a unique key condition
 func (t *Table) UniqueKeyCondition() *expression.ConditionBuilder {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 	cndBuilder := new(condition.Builder)
 	if t.PartitionKeyAttributeDefinition == nil ||
 		t.PartitionKeyAttributeDefinition.AttributeName != nil {
@@ -381,123 +472,138 @@ func (t *Table) UniqueKeyCondition() *expression.ConditionBuilder {
 	return &builder
 }
 
-// CreateBackupInput creates a CreateBackupInput for this table
-func (t *Table) CreateBackupInput(backupName string) *dynamodb.CreateBackupInput {
-	return &dynamodb.CreateBackupInput{
-		BackupName: t.TableName,
-		TableName:  &backupName,
-	}
+//todo: finish GetTableUpdate method
+//func (t *Table) GetTableUpdate(desc *dynamodb.TableDescription) {
+//	update := dynamodb.UpdateTableInput{
+//		AttributeDefinitions:        nil,
+//		BillingMode:                 nil,
+//		GlobalSecondaryIndexUpdates: nil,
+//		ProvisionedThroughput:       nil,
+//		ReplicaUpdates:              nil,
+//		SSESpecification:            nil,
+//		StreamSpecification:         nil,
+//		TableName:                   nil,
+//	}
+//	//TableName
+//	if desc.TableName == nil || *desc.TableName != *t.TableName {
+//		update.TableName = t.TableName
+//	}
+//	//ProvisionedThroughput
+//	if desc.ProvisionedThroughput == nil && t.ProvisionedThroughput != nil {
+//		update.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
+//			ReadCapacityUnits:  t.ProvisionedThroughput.ReadCapacityUnits,
+//			WriteCapacityUnits: t.ProvisionedThroughput.WriteCapacityUnits,
+//		}
+//	} else if desc.ProvisionedThroughput != nil && t.ProvisionedThroughput != nil {
+//		if *desc.ProvisionedThroughput.ReadCapacityUnits != *t.ProvisionedThroughput.ReadCapacityUnits {
+//			update.ProvisionedThroughput = new(dynamodb.ProvisionedThroughput)
+//			update.ProvisionedThroughput.ReadCapacityUnits = t.ProvisionedThroughput.ReadCapacityUnits
+//		}
+//		if *desc.ProvisionedThroughput.WriteCapacityUnits != *t.ProvisionedThroughput.WriteCapacityUnits {
+//			if update.ProvisionedThroughput == nil {
+//				update.ProvisionedThroughput = new(dynamodb.ProvisionedThroughput)
+//			}
+//			update.ProvisionedThroughput.WriteCapacityUnits = t.ProvisionedThroughput.WriteCapacityUnits
+//		}
+//	}
+//	//Billing Mode
+//	if desc.BillingModeSummary.BillingMode == nil && t.BillingModeSummary.BillingMode != nil {
+//		update.BillingMode = t.BillingModeSummary.BillingMode
+//	} else if t.BillingModeSummary.BillingMode != nil && *desc.BillingModeSummary.BillingMode != *t.BillingModeSummary.BillingMode {
+//		update.BillingMode = t.BillingModeSummary.BillingMode
+//	}
+//	////StreamSpecification
+//	//if desc.StreamSpecification == nil && t.StreamSpecification != nil {
+//	//	update.StreamSpecification = t.StreamSpecification
+//	//} else if desc.StreamSpecification != nil && t.StreamSpecification != nil {
+//	//	if desc.StreamSpecification.StreamEnabled != nil
+//	//}
+//}
+
+// Create creates this table in dynamodb with an api call
+// returns a channel that will return a PublishResult when table is ready
+func (t *Table) Create(db *Client) error {
+	return t.CreateWithContext(context.Background(), db)
 }
 
-// Publish creates this table in dynamodb with an api call
+// CreateWithContext creates this table in dynamodb with an api call
 // returns a channel that will return a PublishResult when table is ready
-func (t *Table) Publish(req *Request) <-chan *TableReadyOutput {
-	doneCh := make(chan *TableReadyOutput)
-	go func() {
-		result := new(TableReadyOutput)
-		defer func() {
-			doneCh <- result
-			close(doneCh)
-		}()
-		tblInput, err := t.GetCreateTableInput()
-		if err != nil {
-			result.Err = err
-			return
-		}
-		_, err = req.CreateTable(tblInput, nil)
-		if err != nil {
-			if !IsAwsErrorCode(err, dynamodb.ErrCodeResourceInUseException) {
-				result.Err = err
-				return
-			}
-
-			// table already created
-			tblDescOut, tblDescErr := req.DescribeTable(&dynamodb.DescribeTableInput{TableName: t.TableName}, nil)
-			if tblDescErr != nil {
-				result.Err = tblDescErr
-				return
-			}
-			result.DescribeTableOutput = tblDescOut
-			// set the table (heh)
-			t.Set(result.Table)
-			return
-		}
-
-		// wait for the table to be ready
-		result = <-req.ListenForTableReady(*t.TableName)
-	}()
-	return doneCh
+func (t *Table) CreateWithContext(ctx context.Context, db *Client) error {
+	dynamodbInput, err := t.GetCreateTableInput()
+	if err != nil {
+		return err
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	input := &CreateTableBuilder{CreateTableInput: dynamodbInput}
+	_, err = db.CreateTableWithContext(ctx, input).Await()
+	if err == nil || IsAwsErrorCode(err, dynamodb.ErrCodeResourceInUseException) {
+		// non-locking sync
+		return t.syncWithContext(ctx, db)
+	}
+	return err
 }
 
 // Backup creates a backup of this table
 // returns a channel that will return a BackupResult when backup completes
-func (t *Table) Backup(req *Request, backupName string) <-chan *BackupCompletionOutput {
-	doneCh := make(chan *BackupCompletionOutput)
-	go func() {
-		result := new(BackupCompletionOutput)
-		defer func() {
-			doneCh <- result
-			close(doneCh)
-		}()
+func (t *Table) Backup(db *Client, backupName string) *CreateBackupPromise {
+	return t.BackupWithContext(context.Background(), db, backupName)
+}
 
-		_, err := req.CreateBackup(&dynamodb.CreateBackupInput{
-			BackupName: &backupName,
-			TableName:  t.TableName,
-		}, nil)
-
-		if err != nil {
-			result.Err = err
-			return
-		}
-
-		// wait for the backup to be completed
-		result = <-req.ListenForBackupCompleted(*t.TableName)
-	}()
-	return doneCh
+// BackupWithContext creates a backup of this table
+// returns a channel that will return a BackupResult when backup completes
+func (t *Table) BackupWithContext(ctx context.Context, db *Client, backupName string) *CreateBackupPromise {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return db.CreateBackupWithContext(ctx, NewCreateBackupInput().
+		SetTableName(*t.TableName).
+		SetBackupName(backupName))
 }
 
 // Delete deletes this table in dynamodb
 // returns a channel that will return an error (nil if successful) when complete
-func (t *Table) Delete(req *Request) <-chan error {
-	doneCh := make(chan error)
-	go func() {
-		var err error
-		defer func() {
-			doneCh <- err
-			close(doneCh)
-		}()
-
-		_, err = req.DeleteTable(&dynamodb.DeleteTableInput{
-			TableName: t.TableName,
-		}, nil)
-
-		if err != nil {
-			return
-		}
-		// wait for the table to be deleted
-		err = <-req.ListenForTableDeletion(*t.TableName)
-	}()
-	return doneCh
+func (t *Table) Delete(db *Client) error {
+	return t.DeleteWithContext(context.Background(), db)
 }
 
-//NewPutItemBuilder creates a new PutItemBuilder
-func (t *Table) NewPutItemBuilder(item map[string]*dynamodb.AttributeValue) *PutItemBuilder {
-	p := &PutItemBuilder{
-		PutItemInput: &dynamodb.PutItemInput{
-			Item:      item,
-			TableName: t.TableName,
-		},
-		cnd: new(condition.Builder),
+// DeleteWithContext deletes this table in dynamodb
+// returns a channel that will return an error (nil if successful) when complete
+func (t *Table) DeleteWithContext(ctx context.Context, db *Client) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	_, err := db.DeleteTableWithContext(ctx, NewDeleteTableInput().SetTableName(*t.TableName)).Await()
+	if err != nil && IsAwsErrorCode(err, dynamodb.ErrCodeResourceNotFoundException) {
+		return nil
 	}
-	return p
+	return err
 }
 
-//PutItem puts an item on this table with a given Request
-func (t *Table) PutItem(req *Request, item map[string]*dynamodb.AttributeValue) (*dynamodb.PutItemOutput, error) {
-	p := t.NewPutItemBuilder(item)
-	input, err := p.Build()
-	if err != nil {
-		return nil, err
-	}
-	return req.PutItem(input, nil)
+// NewScanBuilder creates a ScanBuilder with this table
+func (t *Table) NewScanBuilder() *ScanBuilder {
+	return NewScanBuilder().SetTableName(t.Name())
+}
+
+// NewPutItemBuilder creates a PutBuilder with this table
+func (t *Table) NewPutItemBuilder() *PutItemBuilder {
+	return NewPutItemBuilder().SetTableName(t.Name())
+}
+
+// NewPutItemInput creates a PutItemInput with this table
+func (t *Table) NewPutItemInput() *PutItemInput {
+	return NewPutItemInput().SetTableName(t.Name())
+}
+
+// PutItem puts a given item into this table
+func (t *Table) PutItem(db *Client, item map[string]*dynamodb.AttributeValue) *PutItemPromise {
+	return db.PutItem(t.NewPutItemInput().SetItem(item))
+}
+
+// NewGetItemBuilder creates a GetItemBuilder for this table
+func (t *Table) NewGetItemBuilder() *GetItemBuilder {
+	return NewGetItemBuilder().SetTableName(t.Name())
+}
+
+// NewUpdateItemBuilder creates a UpdateItemBuilder for this table
+func (t *Table) NewUpdateItemBuilder() *UpdateItemBuilder {
+	return NewUpdateItemBuilder().SetTableName(t.Name())
 }

@@ -1,12 +1,10 @@
 package dyno
 
 import (
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/ericmaustin/dyno/encoding/attribute"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/segmentio/ksuid"
 	"math/rand"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws/session"
 )
 
 const stringChars = "abcdefghijklmnopqrstuvwxyz" +
@@ -42,15 +40,15 @@ func NewTestItem() *TestItem {
 	}
 }
 
-//MarshalledTestItem represents a simple test record used for testing with marshalling
-type MarshalledTestItem struct {
+//TestItemMarshaller represents a simple test record used for testing with marshalling
+type TestItemMarshaller struct {
 	ID        string
 	TimeStamp time.Time
 	Embedded  *TestEmbeddedItem
 }
 
 //UnmarshalItem implements the encoding.ItemUnmarshaller interface
-func (m *MarshalledTestItem) UnmarshalItem(avMap map[string]*dynamodb.AttributeValue) error {
+func (m *TestItemMarshaller) UnmarshalItem(avMap map[string]*dynamodb.AttributeValue) error {
 	var errs [5]error
 	if av, ok := avMap["id"]; ok {
 		errs[0] = attribute.UnmarshalString(av, &m.ID)
@@ -73,9 +71,9 @@ func (m *MarshalledTestItem) UnmarshalItem(avMap map[string]*dynamodb.AttributeV
 	return NewErrSet(errs[:]).Err()
 }
 
-//NewMarshalledTestItem creates a new random MarshalledTestItem
-func NewMarshalledTestItem() *MarshalledTestItem {
-	return &MarshalledTestItem{
+//NewMarshalledTestItem creates a new random TestItemMarshaller
+func NewMarshalledTestItem() *TestItemMarshaller {
+	return &TestItemMarshaller{
 		ID:        RandomString(100),
 		TimeStamp: time.Unix(rand.Int63n(1e6), 0),
 		Embedded: &TestEmbeddedItem{
@@ -87,7 +85,7 @@ func NewMarshalledTestItem() *MarshalledTestItem {
 }
 
 //MarshalItem implements the encoding.ItemMarshaller interface
-func (m MarshalledTestItem) MarshalItem(av map[string]*dynamodb.AttributeValue) error {
+func (m TestItemMarshaller) MarshalItem(av map[string]*dynamodb.AttributeValue) error {
 	av["id"] = attribute.EncodeString(&m.ID)
 	av["timestamp"] = attribute.EncodeUnix(&m.TimeStamp)
 	if m.Embedded != nil {
@@ -109,29 +107,22 @@ func RandomString(length int) string {
 
 //TestTableName generates a random test table name
 func TestTableName() string {
-	var testTableName = ""
-	testTableName = "__DYNO_TEST__1" + RandomString(50)
 	//testTableName = "__DYNO_TEST__1"
-	return testTableName
+	return "__DYNO_TEST__" + ksuid.New().String()
 }
 
 //CreateTestSession crates a dyo session for testing
-func CreateTestSession() *Session {
-	// create the session
+func CreateTestSession() *Client {
+	// create the aws session
 	awsSess, err := session.NewSession()
-
 	if err != nil {
 		panic(err)
 	}
-	/* get a session */
-	sess := New(awsSess).
-		SetMaxTimeout(time.Minute * 5)
-
-	return sess
+	return New(awsSess)
 }
 
 //CreateTestTable creates the test table
-func CreateTestTable(sess *Session) *Table {
+func CreateTestTable(db *Client) *Table {
 	// test table contains an example of a GSI and an LSI with
 	table := NewTable(TestTableName())
 	table.SetPartitionKey("id", "S")
@@ -142,9 +133,8 @@ func CreateTestTable(sess *Session) *Table {
 		SetPartitionKey("id", "S").
 		SetSortKey("Bar", "N"))
 
-	res := <-table.Publish(sess.Request())
-	if res.Err != nil {
-		panic(res.Err)
+	if err := table.Create(db); err != nil {
+		panic(err)
 	}
 	return table
 }
@@ -157,8 +147,8 @@ func GetTestItems(cnt int) []*TestItem {
 	return out
 }
 
-func GetMarshalledTestRecords(cnt int) []*MarshalledTestItem {
-	out := make([]*MarshalledTestItem, cnt)
+func GetMarshalledTestRecords(cnt int) []*TestItemMarshaller {
+	out := make([]*TestItemMarshaller, cnt)
 	for i := 0; i < cnt; i++ {
 		out[i] = NewMarshalledTestItem()
 	}

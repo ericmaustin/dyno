@@ -5,24 +5,23 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/condition"
-	"github.com/ericmaustin/dyno/operation"
 	"testing"
 )
 
 func TestAvHash(t *testing.T) {
 	av1 := &dynamodb.AttributeValue{
-		S:    dyno.StringPtr("foo"),
+		S: dyno.StringPtr("foo"),
 	}
 
 	av2 := &dynamodb.AttributeValue{
-		SS:    []*string{
+		SS: []*string{
 			dyno.StringPtr("foo"),
 			dyno.StringPtr("bar"),
 		},
 	}
 
 	av3 := &dynamodb.AttributeValue{
-		M:    map[string]*dynamodb.AttributeValue{
+		M: map[string]*dynamodb.AttributeValue{
 			"B": av1,
 			"A": av2,
 		},
@@ -43,19 +42,21 @@ func TestAvHash(t *testing.T) {
 }
 
 func TestQueryInputHash(t *testing.T) {
-	qb := operation.NewQueryBuilder()
+	qb := dyno.NewQueryBuilder()
 	qb.AddFilter(condition.And(
 		condition.Between("foo", 1, 2),
 		condition.Equal("bar", 3),
 	))
-	qb.AddProjectionNames([]string{"foo", "bar"})
+	qb.AddProjectionNames([]string{"foo", "bar"}...)
 	qb.AddKeyCondition(condition.KeyEqual("baz", 4))
 
-	input := qb.Build()
+	input, err := qb.Build()
+	if err != nil {
+		panic(err)
+	}
 
 	buf := NewBuffer()
-	buf.WriteQueryInput(input)
+	buf.WriteQueryInput(input.QueryInput)
 	fmt.Println(buf.String())
 	fmt.Println(buf.SHA256String())
 }
-
