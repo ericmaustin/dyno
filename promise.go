@@ -1,7 +1,6 @@
 package dyno
 
 import (
-	"context"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/segmentio/ksuid"
 	"sync"
@@ -15,7 +14,7 @@ import (
 // use Promise.Await() to wait for and receive the output from a promise
 type Promise struct {
 	id        string
-	ctx       context.Context
+	//ctx       context.Context
 	mu        sync.RWMutex
 	startTime time.Time
 	endTime   time.Time
@@ -27,13 +26,18 @@ type Promise struct {
 }
 
 //NewPromise creates a new Promise with a startTime of Now
-func NewPromise(ctx context.Context) *Promise {
-	p := &Promise{
+func NewPromise() *Promise {
+	return &Promise{
 		id:        ksuid.New().String(),
-		ctx:       ctx,
-		startTime: time.Now(),
+		//ctx:       ctx,
+		//startTime: time.Now(),
 	}
-	return p
+}
+
+func (p *Promise) Start() {
+	p.mu.Lock()
+	p.startTime = time.Now()
+	p.mu.Unlock()
 }
 
 // Done returns a channel that will emit a struct{}{} when Promise contains a result, an error is encountered,
@@ -58,13 +62,6 @@ func (p *Promise) Done() <-chan struct{} {
 					// done!
 					return
 				}
-				select {
-				case <-p.ctx.Done():
-					p.SetResponse(nil, p.ctx.Err())
-					return
-				default:
-					// keep looping
-				}
 			}
 		}()
 	}
@@ -83,6 +80,7 @@ func (p *Promise) SetResponse(val interface{}, err error) {
 	p.mu.Lock()
 	p.value = val
 	p.err = err
+	p.endTime = time.Now()
 	p.mu.Unlock()
 	atomic.StoreUint32(&p.flag, 1)
 }
@@ -92,7 +90,6 @@ func (p *Promise) SetResponse(val interface{}, err error) {
 func (p *Promise) Await() (interface{}, error) {
 	<-p.Done()
 	p.mu.Lock()
-	p.endTime = time.Now()
 	err := p.err
 	out := p.value
 	p.mu.Unlock()

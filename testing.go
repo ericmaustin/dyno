@@ -118,7 +118,7 @@ func CreateTestSession() *Client {
 	if err != nil {
 		panic(err)
 	}
-	return New(awsSess)
+	return NewClient(awsSess)
 }
 
 //CreateTestTable creates the test table
