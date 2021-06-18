@@ -30,6 +30,7 @@ type DeleteItemInputCallback interface {
 type DeleteItemOutputCallback interface {
 	DeleteItemOutputCallback(context.Context, *ddb.DeleteItemOutput) error
 }
+
 // DeleteItemInputCallbackFunc is DeleteItemOutputCallback function
 type DeleteItemInputCallbackFunc func(context.Context, *ddb.DeleteItemInput) (*ddb.DeleteItemOutput, error)
 
@@ -49,7 +50,7 @@ func (cb DeleteItemOutputCallbackFunc) DeleteItemOutputCallback(ctx context.Cont
 // DeleteItemOptions represents options passed to the DeleteItem operation
 type DeleteItemOptions struct {
 	//InputCallbacks are called before the DeleteItem dynamodb api operation with the dynamodb.DeleteItemInput
-	InputCallbacks  []DeleteItemInputCallback
+	InputCallbacks []DeleteItemInputCallback
 	//OutputCallbacks are called after the DeleteItem dynamodb api operation with the dynamodb.DeleteItemOutput
 	OutputCallbacks []DeleteItemOutputCallback
 }
@@ -128,6 +129,17 @@ func (op *DeleteItem) DynoInvoke(ctx context.Context) {
 	return
 }
 
+// NewDeleteItemInput creates a DeleteItemInput with a given table name and key
+func NewDeleteItemInput(tableName *string, key map[string]ddbTypes.AttributeValue) *ddb.DeleteItemInput {
+	return &ddb.DeleteItemInput{
+		Key:                         key,
+		TableName:                   tableName,
+		ReturnConsumedCapacity:      ddbTypes.ReturnConsumedCapacityNone,
+		ReturnItemCollectionMetrics: ddbTypes.ReturnItemCollectionMetricsNone,
+		ReturnValues:                ddbTypes.ReturnValueNone,
+	}
+}
+
 // DeleteItemBuilder is used for dynamically building a DeleteItemInput
 type DeleteItemBuilder struct {
 	*ddb.DeleteItemInput
@@ -135,14 +147,11 @@ type DeleteItemBuilder struct {
 }
 
 // NewDeleteItemBuilder creates a new DeleteItemInput with DeleteItemOpt
-func NewDeleteItemBuilder() *DeleteItemBuilder {
-	return &DeleteItemBuilder{
-		DeleteItemInput: &ddb.DeleteItemInput{
-			ReturnConsumedCapacity:      ddbTypes.ReturnConsumedCapacityNone,
-			ReturnItemCollectionMetrics: ddbTypes.ReturnItemCollectionMetricsNone,
-			ReturnValues:                ddbTypes.ReturnValueNone,
-		},
+func NewDeleteItemBuilder(input *ddb.DeleteItemInput) *DeleteItemBuilder {
+	if input != nil {
+		return &DeleteItemBuilder{DeleteItemInput: input}
 	}
+	return &DeleteItemBuilder{DeleteItemInput: NewDeleteItemInput(nil, nil)}
 }
 
 // SetKey sets the target key for the item to tbe deleted

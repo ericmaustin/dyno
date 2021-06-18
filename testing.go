@@ -1,7 +1,10 @@
 package dyno
 
 import (
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"context"
+	"github.com/aws/aws-sdk-go-v2/config"
+	ddbType "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/ericmaustin/dyno/encoding"
 	"github.com/segmentio/ksuid"
 	"math/rand"
 	"time"
@@ -47,28 +50,41 @@ type TestItemMarshaller struct {
 	Embedded  *TestEmbeddedItem
 }
 
-//UnmarshalItem implements the encoding.ItemUnmarshaller interface
-func (m *TestItemMarshaller) UnmarshalItem(avMap map[string]*dynamodb.AttributeValue) error {
-	var errs [5]error
-	if av, ok := avMap["id"]; ok {
-		errs[0] = attribute.UnmarshalString(av, &m.ID)
-	}
-	if av, ok := avMap["timestamp"]; ok {
-		errs[1] = attribute.UnmarshalUnix(av, &m.TimeStamp)
-	}
+//MarshalItem implements the encoding.ItemMarshaller interface
+func (m TestItemMarshaller) MarshalItem(av map[string]ddbType.AttributeValue) error {
 	if m.Embedded == nil {
 		m.Embedded = new(TestEmbeddedItem)
 	}
-	if av, ok := avMap["Foo"]; ok {
-		errs[2] = attribute.UnmarshalFloat(av, &m.Embedded.Foo)
+
+	mm := encoding.ValueMarshalMap{
+		"id":        encoding.StringMarshaler(&m.ID, encoding.NilNil),
+		"timestamp": encoding.UnixNanoMarshaler(&m.TimeStamp, encoding.NilNil),
 	}
-	if av, ok := avMap["Bar"]; ok {
-		errs[3] = attribute.UnmarshalInt(av, &m.Embedded.Bar)
+
+	if m.Embedded != nil {
+		mm["Foo"] = encoding.Float64Marshaler(&m.Embedded.Foo, encoding.NilNil)
+		mm["Bar"] = encoding.IntMarshaler(&m.Embedded.Bar, encoding.NilNil)
+		mm["Baz"] = encoding.BytesMarshaler(m.Embedded.Baz, encoding.NilNil)
 	}
-	if av, ok := avMap["Baz"]; ok {
-		errs[4] = attribute.UnmarshalBytes(av, &m.Embedded.Baz)
+
+	return mm.MarshalToMap(av)
+}
+
+//UnmarshalItem implements the encoding.ItemUnmarshaller interface
+func (m *TestItemMarshaller) UnmarshalItem(avMap map[string]ddbType.AttributeValue) error {
+	if m.Embedded == nil {
+		m.Embedded = new(TestEmbeddedItem)
 	}
-	return NewErrSet(errs[:]).Err()
+
+	mm := encoding.ValueUnmarshalerMap{
+		"id":        encoding.StringUnmarshaler(&m.ID),
+		"timestamp": encoding.UnixNanoUnmarshaler(&m.TimeStamp),
+		"Foo":       encoding.Float64Unmarshaler(&m.Embedded.Foo),
+		"Bar":       encoding.IntUnmarshaler(&m.Embedded.Bar),
+		"Baz":       encoding.BytesUnmarshaler(&m.Embedded.Baz),
+	}
+
+	return mm.UnmarshalMap(avMap)
 }
 
 //NewMarshalledTestItem creates a new random TestItemMarshaller
@@ -82,18 +98,6 @@ func NewMarshalledTestItem() *TestItemMarshaller {
 			Baz: []byte(RandomString(4)),
 		},
 	}
-}
-
-//MarshalItem implements the encoding.ItemMarshaller interface
-func (m TestItemMarshaller) MarshalItem(av map[string]*dynamodb.AttributeValue) error {
-	av["id"] = attribute.EncodeString(&m.ID)
-	av["timestamp"] = attribute.EncodeUnix(&m.TimeStamp)
-	if m.Embedded != nil {
-		av["Foo"] = attribute.EncodeFloat(&m.Embedded.Foo)
-		av["Bar"] = attribute.EncodeInt(&m.Embedded.Bar)
-		av["Baz"] = attribute.EncodeBytes(m.Embedded.Baz)
-	}
-	return nil
 }
 
 //RandomString gets a random string from the charset
@@ -111,14 +115,14 @@ func TestTableName() string {
 	return "__DYNO_TEST__" + ksuid.New().String()
 }
 
-//CreateTestSession crates a dyo session for testing
-func CreateTestSession() *Client {
+//CreateTestClient crates a dyo session for testing
+func CreateTestClient() *Client {
 	// create the aws session
-	awsSess, err := session.NewSession()
+	c, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
 		panic(err)
 	}
-	return NewClient(awsSess)
+	return NewClientFromConfig(c)
 }
 
 //CreateTestTable creates the test table
@@ -133,9 +137,16 @@ func CreateTestTable(db *Client) *Table {
 		SetPartitionKey("id", "S").
 		SetSortKey("Bar", "N"))
 
-	if err := table.Create(db); err != nil {
+	input, err := table.CreateTableInput()
+	if err != nil {
 		panic(err)
 	}
+
+	_, err = db.CreateTable(context.Background(), input, CreateTableWithOutputCallback(table))
+	if err != nil {
+		panic(err)
+	}
+
 	return table
 }
 

@@ -1,4 +1,5 @@
 package dyno
+
 //
 //import (
 //	"context"
@@ -29,9 +30,9 @@ package dyno
 //	CreateTableInputCallback(context.Context, *ddb.CreateTableInput) (*ddb.CreateTableOutput, error)
 //}
 //
-//type CreateTableInputCallbackFunc func(context.Context, *ddb.CreateTableInput) (*ddb.CreateTableOutput, error)
+//type CreateTableInputCallbackF func(context.Context, *ddb.CreateTableInput) (*ddb.CreateTableOutput, error)
 //
-//func (cb CreateTableInputCallbackFunc) CreateTableInputCallback(ctx context.Context, input *ddb.CreateTableInput) (*ddb.CreateTableOutput, error) {
+//func (cb CreateTableInputCallbackF) CreateTableInputCallback(ctx context.Context, input *ddb.CreateTableInput) (*ddb.CreateTableOutput, error) {
 //	return cb(ctx, input)
 //}
 //
@@ -39,9 +40,9 @@ package dyno
 //	CreateTableOutputCallback(context.Context, *ddb.CreateTableOutput) error
 //}
 //
-//type CreateTableOutputCallbackFunc func(context.Context, *ddb.CreateTableOutput) error
+//type CreateTableOutputCallbackF func(context.Context, *ddb.CreateTableOutput) error
 //
-//func (cb CreateTableOutputCallbackFunc) CreateTableOutputCallback(ctx context.Context, input *ddb.CreateTableOutput) error {
+//func (cb CreateTableOutputCallbackF) CreateTableOutputCallback(ctx context.Context, input *ddb.CreateTableOutput) error {
 //	return cb(ctx, input)
 //}
 //
@@ -129,9 +130,9 @@ package dyno
 //	DescribeTableInputCallback(context.Context, *ddb.DescribeTableInput) (*ddb.DescribeTableOutput, error)
 //}
 //
-//type DescribeTableInputCallbackFunc func(context.Context, *ddb.DescribeTableInput) (*ddb.DescribeTableOutput, error)
+//type DescribeTableInputCallbackF func(context.Context, *ddb.DescribeTableInput) (*ddb.DescribeTableOutput, error)
 //
-//func (cb DescribeTableInputCallbackFunc) DescribeTableInputCallback(ctx context.Context, input *ddb.DescribeTableInput) (*ddb.DescribeTableOutput, error) {
+//func (cb DescribeTableInputCallbackF) DescribeTableInputCallback(ctx context.Context, input *ddb.DescribeTableInput) (*ddb.DescribeTableOutput, error) {
 //	return cb(ctx, input)
 //}
 //
@@ -139,9 +140,9 @@ package dyno
 //	DescribeTableOutputCallback(context.Context, *ddb.DescribeTableOutput) error
 //}
 //
-//type DescribeTableOutputCallbackFunc func(context.Context, *ddb.DescribeTableOutput) error
+//type DescribeTableOutputCallbackF func(context.Context, *ddb.DescribeTableOutput) error
 //
-//func (cb DescribeTableOutputCallbackFunc) DescribeTableOutputCallback(ctx context.Context, input *ddb.DescribeTableOutput) error {
+//func (cb DescribeTableOutputCallbackF) DescribeTableOutputCallback(ctx context.Context, input *ddb.DescribeTableOutput) error {
 //	return cb(ctx, input)
 //}
 //

@@ -22,13 +22,13 @@ type PoolTestSuite struct {
 }
 
 func (suite *PoolTestSuite) SetupTest() {
-	suite.db = CreateTestSession()
+	suite.db = CreateTestClient()
 	fmt.Println("creating test table")
 	suite.table = CreateTestTable(suite.db)
-	fmt.Println("test table created:", suite.table.String())
+	fmt.Println("test table created:", suite.table.Name())
 	suite.testItems = GetTestItems(10)
 	suite.testMarshalledItems = GetMarshalledTestRecords(10)
-	fmt.Println("test table created:", suite.table.String())
+	fmt.Println("test table created:", suite.table.Name())
 	suite.pool = NewPool(context.Background(), suite.db, 3)
 }
 

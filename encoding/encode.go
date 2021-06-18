@@ -10,12 +10,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-//MapMarshaller allows more control over encoding types to attribute value maps
-type MapMarshaller interface {
+//ValueMarshalMap allows more control over encoding types to attribute value maps
+type MapMarshaler interface {
 	MarshalMap(map[string]types.AttributeValue) error
 }
 
-var mapMarshallerReflectType = reflect.TypeOf((*MapMarshaller)(nil)).Elem()
+var mapMarshallerReflectType = reflect.TypeOf((*MapMarshaler)(nil)).Elem()
 
 // MarshalMaps marshals an input slice into a slice of attribute value maps
 // panics if the input's kind is not a slice
@@ -53,7 +53,7 @@ func AppendItems(items *[]map[string]types.AttributeValue, input interface{}) er
 	if rv.Type().Elem().Implements(mapMarshallerReflectType) {
 		for i := 0; i < rv.Len(); i++ {
 			avMap := make(map[string]types.AttributeValue)
-			err := rv.Index(i).Interface().(MapMarshaller).MarshalMap(avMap)
+			err := rv.Index(i).Interface().(MapMarshaler).MarshalMap(avMap)
 			if err != nil {
 				return err
 			}
@@ -77,7 +77,7 @@ func MarshalMap(input interface{}) (map[string]types.AttributeValue, error) {
 	if avMap, ok := input.(map[string]types.AttributeValue); ok {
 		return avMap, nil
 	}
-	if marshaller, ok := input.(MapMarshaller); ok {
+	if marshaller, ok := input.(MapMarshaler); ok {
 		avMap := make(map[string]types.AttributeValue)
 		return avMap, marshaller.MarshalMap(avMap)
 	}

@@ -50,7 +50,7 @@ func CopyAttributeValue(av types.AttributeValue) types.AttributeValue {
 	panic(errors.New("AttributeValue has an unknown type"))
 }
 
-//CopyAttributeValueMap creates a deep copy of a `map[string]ddb.AttributeValue`
+// CopyAttributeValueMap creates a deep copy of a `map[string]ddb.AttributeValue`
 func CopyAttributeValueMap(input map[string]types.AttributeValue) map[string]types.AttributeValue {
 	if input == nil {
 		return nil
@@ -73,8 +73,6 @@ func CopyCondition(cnd types.Condition) types.Condition {
 	}
 	return newCnd
 }
-
-
 
 //addProjectionNames adds a string slice of projection values to a expression.ProjectionBuilder
 func addProjectionNames(projectionBuilder *expression.ProjectionBuilder, names []string) {
@@ -104,6 +102,7 @@ func addProjection(projectionBuilder *expression.ProjectionBuilder, projection i
 	proj = proj.AddNames(nameBuilders...)
 	projectionBuilder = &proj
 }
+
 //
 //// IsAwsErrorCode checks to see if the provided err is an aws error, and if so if it matches any of the provided codes
 //func IsAwsErrorCode(err error, codes ...string) bool {
@@ -119,3 +118,50 @@ func addProjection(projectionBuilder *expression.ProjectionBuilder, projection i
 //	}
 //	return false
 //}
+
+// CopyKeysAndAttributes creates a deep copy of a KeysAndAttributes
+func CopyKeysAndAttributes(input types.KeysAndAttributes) types.KeysAndAttributes {
+	clone := types.KeysAndAttributes{}
+
+	if len(input.Keys) > 0 {
+		clone.Keys = make([]map[string]types.AttributeValue, len(input.Keys))
+		for i, m := range clone.Keys {
+			clone.Keys[i] = CopyAttributeValueMap(m)
+		}
+	}
+
+	if len(input.AttributesToGet) > 0 {
+		copy(clone.AttributesToGet, input.AttributesToGet)
+	}
+
+	if input.ConsistentRead != nil {
+		clone.ConsistentRead = new(bool)
+		*clone.ConsistentRead = *input.ConsistentRead
+	}
+
+	if input.ExpressionAttributeNames != nil {
+		clone.ExpressionAttributeNames = make(map[string]string, len(input.ExpressionAttributeNames))
+		for k, v := range input.ExpressionAttributeNames {
+			clone.ExpressionAttributeNames[k] = v
+		}
+	}
+
+	if input.ProjectionExpression != nil {
+		clone.ProjectionExpression = new(string)
+		*clone.ProjectionExpression = *input.ProjectionExpression
+	}
+
+	return clone
+}
+
+// CopyKeysAndAttributesMap creates a deep copy of a map of KeysAndAttributes
+func CopyKeysAndAttributesMap(input map[string]types.KeysAndAttributes) map[string]types.KeysAndAttributes {
+	if input == nil {
+		return nil
+	}
+	out := make(map[string]types.KeysAndAttributes, len(input))
+	for k, v := range input {
+		out[k] = CopyKeysAndAttributes(v)
+	}
+	return out
+}

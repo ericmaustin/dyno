@@ -1,11 +1,12 @@
-package attributevalue
+package encoding
 
 import (
 	"encoding/json"
 	"errors"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	ddbav "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"strconv"
+	"time"
 )
 
 // UnmarshalerFunc represents a func that unmarshals an AttributeValue
@@ -16,11 +17,11 @@ func (d UnmarshalerFunc) UnmarshalDynamoDBAttributeValue(v ddb.AttributeValue) e
 	return d(v)
 }
 
-// UnmarshalerMap represents a map of attributevalue.Unmarshaler
-type UnmarshalerMap map[string]attributevalue.Unmarshaler
+// ValueUnmarshalerMap represents a map of attributevalue.Unmarshaler
+type ValueUnmarshalerMap map[string]ddbav.Unmarshaler
 
 // UnmarshalMap runs all the attributevalue.Unmarshalers in the UnmarshalerFunc map
-func (dm UnmarshalerMap) UnmarshalMap(m map[string]ddb.AttributeValue) error {
+func (dm ValueUnmarshalerMap) UnmarshalMap(m map[string]ddb.AttributeValue) error {
 	for key, decoder := range dm {
 		if av, ok := m[key]; ok {
 			if err := decoder.UnmarshalDynamoDBAttributeValue(av); err != nil {
@@ -185,5 +186,41 @@ func UnmarshalJSON(av ddb.AttributeValue, v interface{}) error {
 func JSONUnmarshaler(v interface{}) UnmarshalerFunc {
 	return func(av ddb.AttributeValue) error {
 		return UnmarshalJSON(av, v)
+	}
+}
+
+// UnmarshalUnixNano unmarshals an AttributeValue into the given value
+func UnmarshalUnixNano(av ddb.AttributeValue, v *time.Time) error {
+	intV := int64(0)
+	if err := UnmarshalInt64(av, &intV); err != nil {
+		return err
+	}
+	t := time.Unix(0, intV)
+	*v = t
+	return nil
+}
+
+// UnixNanoUnmarshaler returns a UnmarshalerFunc func that will unmarshal an AttributeValue into the given ptr
+func UnixNanoUnmarshaler(v *time.Time) UnmarshalerFunc {
+	return func(av ddb.AttributeValue) error {
+		return UnmarshalUnixNano(av, v)
+	}
+}
+
+// UnmarshalUnix unmarshals an AttributeValue into the given value
+func UnmarshalUnix(av ddb.AttributeValue, v *time.Time) error {
+	intV := int64(0)
+	if err := UnmarshalInt64(av, &intV); err != nil {
+		return err
+	}
+	t := time.Unix(intV, 0)
+	*v = t
+	return nil
+}
+
+// UnixUnmarshaler returns a UnmarshalerFunc func that will unmarshal an AttributeValue into the given ptr
+func UnixUnmarshaler(v *time.Time) UnmarshalerFunc {
+	return func(av ddb.AttributeValue) error {
+		return UnmarshalUnix(av, v)
 	}
 }

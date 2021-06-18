@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	ddbtype "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // NewGetItem creates a new GetItem with this Client
@@ -29,6 +29,7 @@ type GetItemInputCallback interface {
 type GetItemOutputCallback interface {
 	GetItemOutputCallback(context.Context, *ddb.GetItemOutput) error
 }
+
 // GetItemInputCallbackFunc is GetItemOutputCallback function
 type GetItemInputCallbackFunc func(context.Context, *ddb.GetItemInput) (*ddb.GetItemOutput, error)
 
@@ -48,7 +49,7 @@ func (cb GetItemOutputCallbackFunc) GetItemOutputCallback(ctx context.Context, i
 // GetItemOptions represents options passed to the GetItem operation
 type GetItemOptions struct {
 	//InputCallbacks are called before the GetItem dynamodb api operation with the dynamodb.GetItemInput
-	InputCallbacks  []GetItemInputCallback
+	InputCallbacks []GetItemInputCallback
 	//OutputCallbacks are called after the GetItem dynamodb api operation with the dynamodb.GetItemOutput
 	OutputCallbacks []GetItemOutputCallback
 }
@@ -127,20 +128,27 @@ func (op *GetItem) DynoInvoke(ctx context.Context) {
 	return
 }
 
-
 // GetItemBuilder is used to dynamically build a GetItemInput request
 type GetItemBuilder struct {
 	*ddb.GetItemInput
 	projection *expression.ProjectionBuilder
 }
 
-// NewGetItemBuilder returns a new GetItemBuilder for given tableName if tableName is not nil
-func NewGetItemBuilder() *GetItemBuilder {
-	return &GetItemBuilder{
-		GetItemInput: &ddb.GetItemInput{
-			ReturnConsumedCapacity: ddbtype.ReturnConsumedCapacityNone,
-		},
+// NewGetItemInput creates a new GetItemInput with a table name and key
+func NewGetItemInput(tableName *string, key map[string]ddbTypes.AttributeValue) *ddb.GetItemInput {
+	return &ddb.GetItemInput{
+		Key:                    key,
+		TableName:              tableName,
+		ReturnConsumedCapacity: ddbTypes.ReturnConsumedCapacityNone,
 	}
+}
+
+// NewGetItemBuilder returns a new GetItemBuilder for given tableName if tableName is not nil
+func NewGetItemBuilder(input *ddb.GetItemInput) *GetItemBuilder {
+	if input != nil {
+		return &GetItemBuilder{GetItemInput: input}
+	}
+	return &GetItemBuilder{GetItemInput: NewGetItemInput(nil, nil)}
 }
 
 // SetInput sets the GetItemBuilder's dynamodb.GetItemInput
@@ -168,7 +176,7 @@ func (bld *GetItemBuilder) SetExpressionAttributeNames(v map[string]string) *Get
 }
 
 // SetKey sets the Key field's value.
-func (bld *GetItemBuilder) SetKey(v map[string]ddbtype.AttributeValue) *GetItemBuilder {
+func (bld *GetItemBuilder) SetKey(v map[string]ddbTypes.AttributeValue) *GetItemBuilder {
 	bld.Key = v
 	return bld
 }
@@ -180,7 +188,7 @@ func (bld *GetItemBuilder) SetProjectionExpression(v string) *GetItemBuilder {
 }
 
 // SetReturnConsumedCapacity sets the ReturnConsumedCapacity field's value.
-func (bld *GetItemBuilder) SetReturnConsumedCapacity(v ddbtype.ReturnConsumedCapacity) *GetItemBuilder {
+func (bld *GetItemBuilder) SetReturnConsumedCapacity(v ddbTypes.ReturnConsumedCapacity) *GetItemBuilder {
 	bld.ReturnConsumedCapacity = v
 	return bld
 }

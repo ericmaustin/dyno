@@ -31,6 +31,7 @@ type ScanInputCallback interface {
 type ScanOutputCallback interface {
 	ScanOutputCallback(context.Context, *ddb.ScanOutput) error
 }
+
 // ScanInputCallbackFunc is ScanOutputCallback function
 type ScanInputCallbackFunc func(context.Context, *ddb.ScanInput) (*ddb.ScanOutput, error)
 
@@ -50,7 +51,7 @@ func (cb ScanOutputCallbackFunc) ScanOutputCallback(ctx context.Context, input *
 // ScanOptions represents options passed to the Scan operation
 type ScanOptions struct {
 	//InputCallbacks are called before the Scan dynamodb api operation with the dynamodb.ScanInput
-	InputCallbacks  []ScanInputCallback
+	InputCallbacks []ScanInputCallback
 	//OutputCallbacks are called after the Scan dynamodb api operation with the dynamodb.ScanOutput
 	OutputCallbacks []ScanOutputCallback
 }
@@ -185,7 +186,7 @@ func (op *ScanAll) DynoInvoke(ctx context.Context) {
 	var (
 		outs []*ddb.ScanOutput
 		out  *ddb.ScanOutput
-		err error
+		err  error
 	)
 	defer op.SetResponse(outs, err)
 	//copy the scan so we're not mutating the original
@@ -217,6 +218,14 @@ func (op *ScanAll) DynoInvoke(ctx context.Context) {
 	return
 }
 
+// NewScanInput creates a new ScanInput with a table name
+func NewScanInput(tableName *string) *ddb.ScanInput {
+	return &ddb.ScanInput{
+		TableName:              tableName,
+		ReturnConsumedCapacity: ddbTypes.ReturnConsumedCapacityNone,
+		Select:                 ddbTypes.SelectAllAttributes,
+	}
+}
 
 //ScanBuilder extends dynamodb.ScanInput to allow dynamic input building
 type ScanBuilder struct {
@@ -226,14 +235,11 @@ type ScanBuilder struct {
 }
 
 // NewScanBuilder creates a new scan builder with ScanOption
-func NewScanBuilder() *ScanBuilder {
-	q := &ScanBuilder{
-		ScanInput: &ddb.ScanInput{
-			ReturnConsumedCapacity: ddbTypes.ReturnConsumedCapacityNone,
-			Select:                 ddbTypes.SelectAllAttributes,
-		},
+func NewScanBuilder(input *ddb.ScanInput) *ScanBuilder {
+	if input != nil {
+		return &ScanBuilder{ScanInput: input}
 	}
-	return q
+	return &ScanBuilder{ScanInput: NewScanInput(nil)}
 }
 
 // SetTableName sets the TableName field's value.
@@ -409,7 +415,6 @@ func (bld *ScanBuilder) BuildSegments(segments int32, inputCB ScanInputCallback,
 
 	return SplitScanIntoSegments(input, segments), nil
 }
-
 
 //SplitScanIntoSegments splits an input into segments, each segment is a deep copy of the original
 // with a unique segment number

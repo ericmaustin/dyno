@@ -9,7 +9,6 @@ import (
 	"github.com/ericmaustin/dyno/encoding"
 )
 
-
 // NewQuery creates a new Query with this Client
 func (c *Client) NewQuery(input *ddb.QueryInput, optFns ...func(*QueryOptions)) *Query {
 	return NewQuery(c.ddb, input, optFns...)
@@ -45,6 +44,7 @@ type QueryInputCallback interface {
 type QueryOutputCallback interface {
 	QueryOutputCallback(context.Context, *ddb.QueryOutput) error
 }
+
 // QueryInputCallbackFunc is QueryOutputCallback function
 type QueryInputCallbackFunc func(context.Context, *ddb.QueryInput) (*ddb.QueryOutput, error)
 
@@ -64,7 +64,7 @@ func (cb QueryOutputCallbackFunc) QueryOutputCallback(ctx context.Context, input
 // QueryOptions represents options passed to the Query operation
 type QueryOptions struct {
 	//InputCallbacks are called before the Query dynamodb api operation with the dynamodb.QueryInput
-	InputCallbacks  []QueryInputCallback
+	InputCallbacks []QueryInputCallback
 	//OutputCallbacks are called after the Query dynamodb api operation with the dynamodb.QueryOutput
 	OutputCallbacks []QueryOutputCallback
 }
@@ -187,7 +187,7 @@ func (op *QueryAll) DynoInvoke(ctx context.Context) {
 	var (
 		outs []*ddb.QueryOutput
 		out  *ddb.QueryOutput
-		err error
+		err  error
 	)
 	defer op.SetResponse(outs, err)
 	//copy the scan so we're not mutating the original
@@ -219,7 +219,14 @@ func (op *QueryAll) DynoInvoke(ctx context.Context) {
 	return
 }
 
-
+// NewQueryInput creates a new QueryInput with a table name
+func NewQueryInput(tableName *string) *ddb.QueryInput {
+	return &ddb.QueryInput{
+		TableName:              tableName,
+		ReturnConsumedCapacity: ddbTypes.ReturnConsumedCapacityNone,
+		Select:                 ddbTypes.SelectAllAttributes,
+	}
+}
 
 // QueryBuilder dynamically constructs a QueryInput
 type QueryBuilder struct {
@@ -230,13 +237,11 @@ type QueryBuilder struct {
 }
 
 // NewQueryBuilder creates a new QueryBuilder builder with QueryOpt
-func NewQueryBuilder() *QueryBuilder {
-	return &QueryBuilder{
-		QueryInput: &ddb.QueryInput{
-			ReturnConsumedCapacity: ddbTypes.ReturnConsumedCapacityNone,
-			Select:                 ddbTypes.SelectAllAttributes,
-		},
+func NewQueryBuilder(input *ddb.QueryInput) *QueryBuilder {
+	if input != nil {
+		return &QueryBuilder{QueryInput: input}
 	}
+	return &QueryBuilder{QueryInput: NewQueryInput(nil)}
 }
 
 // SetAscOrder sets the query to return in ascending order

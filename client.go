@@ -2,6 +2,7 @@ package dyno
 
 import (
 	"context"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
@@ -9,6 +10,13 @@ import (
 func NewClient(client *ddb.Client) *Client {
 	return &Client{
 		ddb: client,
+	}
+}
+
+// NewClientFromConfig creates a new Client with provided config
+func NewClientFromConfig(config aws.Config, optFns ...func(*ddb.Options)) *Client {
+	return &Client{
+		ddb: ddb.NewFromConfig(config, optFns...),
 	}
 }
 
@@ -27,6 +35,7 @@ func (c *Client) DynamoDBClient() *ddb.Client {
 type Operation interface {
 	DynoInvoke(context.Context)
 }
+
 //
 ////GetItem runs a GetItem dynamodb operation with a GetItemInput and returns a GetItemPromise
 //func (c *Client) GetItem(in *GetItemInput) *GetItemPromise {

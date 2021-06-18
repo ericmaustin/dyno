@@ -1,16 +1,16 @@
 package dyno
 
 import (
+	"context"
 	"fmt"
 	"testing"
 )
 
 func TestCreateNewTableDeleteTable(t *testing.T) {
-	sess := CreateTestSession()
-	tbl := CreateTestTable(sess)
-	sess.WaitUntilTableExists(NewDescribeTableInput(DescribeTableWithTableName(tbl.Name())))
+	client := CreateTestClient()
+	tbl := CreateTestTable(client)
 	// delete the table
-	err := tbl.Delete(sess)
+	_, err := client.DeleteTable(context.Background(), tbl.DeleteInput())
 	if err != nil {
 		panic(err)
 	}

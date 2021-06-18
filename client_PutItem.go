@@ -29,6 +29,7 @@ type PutItemInputCallback interface {
 type PutItemOutputCallback interface {
 	PutItemOutputCallback(context.Context, *ddb.PutItemOutput) error
 }
+
 // PutItemInputCallbackFunc is PutItemOutputCallback function
 type PutItemInputCallbackFunc func(context.Context, *ddb.PutItemInput) (*ddb.PutItemOutput, error)
 
@@ -48,7 +49,7 @@ func (cb PutItemOutputCallbackFunc) PutItemOutputCallback(ctx context.Context, i
 // PutItemOptions represents options passed to the PutItem operation
 type PutItemOptions struct {
 	//InputCallbacks are called before the PutItem dynamodb api operation with the dynamodb.PutItemInput
-	InputCallbacks  []PutItemInputCallback
+	InputCallbacks []PutItemInputCallback
 	//OutputCallbacks are called after the PutItem dynamodb api operation with the dynamodb.PutItemOutput
 	OutputCallbacks []PutItemOutputCallback
 }
@@ -127,7 +128,6 @@ func (op *PutItem) DynoInvoke(ctx context.Context) {
 	return
 }
 
-
 // PutItemBuilder allows for dynamic building of a PutItem input
 type PutItemBuilder struct {
 	*ddb.PutItemInput
@@ -135,16 +135,11 @@ type PutItemBuilder struct {
 }
 
 // NewPutItemBuilder creates a new PutItemBuilder with PutItemOpt
-func NewPutItemBuilder() *PutItemBuilder {
-	p := &PutItemBuilder{
-		PutItemInput: &ddb.PutItemInput{
-			ReturnConsumedCapacity:      ddbTypes.ReturnConsumedCapacityNone,
-			ReturnItemCollectionMetrics: ddbTypes.ReturnItemCollectionMetricsNone,
-			ReturnValues:                ddbTypes.ReturnValueNone,
-		},
-		cnd: new(condition.Builder),
+func NewPutItemBuilder(input *ddb.PutItemInput) *PutItemBuilder {
+	if input != nil {
+		return &PutItemBuilder{PutItemInput: input}
 	}
-	return p
+	return &PutItemBuilder{PutItemInput: NewPutItemInput(nil, nil)}
 }
 
 // SetItem shadows dynamodb.PutItemInput and sets the item that will be used to build the put input
@@ -228,4 +223,15 @@ func (bld *PutItemBuilder) Build() (*ddb.PutItemInput, error) {
 		bld.ExpressionAttributeValues = b.Values()
 	}
 	return bld.PutItemInput, nil
+}
+
+// NewPutItemInput creates a new PutItemInput with a given table name and item
+func NewPutItemInput(tableName *string, item map[string]ddbTypes.AttributeValue) *ddb.PutItemInput {
+	return &ddb.PutItemInput{
+		Item:                        item,
+		TableName:                   tableName,
+		ReturnConsumedCapacity:      ddbTypes.ReturnConsumedCapacityNone,
+		ReturnItemCollectionMetrics: ddbTypes.ReturnItemCollectionMetricsNone,
+		ReturnValues:                ddbTypes.ReturnValueNone,
+	}
 }

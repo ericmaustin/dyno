@@ -21,7 +21,7 @@ func TestLock(t *testing.T) {
 
 	// create the session
 	// create the session
-	db := dyno.CreateTestSession()
+	db := dyno.CreateTestClient()
 
 	// set up the table
 	tbl := dyno.NewTable(dyno.TestTableName()).

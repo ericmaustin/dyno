@@ -26,6 +26,7 @@ type DescribeBackupInputCallback interface {
 type DescribeBackupOutputCallback interface {
 	DescribeBackupOutputCallback(context.Context, *ddb.DescribeBackupOutput) error
 }
+
 // DescribeBackupInputCallbackFunc is DescribeBackupOutputCallback function
 type DescribeBackupInputCallbackFunc func(context.Context, *ddb.DescribeBackupInput) (*ddb.DescribeBackupOutput, error)
 
@@ -45,7 +46,7 @@ func (cb DescribeBackupOutputCallbackFunc) DescribeBackupOutputCallback(ctx cont
 // DescribeBackupOptions represents options passed to the DescribeBackup operation
 type DescribeBackupOptions struct {
 	//InputCallbacks are called before the DescribeBackup dynamodb api operation with the dynamodb.DescribeBackupInput
-	InputCallbacks  []DescribeBackupInputCallback
+	InputCallbacks []DescribeBackupInputCallback
 	//OutputCallbacks are called after the DescribeBackup dynamodb api operation with the dynamodb.DescribeBackupOutput
 	OutputCallbacks []DescribeBackupOutputCallback
 }
@@ -125,6 +126,6 @@ func (op *DescribeBackup) DynoInvoke(ctx context.Context) {
 }
 
 // NewDescribeBackupInput creates a new DescribeBackupInput
-func NewDescribeBackupInput(backupArn string) *ddb.DescribeBackupInput {
-	return &ddb.DescribeBackupInput{BackupArn: &backupArn}
+func NewDescribeBackupInput(backupArn *string) *ddb.DescribeBackupInput {
+	return &ddb.DescribeBackupInput{BackupArn: backupArn}
 }

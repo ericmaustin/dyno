@@ -2,29 +2,23 @@ package dyno
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
-
-var validAttributeTypes = map[string]struct{}{
-	dynamodb.ScalarAttributeTypeS: {},
-	dynamodb.ScalarAttributeTypeN: {},
-	dynamodb.ScalarAttributeTypeB: {},
-}
 
 // GSI represents a Global Secondary Index
 type GSI struct {
-	*dynamodb.GlobalSecondaryIndex
-	PartitionKeyAttributeDefinition *dynamodb.AttributeDefinition
-	SortKeyAttributeDefinition      *dynamodb.AttributeDefinition
+	ddb.GlobalSecondaryIndex
+	PartitionKeyAttributeDefinition *ddb.AttributeDefinition
+	SortKeyAttributeDefinition      *ddb.AttributeDefinition
 }
 
-// NewGSI creae a new Global Secondary Index with a given name, key, cost units
+// NewGSI create a new Global Secondary Index with a given name, key, cost units
 func NewGSI(name string) *GSI {
 	gsi := &GSI{
-		GlobalSecondaryIndex: &dynamodb.GlobalSecondaryIndex{
+		GlobalSecondaryIndex: ddb.GlobalSecondaryIndex{
 			IndexName: &name,
-			Projection: &dynamodb.Projection{
-				ProjectionType: StringPtr(dynamodb.ProjectionTypeAll),
+			Projection: &ddb.Projection{
+				ProjectionType: ddb.ProjectionTypeAll,
 			},
 		},
 	}
@@ -59,37 +53,30 @@ func (g *GSI) SetCostUnits(wcus, rcus int64) *GSI {
 		return g
 	}
 	if g.ProvisionedThroughput == nil {
-		g.ProvisionedThroughput = new(dynamodb.ProvisionedThroughput)
+		g.ProvisionedThroughput = new(ddb.ProvisionedThroughput)
 	}
-	g.ProvisionedThroughput.SetWriteCapacityUnits(wcus)
-	g.ProvisionedThroughput.SetReadCapacityUnits(rcus)
+	g.ProvisionedThroughput.WriteCapacityUnits = &wcus
+	g.ProvisionedThroughput.ReadCapacityUnits = &rcus
 	return g
 }
 
 // SetPartitionKey sets the partition key for this GSI
-func (g *GSI) SetPartitionKey(pkName string, attributeType string) *GSI {
-	if _, ok := validAttributeTypes[attributeType]; !ok {
-		panic(fmt.Errorf("attribute type %s is not valid", attributeType))
-	}
+func (g *GSI) SetPartitionKey(pkName string, attributeType ddb.ScalarAttributeType) *GSI {
 
 	g.KeySchema = addPartitionKeyToKeySchema(g.KeySchema, pkName)
-	g.PartitionKeyAttributeDefinition = &dynamodb.AttributeDefinition{
+	g.PartitionKeyAttributeDefinition = &ddb.AttributeDefinition{
 		AttributeName: &pkName,
-		AttributeType: &attributeType,
+		AttributeType: attributeType,
 	}
 	return g
 }
 
 // SetSortKey sets the sortKey key for this GSI
-func (g *GSI) SetSortKey(skName string, attributeType string) *GSI {
-	if _, ok := validAttributeTypes[attributeType]; !ok {
-		panic(fmt.Errorf("attribute type %s is not valid", attributeType))
-	}
-
+func (g *GSI) SetSortKey(skName string, attributeType ddb.ScalarAttributeType) *GSI {
 	g.KeySchema = addSortKeyToKeySchema(g.KeySchema, skName)
-	g.SortKeyAttributeDefinition = &dynamodb.AttributeDefinition{
+	g.SortKeyAttributeDefinition = &ddb.AttributeDefinition{
 		AttributeName: &skName,
-		AttributeType: &attributeType,
+		AttributeType: attributeType,
 	}
 	return g
 }
@@ -97,7 +84,7 @@ func (g *GSI) SetSortKey(skName string, attributeType string) *GSI {
 // AddProjectionNames adds projection names to this SortKey
 func (g *GSI) AddProjectionNames(names ...string) *GSI {
 	if g.Projection == nil {
-		g.Projection = new(dynamodb.Projection)
+		g.Projection = new(ddb.Projection)
 	}
 
 	skn := g.SortKeyName()
@@ -108,12 +95,12 @@ func (g *GSI) AddProjectionNames(names ...string) *GSI {
 	for _, n := range names {
 		if (skn != nil && n != *skn) && (pkn != nil && n != *pkn) { // execute not add the key names
 			cnt++
-			g.Projection.NonKeyAttributes = append(g.Projection.NonKeyAttributes, &n)
+			g.Projection.NonKeyAttributes = append(g.Projection.NonKeyAttributes, n)
 		}
 	}
 
 	if cnt > 0 {
-		g.Projection.SetProjectionType(dynamodb.ProjectionTypeInclude)
+		g.Projection.ProjectionType = ddb.ProjectionTypeInclude
 	}
 
 	return g
@@ -121,33 +108,33 @@ func (g *GSI) AddProjectionNames(names ...string) *GSI {
 
 // SetProjectionTypeKeysOnly sets the Keys Only projection type
 func (g *GSI) SetProjectionTypeKeysOnly(skName string) *GSI {
-	g.Projection = &dynamodb.Projection{
+	g.Projection = &ddb.Projection{
 		NonKeyAttributes: nil,
-		ProjectionType:   StringPtr(dynamodb.ProjectionTypeKeysOnly),
+		ProjectionType:   ddb.ProjectionTypeKeysOnly,
 	}
 	return g
 }
 
 // ExtractKeys extracts key values from a dynamodb.AttributeValue map
-func (g *GSI) ExtractKeys(avMap map[string]*dynamodb.AttributeValue) map[string]*dynamodb.AttributeValue {
+func (g *GSI) ExtractKeys(avMap map[string]ddb.AttributeValue) map[string]ddb.AttributeValue {
 	return extractKeyAttributeValuesFromKeySchema(g.KeySchema, avMap)
 }
 
 // ExtractAllKeys extracts all key values from a slice of dynamodb.AttributeValue maps
-func (g *GSI) ExtractAllKeys(avMaps []map[string]*dynamodb.AttributeValue) []map[string]*dynamodb.AttributeValue {
+func (g *GSI) ExtractAllKeys(avMaps []map[string]ddb.AttributeValue) []map[string]ddb.AttributeValue {
 	return extractAllKeyAttributeValuesFromKeySchema(g.KeySchema, avMaps)
 }
 
 // DynamoGlobalSecondaryIndex gets the global secondary index dynamo object
-func (g *GSI) DynamoGlobalSecondaryIndex() *dynamodb.GlobalSecondaryIndex {
+func (g *GSI) DynamoGlobalSecondaryIndex() ddb.GlobalSecondaryIndex {
 	return g.GlobalSecondaryIndex
 }
 
 //LSI represents a Local Secondary Index
 type LSI struct {
-	*dynamodb.LocalSecondaryIndex
-	PartitionKeyAttributeDefinition *dynamodb.AttributeDefinition
-	SortKeyAttributeDefinition      *dynamodb.AttributeDefinition
+	ddb.LocalSecondaryIndex
+	PartitionKeyAttributeDefinition *ddb.AttributeDefinition
+	SortKeyAttributeDefinition      *ddb.AttributeDefinition
 }
 
 // NewLSI creates a new Local Secondary Index with a given name and key
@@ -157,10 +144,10 @@ func NewLSI(name string) *LSI {
 	}
 	return &LSI{
 		//Index: newIndex(name, key),
-		LocalSecondaryIndex: &dynamodb.LocalSecondaryIndex{
+		LocalSecondaryIndex: ddb.LocalSecondaryIndex{
 			IndexName: &name,
-			Projection: &dynamodb.Projection{
-				ProjectionType: StringPtr(dynamodb.ProjectionTypeAll),
+			Projection: &ddb.Projection{
+				ProjectionType: ddb.ProjectionTypeAll,
 			},
 		},
 	}
@@ -183,38 +170,30 @@ func (l *LSI) SortKeyName() *string {
 }
 
 // SetPartitionKey sets the partition key for this local index
-func (l *LSI) SetPartitionKey(pkName string, attributeType string) *LSI {
-	if _, ok := validAttributeTypes[attributeType]; !ok {
-		panic(fmt.Errorf("attribute type %s is not valid", attributeType))
-	}
-
+func (l *LSI) SetPartitionKey(pkName string, attributeType ddb.ScalarAttributeType) *LSI {
 	l.KeySchema = addPartitionKeyToKeySchema(l.KeySchema, pkName)
-	l.PartitionKeyAttributeDefinition = &dynamodb.AttributeDefinition{
+	l.PartitionKeyAttributeDefinition = &ddb.AttributeDefinition{
 		AttributeName: &pkName,
-		AttributeType: &attributeType,
+		AttributeType: attributeType,
 	}
 	return l
 }
 
 // SetSortKey sets the sortKey key for this local index
-func (l *LSI) SetSortKey(skName string, attributeType string) *LSI {
-	if _, ok := validAttributeTypes[attributeType]; !ok {
-		panic(fmt.Errorf("attribute type %s is not valid", attributeType))
-	}
-
+func (l *LSI) SetSortKey(skName string, attributeType ddb.ScalarAttributeType) *LSI {
 	l.KeySchema = addSortKeyToKeySchema(l.KeySchema, skName)
-	l.SortKeyAttributeDefinition = &dynamodb.AttributeDefinition{
+	l.SortKeyAttributeDefinition = &ddb.AttributeDefinition{
 		AttributeName: &skName,
-		AttributeType: &attributeType,
+		AttributeType: attributeType,
 	}
 	return l
 }
 
 // SetProjectionTypeKeysOnly sets the Keys Only projection type
 func (l *LSI) SetProjectionTypeKeysOnly(skName string) *LSI {
-	l.Projection = &dynamodb.Projection{
+	l.Projection = &ddb.Projection{
 		NonKeyAttributes: nil,
-		ProjectionType:   StringPtr(dynamodb.ProjectionTypeKeysOnly),
+		ProjectionType:   ddb.ProjectionTypeKeysOnly,
 	}
 	return l
 }
@@ -222,7 +201,7 @@ func (l *LSI) SetProjectionTypeKeysOnly(skName string) *LSI {
 // AddProjectionNames adds projection names to this SortKey
 func (l *LSI) AddProjectionNames(names ...string) *LSI {
 	if l.Projection == nil {
-		l.Projection = new(dynamodb.Projection)
+		l.Projection = new(ddb.Projection)
 	}
 
 	skn := l.SortKeyName()
@@ -233,43 +212,43 @@ func (l *LSI) AddProjectionNames(names ...string) *LSI {
 	for _, n := range names {
 		if (skn != nil && n != *skn) && (pkn != nil && n != *pkn) { // execute not add the key names
 			cnt++
-			l.Projection.NonKeyAttributes = append(l.Projection.NonKeyAttributes, &n)
+			l.Projection.NonKeyAttributes = append(l.Projection.NonKeyAttributes, n)
 		}
 	}
 
 	if cnt > 0 {
-		l.Projection.SetProjectionType(dynamodb.ProjectionTypeInclude)
+		l.Projection.ProjectionType = ddb.ProjectionTypeInclude
 	}
 
 	return l
 }
 
 // ExtractKeys extracts key values from a dynamodb.AttributeValue map
-func (l *LSI) ExtractKeys(avMap map[string]*dynamodb.AttributeValue) map[string]*dynamodb.AttributeValue {
+func (l *LSI) ExtractKeys(avMap map[string]ddb.AttributeValue) map[string]ddb.AttributeValue {
 	return extractKeyAttributeValuesFromKeySchema(l.KeySchema, avMap)
 }
 
 // ExtractAllKeys extracts all key values from a slice of dynamodb.AttributeValue maps
-func (l *LSI) ExtractAllKeys(avMaps []map[string]*dynamodb.AttributeValue) []map[string]*dynamodb.AttributeValue {
+func (l *LSI) ExtractAllKeys(avMaps []map[string]ddb.AttributeValue) []map[string]ddb.AttributeValue {
 	return extractAllKeyAttributeValuesFromKeySchema(l.KeySchema, avMaps)
 }
 
 // DynamoLocalSecondaryIndex gets a local secondary index dynamo object representation
-func (l *LSI) DynamoLocalSecondaryIndex() *dynamodb.LocalSecondaryIndex {
+func (l *LSI) DynamoLocalSecondaryIndex() ddb.LocalSecondaryIndex {
 	return l.LocalSecondaryIndex
 }
 
 //addSortKeyToKeySchema adds a sort key to they keySchema
-func addSortKeyToKeySchema(keySchema []*dynamodb.KeySchemaElement, skName string) []*dynamodb.KeySchemaElement {
+func addSortKeyToKeySchema(keySchema []ddb.KeySchemaElement, skName string) []ddb.KeySchemaElement {
 	var iExisting *int
 
-	keySchemaElement := &dynamodb.KeySchemaElement{
+	keySchemaElement := ddb.KeySchemaElement{
 		AttributeName: &skName,
-		KeyType:       StringPtr(dynamodb.KeyTypeRange),
+		KeyType:       ddb.KeyTypeRange,
 	}
 
 	for i, ks := range keySchema {
-		if ks.KeyType != nil && *ks.KeyType == dynamodb.KeyTypeRange {
+		if ks.KeyType == ddb.KeyTypeRange {
 			iExisting = &i
 		}
 	}
@@ -284,16 +263,16 @@ func addSortKeyToKeySchema(keySchema []*dynamodb.KeySchemaElement, skName string
 }
 
 //addPartitionKeyToKeySchema adds a partition key to they keySchema
-func addPartitionKeyToKeySchema(keySchema []*dynamodb.KeySchemaElement, pkName string) []*dynamodb.KeySchemaElement {
+func addPartitionKeyToKeySchema(keySchema []ddb.KeySchemaElement, pkName string) []ddb.KeySchemaElement {
 	var iExisting *int
 
-	keySchemaElement := &dynamodb.KeySchemaElement{
+	keySchemaElement := ddb.KeySchemaElement{
 		AttributeName: &pkName,
-		KeyType:       StringPtr(dynamodb.KeyTypeHash),
+		KeyType:       ddb.KeyTypeHash,
 	}
 
 	for i, ks := range keySchema {
-		if ks.KeyType != nil && *ks.KeyType == dynamodb.KeyTypeHash {
+		if ks.KeyType == ddb.KeyTypeHash {
 			iExisting = &i
 		}
 	}
@@ -307,32 +286,32 @@ func addPartitionKeyToKeySchema(keySchema []*dynamodb.KeySchemaElement, pkName s
 	return keySchema
 }
 
-func getPartitionKeyNameFromKeySchema(keySchema []*dynamodb.KeySchemaElement) *string {
+func getPartitionKeyNameFromKeySchema(keySchema []ddb.KeySchemaElement) *string {
 	if len(keySchema) == 0 {
 		return nil
 	}
 	for _, ks := range keySchema {
-		if ks.KeyType != nil && *ks.KeyType == dynamodb.KeyTypeHash {
+		if ks.KeyType == ddb.KeyTypeHash {
 			return ks.AttributeName
 		}
 	}
 	return nil
 }
 
-func getSortKeyNameFromKeySchema(keySchema []*dynamodb.KeySchemaElement) *string {
+func getSortKeyNameFromKeySchema(keySchema []ddb.KeySchemaElement) *string {
 	if len(keySchema) == 0 {
 		return nil
 	}
 	for _, ks := range keySchema {
-		if ks.KeyType != nil && *ks.KeyType == dynamodb.KeyTypeRange {
+		if ks.KeyType == ddb.KeyTypeRange {
 			return ks.AttributeName
 		}
 	}
 	return nil
 }
 
-// extractKeyAttributeValuesFromKeySchema converts a list of records to a list of dynamodb attribute items
-func extractKeyAttributeValuesFromKeySchema(keySchema []*dynamodb.KeySchemaElement, avMap map[string]*dynamodb.AttributeValue) map[string]*dynamodb.AttributeValue {
+// extractKeyAttributeValuesFromKeySchema converts a list of records to a list of ddb attribute items
+func extractKeyAttributeValuesFromKeySchema(keySchema []ddb.KeySchemaElement, avMap map[string]ddb.AttributeValue) map[string]ddb.AttributeValue {
 
 	names := make([]string, len(keySchema))
 
@@ -340,7 +319,7 @@ func extractKeyAttributeValuesFromKeySchema(keySchema []*dynamodb.KeySchemaEleme
 		names[i] = *ks.AttributeName
 	}
 
-	out := make(map[string]*dynamodb.AttributeValue)
+	out := make(map[string]ddb.AttributeValue)
 
 	for _, n := range names {
 		if _, ok := avMap[n]; ok {
@@ -351,9 +330,9 @@ func extractKeyAttributeValuesFromKeySchema(keySchema []*dynamodb.KeySchemaEleme
 	return out
 }
 
-// extractAllKeyAttributeValuesFromKeySchema converts a list of records to a list of dynamodb attribute items
-func extractAllKeyAttributeValuesFromKeySchema(keySchema []*dynamodb.KeySchemaElement, avMaps []map[string]*dynamodb.AttributeValue) []map[string]*dynamodb.AttributeValue {
-	out := make([]map[string]*dynamodb.AttributeValue, len(avMaps))
+// extractAllKeyAttributeValuesFromKeySchema converts a list of records to a list of ddb attribute items
+func extractAllKeyAttributeValuesFromKeySchema(keySchema []ddb.KeySchemaElement, avMaps []map[string]ddb.AttributeValue) []map[string]ddb.AttributeValue {
+	out := make([]map[string]ddb.AttributeValue, len(avMaps))
 
 	for i, avMap := range avMaps {
 		out[i] = extractKeyAttributeValuesFromKeySchema(keySchema, avMap)
@@ -363,7 +342,7 @@ func extractAllKeyAttributeValuesFromKeySchema(keySchema []*dynamodb.KeySchemaEl
 }
 
 // extractPartitionKeyAttributeValueFromKeySchema extracts the partition key value from a dynamodb.AttributeValue with given keySchema
-func extractPartitionKeyAttributeValueFromKeySchema(keySchema []*dynamodb.KeySchemaElement, avMap map[string]*dynamodb.AttributeValue) *dynamodb.AttributeValue {
+func extractPartitionKeyAttributeValueFromKeySchema(keySchema []ddb.KeySchemaElement, avMap map[string]ddb.AttributeValue) ddb.AttributeValue {
 
 	pkName := getPartitionKeyNameFromKeySchema(keySchema)
 
@@ -379,7 +358,7 @@ func extractPartitionKeyAttributeValueFromKeySchema(keySchema []*dynamodb.KeySch
 }
 
 // extractSortKeyAttributeValueFromKeySchema extracts the sort key value from a dynamodb.AttributeValue with given keySchema
-func extractSortKeyAttributeValueFromKeySchema(keySchema []*dynamodb.KeySchemaElement, avMap map[string]*dynamodb.AttributeValue) *dynamodb.AttributeValue {
+func extractSortKeyAttributeValueFromKeySchema(keySchema []ddb.KeySchemaElement, avMap map[string]ddb.AttributeValue) ddb.AttributeValue {
 
 	skName := getSortKeyNameFromKeySchema(keySchema)
 
@@ -396,7 +375,7 @@ func extractSortKeyAttributeValueFromKeySchema(keySchema []*dynamodb.KeySchemaEl
 
 //appendUniqueAttributeDefinitions appends only uniques
 // this func will panic if any of the dynamodb.AttributeDefinition have a nil AttributeName
-func appendUniqueAttributeDefinitions(defs []*dynamodb.AttributeDefinition, new ...*dynamodb.AttributeDefinition) []*dynamodb.AttributeDefinition {
+func appendUniqueAttributeDefinitions(defs []ddb.AttributeDefinition, new ...ddb.AttributeDefinition) []ddb.AttributeDefinition {
 	adKeys := make(map[string]struct{}, len(defs))
 	for _, ad := range defs {
 		if ad.AttributeName == nil {

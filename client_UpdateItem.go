@@ -32,6 +32,7 @@ type UpdateItemInputCallback interface {
 type UpdateItemOutputCallback interface {
 	UpdateItemOutputCallback(context.Context, *ddb.UpdateItemOutput) error
 }
+
 // UpdateItemInputCallbackFunc is UpdateItemOutputCallback function
 type UpdateItemInputCallbackFunc func(context.Context, *ddb.UpdateItemInput) (*ddb.UpdateItemOutput, error)
 
@@ -128,6 +129,14 @@ func (op *UpdateItem) DynoInvoke(ctx context.Context) {
 	return
 }
 
+func NewUpdateItemInput(tableName *string) *ddb.UpdateItemInput {
+	return &ddb.UpdateItemInput{
+		TableName:                   tableName,
+		ReturnConsumedCapacity:      ddbtype.ReturnConsumedCapacityNone,
+		ReturnItemCollectionMetrics: ddbtype.ReturnItemCollectionMetricsNone,
+		ReturnValues:                ddbtype.ReturnValueNone,
+	}
+}
 
 // UpdateItemBuilder is used to build an UpdateItemInput
 type UpdateItemBuilder struct {
@@ -137,14 +146,11 @@ type UpdateItemBuilder struct {
 }
 
 // NewUpdateItemBuilder creates a new UpdateItemBuilder
-func NewUpdateItemBuilder() *UpdateItemBuilder {
-	return &UpdateItemBuilder{
-		UpdateItemInput: &ddb.UpdateItemInput{
-			ReturnConsumedCapacity:      ddbtype.ReturnConsumedCapacityNone,
-			ReturnItemCollectionMetrics: ddbtype.ReturnItemCollectionMetricsNone,
-			ReturnValues:                ddbtype.ReturnValueNone,
-		},
+func NewUpdateItemBuilder(input *ddb.UpdateItemInput) *UpdateItemBuilder {
+	if input != nil {
+		return &UpdateItemBuilder{UpdateItemInput: input}
 	}
+	return &UpdateItemBuilder{UpdateItemInput: NewUpdateItemInput(nil)}
 }
 
 // Add adds an Add operation on this update with the given field name and value
