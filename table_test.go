@@ -14,5 +14,6 @@ func TestCreateNewTableDeleteTable(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+
 	fmt.Println("table", tbl.Name(), "has been deleted")
 }

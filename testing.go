@@ -2,6 +2,7 @@ package dyno
 
 import (
 	"context"
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/config"
 	ddbType "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ericmaustin/dyno/encoding"
@@ -16,21 +17,21 @@ const stringChars = "abcdefghijklmnopqrstuvwxyz" +
 
 var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-//TestEmbeddedItem represents a simple embedded test record used for testing
+// TestEmbeddedItem represents a simple embedded test record used for testing
 type TestEmbeddedItem struct {
 	Foo float64
 	Bar int
 	Baz []byte
 }
 
-//TestItem represents a simple test record used for testing
+// TestItem represents a simple test record used for testing
 type TestItem struct {
-	ID        string            `dyno:"id"`
-	TimeStamp int64             `dyno:"timestamp"`
-	Embedded  *TestEmbeddedItem `dyno:",*"`
+	ID        string            `dynamodbav:"id"`
+	TimeStamp int64             `dynamodbav:"timestamp"`
+	Embedded  *TestEmbeddedItem `dynamodbav:",*"`
 }
 
-//NewTestItem creates a new random TestItem
+// NewTestItem creates a new random TestItem
 func NewTestItem() *TestItem {
 	return &TestItem{
 		ID:        RandomString(100),
@@ -43,15 +44,15 @@ func NewTestItem() *TestItem {
 	}
 }
 
-//TestItemMarshaller represents a simple test record used for testing with marshalling
+// TestItemMarshaller represents a simple test record used for testing with marshalling
 type TestItemMarshaller struct {
 	ID        string
 	TimeStamp time.Time
 	Embedded  *TestEmbeddedItem
 }
 
-//MarshalItem implements the encoding.ItemMarshaller interface
-func (m TestItemMarshaller) MarshalItem(av map[string]ddbType.AttributeValue) error {
+// MarshalAttributeValueMap implements the encoding.ItemMarshaller interface
+func (m TestItemMarshaller) MarshalAttributeValueMap(av map[string]ddbType.AttributeValue) error {
 	if m.Embedded == nil {
 		m.Embedded = new(TestEmbeddedItem)
 	}
@@ -70,8 +71,8 @@ func (m TestItemMarshaller) MarshalItem(av map[string]ddbType.AttributeValue) er
 	return mm.MarshalToMap(av)
 }
 
-//UnmarshalItem implements the encoding.ItemUnmarshaller interface
-func (m *TestItemMarshaller) UnmarshalItem(avMap map[string]ddbType.AttributeValue) error {
+// UnmarshalAttributeValueMap implements the encoding.ItemUnmarshaller interface
+func (m *TestItemMarshaller) UnmarshalAttributeValueMap(avMap map[string]ddbType.AttributeValue) error {
 	if m.Embedded == nil {
 		m.Embedded = new(TestEmbeddedItem)
 	}
@@ -84,10 +85,10 @@ func (m *TestItemMarshaller) UnmarshalItem(avMap map[string]ddbType.AttributeVal
 		"Baz":       encoding.BytesUnmarshaler(&m.Embedded.Baz),
 	}
 
-	return mm.UnmarshalMap(avMap)
+	return mm.UnmarshalAttributeValueMap(avMap)
 }
 
-//NewMarshalledTestItem creates a new random TestItemMarshaller
+// NewMarshalledTestItem creates a new random TestItemMarshaller
 func NewMarshalledTestItem() *TestItemMarshaller {
 	return &TestItemMarshaller{
 		ID:        RandomString(100),
@@ -100,33 +101,35 @@ func NewMarshalledTestItem() *TestItemMarshaller {
 	}
 }
 
-//RandomString gets a random string from the charset
+// RandomString gets a random string from the charset
 func RandomString(length int) string {
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = stringChars[seededRand.Intn(len(stringChars))]
 	}
+
 	return string(b)
 }
 
-//TestTableName generates a random test table name
+// TestTableName generates a random test table name
 func TestTableName() string {
-	//testTableName = "__DYNO_TEST__1"
+	// testTableName = "__DYNO_TEST__1"
 	return "__DYNO_TEST__" + ksuid.New().String()
 }
 
-//CreateTestClient crates a dyo session for testing
-func CreateTestClient() *Client {
+// CreateTestClient crates a dyo session for testing
+func CreateTestClient() *DefaultClient {
 	// create the aws session
 	c, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
 		panic(err)
 	}
+
 	return NewClientFromConfig(c)
 }
 
-//CreateTestTable creates the test table
-func CreateTestTable(db *Client) *Table {
+// CreateTestTable creates the test table
+func CreateTestTable(db *DefaultClient) *Table {
 	// test table contains an example of a GSI and an LSI with
 	table := NewTable(TestTableName())
 	table.SetPartitionKey("id", "S")
@@ -137,13 +140,20 @@ func CreateTestTable(db *Client) *Table {
 		SetPartitionKey("id", "S").
 		SetSortKey("Bar", "N"))
 
-	input, err := table.CreateTableInput()
+	input, err := table.Create()
 	if err != nil {
 		panic(err)
 	}
 
-	_, err = db.CreateTable(context.Background(), input, CreateTableWithOutputCallback(table))
+	out, err := input.Invoke(context.Background(), db.DynamoDBClient()).Await()
 	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("create table output:\n", MustYamlString(out))
+
+	// update the local table (also waits for table to exist)
+	if err = table.UpdateWithRemote().Invoke(context.Background(), db.ddb).Await(); err != nil {
 		panic(err)
 	}
 
@@ -155,6 +165,7 @@ func GetTestItems(cnt int) []*TestItem {
 	for i := 0; i < cnt; i++ {
 		out[i] = NewTestItem()
 	}
+
 	return out
 }
 
@@ -163,5 +174,6 @@ func GetMarshalledTestRecords(cnt int) []*TestItemMarshaller {
 	for i := 0; i < cnt; i++ {
 		out[i] = NewMarshalledTestItem()
 	}
+
 	return out
 }

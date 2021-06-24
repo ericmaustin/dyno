@@ -5,16 +5,23 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
-// NewDeleteBackup creates a new DeleteBackup with this Client
-func (c *Client) NewDeleteBackup(input *ddb.DeleteBackupInput, optFns ...func(*DeleteBackupOptions)) *DeleteBackup {
-	return NewDeleteBackup(c.ddb, input, optFns...)
+// DeleteBackup executes a scan api call with a DeleteBackupInput
+func (c *DefaultClient) DeleteBackup(ctx context.Context, input *ddb.DeleteBackupInput, optFns ...func(*DeleteBackupOptions)) (*ddb.DeleteBackupOutput, error) {
+	op := NewDeleteBackup(input, optFns...)
+	op.DynoInvoke(ctx, c.ddb)
+
+	return op.Await()
 }
 
-// DeleteBackup executes a scan api call with a DeleteBackupInput
-func (c *Client) DeleteBackup(ctx context.Context, input *ddb.DeleteBackupInput, optFns ...func(*DeleteBackupOptions)) (*ddb.DeleteBackupOutput, error) {
-	scan := c.NewDeleteBackup(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
+// DeleteBackup executes a DeleteBackup operation with a DeleteBackupInput in this pool and returns the DeleteBackup for processing
+func (p *Pool) DeleteBackup(input *ddb.DeleteBackupInput, optFns ...func(*DeleteBackupOptions)) *DeleteBackup {
+	op := NewDeleteBackup(input, optFns...)
+
+	if err := p.Do(op); err != nil {
+		op.SetResponse(nil, err)
+	}
+
+	return op
 }
 
 // DeleteBackupInputCallback is a callback that is called on a given DeleteBackupInput before a DeleteBackup operation api call executes
@@ -45,9 +52,9 @@ func (cb DeleteBackupOutputCallbackFunc) DeleteBackupOutputCallback(ctx context.
 
 // DeleteBackupOptions represents options passed to the DeleteBackup operation
 type DeleteBackupOptions struct {
-	//InputCallbacks are called before the DeleteBackup dynamodb api operation with the dynamodb.DeleteBackupInput
+	// InputCallbacks are called before the DeleteBackup dynamodb api operation with the dynamodb.DeleteBackupInput
 	InputCallbacks []DeleteBackupInputCallback
-	//OutputCallbacks are called after the DeleteBackup dynamodb api operation with the dynamodb.DeleteBackupOutput
+	// OutputCallbacks are called after the DeleteBackup dynamodb api operation with the dynamodb.DeleteBackupOutput
 	OutputCallbacks []DeleteBackupOutputCallback
 }
 
@@ -68,20 +75,20 @@ func DeleteBackupWithOutputCallback(cb DeleteBackupOutputCallback) func(*DeleteB
 // DeleteBackup represents a DeleteBackup operation
 type DeleteBackup struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.DeleteBackupInput
 	options DeleteBackupOptions
 }
 
 // NewDeleteBackup creates a new DeleteBackup operation on the given client with a given DeleteBackupInput and options
-func NewDeleteBackup(client *ddb.Client, input *ddb.DeleteBackupInput, optFns ...func(*DeleteBackupOptions)) *DeleteBackup {
+func NewDeleteBackup(input *ddb.DeleteBackupInput, optFns ...func(*DeleteBackupOptions)) *DeleteBackup {
 	opts := DeleteBackupOptions{}
+
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &DeleteBackup{
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -93,36 +100,40 @@ func (op *DeleteBackup) Await() (*ddb.DeleteBackupOutput, error) {
 	if out == nil {
 		return nil, err
 	}
+	
 	return out.(*ddb.DeleteBackupOutput), err
 }
 
 // Invoke invokes the DeleteBackup operation
-func (op *DeleteBackup) Invoke(ctx context.Context) *DeleteBackup {
-	go op.DynoInvoke(ctx)
+func (op *DeleteBackup) Invoke(ctx context.Context, client *ddb.Client) *DeleteBackup {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DeleteBackup) DynoInvoke(ctx context.Context) {
+func (op *DeleteBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.DeleteBackupOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func() { op.SetResponse(out, err) }()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.DeleteBackupInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.DeleteBackup(ctx, op.input); err != nil {
+
+	if out, err = client.DeleteBackup(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.DeleteBackupOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
-	return
 }
 
 // NewDeleteBackupInput creates a DeleteBackupInput with a given table name and key

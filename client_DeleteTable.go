@@ -5,16 +5,23 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
-// NewDeleteTable creates a new DeleteTable with this Client
-func (c *Client) NewDeleteTable(input *ddb.DeleteTableInput, optFns ...func(*DeleteTableOptions)) *DeleteTable {
-	return NewDeleteTable(c.ddb, input, optFns...)
+// DeleteTable executes a scan api call with a DeleteTableInput
+func (c *DefaultClient) DeleteTable(ctx context.Context, input *ddb.DeleteTableInput, optFns ...func(*DeleteTableOptions)) (*ddb.DeleteTableOutput, error) {
+	op := NewDeleteTable(input, optFns...)
+	op.DynoInvoke(ctx, c.ddb)
+	
+	return op.Await()
 }
 
-// DeleteTable executes a scan api call with a DeleteTableInput
-func (c *Client) DeleteTable(ctx context.Context, input *ddb.DeleteTableInput, optFns ...func(*DeleteTableOptions)) (*ddb.DeleteTableOutput, error) {
-	scan := c.NewDeleteTable(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
+// DeleteTable executes a DeleteTable operation with a DeleteTableInput in this pool and returns the DeleteTable for processing
+func (p *Pool) DeleteTable(input *ddb.DeleteTableInput, optFns ...func(*DeleteTableOptions)) *DeleteTable {
+	op := NewDeleteTable(input, optFns...)
+
+	if err := p.Do(op); err != nil {
+		op.SetResponse(nil, err)
+	}
+
+	return op
 }
 
 // DeleteTableInputCallback is a callback that is called on a given DeleteTableInput before a DeleteTable operation api call executes
@@ -45,9 +52,9 @@ func (cb DeleteTableOutputCallbackFunc) DeleteTableOutputCallback(ctx context.Co
 
 // DeleteTableOptions represents options passed to the DeleteTable operation
 type DeleteTableOptions struct {
-	//InputCallbacks are called before the DeleteTable dynamodb api operation with the dynamodb.DeleteTableInput
+	// InputCallbacks are called before the DeleteTable dynamodb api operation with the dynamodb.DeleteTableInput
 	InputCallbacks []DeleteTableInputCallback
-	//OutputCallbacks are called after the DeleteTable dynamodb api operation with the dynamodb.DeleteTableOutput
+	// OutputCallbacks are called after the DeleteTable dynamodb api operation with the dynamodb.DeleteTableOutput
 	OutputCallbacks []DeleteTableOutputCallback
 }
 
@@ -68,20 +75,20 @@ func DeleteTableWithOutputCallback(cb DeleteTableOutputCallback) func(*DeleteTab
 // DeleteTable represents a DeleteTable operation
 type DeleteTable struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.DeleteTableInput
 	options DeleteTableOptions
 }
 
 // NewDeleteTable creates a new DeleteTable operation on the given client with a given DeleteTableInput and options
-func NewDeleteTable(client *ddb.Client, input *ddb.DeleteTableInput, optFns ...func(*DeleteTableOptions)) *DeleteTable {
+func NewDeleteTable(input *ddb.DeleteTableInput, optFns ...func(*DeleteTableOptions)) *DeleteTable {
 	opts := DeleteTableOptions{}
+
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &DeleteTable{
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -90,39 +97,44 @@ func NewDeleteTable(client *ddb.Client, input *ddb.DeleteTableInput, optFns ...f
 // Await waits for the Operation to be complete and then returns a DeleteTableOutput and error
 func (op *DeleteTable) Await() (*ddb.DeleteTableOutput, error) {
 	out, err := op.Promise.Await()
+
 	if out == nil {
 		return nil, err
 	}
+
 	return out.(*ddb.DeleteTableOutput), err
 }
 
 // Invoke invokes the DeleteTable operation
-func (op *DeleteTable) Invoke(ctx context.Context) *DeleteTable {
-	go op.DynoInvoke(ctx)
+func (op *DeleteTable) Invoke(ctx context.Context, client *ddb.Client) *DeleteTable {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DeleteTable) DynoInvoke(ctx context.Context) {
+func (op *DeleteTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.DeleteTableOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func() { op.SetResponse(out, err) }()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.DeleteTableInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.DeleteTable(ctx, op.input); err != nil {
+
+	if out, err = client.DeleteTable(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.DeleteTableOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
-	return
 }
 
 // NewDeleteTableInput creates a new DeleteTableInput

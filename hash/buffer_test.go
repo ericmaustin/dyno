@@ -2,26 +2,26 @@ package hash
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/condition"
 	"testing"
 )
 
 func TestAvHash(t *testing.T) {
-	av1 := &dynamodb.AttributeValue{
-		S: dyno.StringPtr("foo"),
+	av1 := &types.AttributeValueMemberS{
+		Value: "foo",
 	}
 
-	av2 := &dynamodb.AttributeValue{
-		SS: []*string{
-			dyno.StringPtr("foo"),
-			dyno.StringPtr("bar"),
+	av2 := &types.AttributeValueMemberSS{
+		Value: []string{
+			"foo",
+			"bar",
 		},
 	}
 
-	av3 := &dynamodb.AttributeValue{
-		M: map[string]*dynamodb.AttributeValue{
+	av3 := &types.AttributeValueMemberM{
+		Value: map[string]types.AttributeValue{
 			"B": av1,
 			"A": av2,
 		},
@@ -42,7 +42,8 @@ func TestAvHash(t *testing.T) {
 }
 
 func TestQueryInputHash(t *testing.T) {
-	qb := dyno.NewQueryBuilder()
+	qb := dyno.NewQueryBuilder(nil)
+	qb.SetTableName("testTable")
 	qb.AddFilter(condition.And(
 		condition.Between("foo", 1, 2),
 		condition.Equal("bar", 3),
@@ -56,7 +57,7 @@ func TestQueryInputHash(t *testing.T) {
 	}
 
 	buf := NewBuffer()
-	buf.WriteQueryInput(input.QueryInput)
+	buf.WriteQueryInput(input)
 	fmt.Println(buf.String())
 	fmt.Println(buf.SHA256String())
 }

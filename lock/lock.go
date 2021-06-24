@@ -9,10 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/condition"
 )
+
+//TODO: update this to sdk-v2
 
 const (
 	// LeaseFieldName is the name of the fields that specifies the lock lease duration for a lock
@@ -48,8 +51,8 @@ type (
 
 	// Lock is a representation of a lock on a specific record in a table
 	Lock struct {
-		DB                     *dyno.Client
-		Key                    map[string]*dynamodb.AttributeValue // the item that is being locked
+		DB                     *dyno.DefaultClient
+		Key                    map[string]types.AttributeValue // the item that is being locked
 		TableName              string
 		SessionID              *string       // this lock sessionId
 		HasLock                bool          // whether or not we have a lock
@@ -70,7 +73,7 @@ Acquire the lock by attempting to update release the lock.
 */
 func (dl *Lock) Acquire() (err error) {
 	var (
-		updateInput *dyno.UpdateItemInput
+		updateInput *dynamodb.UpdateItemInput
 	)
 	// create a ticker for the lock request
 	ticker := time.NewTicker(100 * time.Millisecond)
@@ -113,7 +116,7 @@ func (dl *Lock) Acquire() (err error) {
 			return &dyno.Error{Code: dyno.ErrLockTimeout}
 		case <-ticker.C:
 
-			updateOutput, err := dl.DB.UpdateItemWithContext(ctx, updateInput).Await()
+			updateOutput, err := dl.DB.UpdateItem(ctx, updateInput)
 			if err != nil {
 				if dyno.IsAwsErrorCode(err, dynamodb.ErrCodeConditionalCheckFailedException) {
 					// conditional check failed... another process/routine holds the lock
@@ -233,7 +236,7 @@ func (dl *Lock) renew() {
 	ctx, done := context.WithTimeout(dl.Context, dl.LeaseDuration)
 	defer done()
 
-	output, err := dl.DB.UpdateItemWithContext(ctx, updateInput).Await()
+	output, err := dl.DB.UpdateItem(ctx, updateInput)
 
 	select {
 	case <-dl.Context.Done():
@@ -257,10 +260,9 @@ func (dl *Lock) clear() {
 	dl.mu.Lock()
 	defer dl.mu.Unlock()
 
-	updateInput, err := dyno.NewUpdateItemBuilder(
-		dyno.UpdateItemWithTableName(dl.TableName),
-		dyno.UpdateItemWithKey(dl.Key),
-	).
+	updateInput, err := dyno.NewUpdateItemBuilder(nil).
+		SetTableName(dl.TableName).
+		SetKey(dl.Key).
 		SetReturnValues(dynamodb.ReturnValueUpdatedNew).
 		Set(ExpiresFieldName, 0).
 		AddCondition(condition.Equal(VersionFieldName, *dl.SessionID)).
@@ -324,7 +326,7 @@ func OptContext(ctx context.Context) Opt {
 /*
 Acquire acquires a lock for a given table with a given map of key fields
 */
-func Acquire(tableName string, itemKey interface{}, db *dyno.Client, opts ...Opt) (lock *Lock, err error) {
+func Acquire(tableName string, itemKey interface{}, db *dyno.DefaultClient, opts ...Opt) (lock *Lock, err error) {
 
 	var (
 		ctx    context.Context
@@ -384,7 +386,7 @@ func Acquire(tableName string, itemKey interface{}, db *dyno.Client, opts ...Opt
 }
 
 // MustAcquire acquires a lock or panics
-func MustAcquire(tableName string, itemKey interface{}, sess *dyno.Client, opts ...Opt) *Lock {
+func MustAcquire(tableName string, itemKey interface{}, sess *dyno.DefaultClient, opts ...Opt) *Lock {
 	lock, err := Acquire(tableName, itemKey, sess, opts...)
 	if err != nil {
 		panic(err)

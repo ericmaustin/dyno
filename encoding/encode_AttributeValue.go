@@ -33,15 +33,18 @@ type ValueMarshalMap map[string]attributevalue.Marshaler
 // MarshalMap runs all the attributevalue.Marshaler in the MarshalMap and generates a map of AttributeValues
 func (em ValueMarshalMap) MarshalMap() (map[string]ddb.AttributeValue, error) {
 	m := make(map[string]ddb.AttributeValue, len(em))
+
 	for k, v := range em {
 		av, err := v.MarshalDynamoDBAttributeValue()
 		if err != nil {
 			return nil, err
 		}
+
 		if av != nil {
 			m[k] = av
 		}
 	}
+
 	return m, nil
 }
 
@@ -52,10 +55,12 @@ func (em ValueMarshalMap) MarshalToMap(input map[string]ddb.AttributeValue) erro
 		if err != nil {
 			return err
 		}
+
 		if av != nil {
 			input[k] = av
 		}
 	}
+
 	return nil
 }
 
@@ -108,6 +113,7 @@ func MarshalInt(v *int, mode NilMode) ddb.AttributeValue {
 	if v == nil {
 		return numericNil(mode)
 	}
+
 	return &ddb.AttributeValueMemberN{Value: strconv.Itoa(*v)}
 }
 
@@ -123,6 +129,7 @@ func MarshalInt64(v *int64, mode NilMode) ddb.AttributeValue {
 	if v == nil {
 		return numericNil(mode)
 	}
+
 	return &ddb.AttributeValueMemberN{Value: strconv.FormatInt(*v, 10)}
 }
 
@@ -138,6 +145,7 @@ func MarshalFloat32(v *float32, mode NilMode) ddb.AttributeValue {
 	if v == nil {
 		return numericNil(mode)
 	}
+
 	return &ddb.AttributeValueMemberN{Value: strconv.FormatFloat(float64(*v), 'g', -1, 32)}
 }
 
@@ -153,6 +161,7 @@ func MarshalFloat64(v *float64, mode NilMode) ddb.AttributeValue {
 	if v == nil {
 		return numericNil(mode)
 	}
+
 	return &ddb.AttributeValueMemberN{Value: strconv.FormatFloat(*v, 'g', -1, 64)}
 }
 
@@ -168,6 +177,7 @@ func MarshalBool(v *bool, mode NilMode) ddb.AttributeValue {
 	if v == nil {
 		return boolNil(mode)
 	}
+
 	return &ddb.AttributeValueMemberBOOL{Value: *v}
 }
 

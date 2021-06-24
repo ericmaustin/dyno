@@ -99,7 +99,7 @@ type UnMarshalStruct struct {
 	Foo *string
 }
 
-func (u *UnMarshalStruct) UnmarshalMap(av map[string]ddb.AttributeValue) error {
+func (u *UnMarshalStruct) UnmarshalAttributeValueMap(av map[string]ddb.AttributeValue) error {
 	u.Foo = new(string)
 	if v, ok := av["Foo"].(*ddb.AttributeValueMemberS); ok {
 		*u.Foo = v.Value

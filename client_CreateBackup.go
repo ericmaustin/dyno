@@ -5,16 +5,23 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
-// NewCreateBackup creates a new CreateBackup with this Client
-func (c *Client) NewCreateBackup(input *ddb.CreateBackupInput, optFns ...func(*CreateBackupOptions)) *CreateBackup {
-	return NewCreateBackup(c.ddb, input, optFns...)
+// CreateBackup executes a scan api call with a CreateBackupInput
+func (c *DefaultClient) CreateBackup(ctx context.Context, input *ddb.CreateBackupInput, optFns ...func(*CreateBackupOptions)) (*ddb.CreateBackupOutput, error) {
+	op := NewCreateBackup(input, optFns...)
+	op.DynoInvoke(ctx, c.ddb)
+
+	return op.Await()
 }
 
-// CreateBackup executes a scan api call with a CreateBackupInput
-func (c *Client) CreateBackup(ctx context.Context, input *ddb.CreateBackupInput, optFns ...func(*CreateBackupOptions)) (*ddb.CreateBackupOutput, error) {
-	scan := c.NewCreateBackup(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
+// CreateBackup executes a CreateBackup operation with a CreateBackupInput in this pool and returns the CreateBackup for processing
+func (p *Pool) CreateBackup(input *ddb.CreateBackupInput, optFns ...func(*CreateBackupOptions)) *CreateBackup {
+	op := NewCreateBackup(input, optFns...)
+
+	if err := p.Do(op); err != nil {
+		op.SetResponse(nil, err)
+	}
+
+	return op
 }
 
 // CreateBackupInputCallback is a callback that is called on a given CreateBackupInput before a CreateBackup operation api call executes
@@ -45,9 +52,9 @@ func (cb CreateBackupOutputCallbackFunc) CreateBackupOutputCallback(ctx context.
 
 // CreateBackupOptions represents options passed to the CreateBackup operation
 type CreateBackupOptions struct {
-	//InputCallbacks are called before the CreateBackup dynamodb api operation with the dynamodb.CreateBackupInput
+	// InputCallbacks are called before the CreateBackup dynamodb api operation with the dynamodb.CreateBackupInput
 	InputCallbacks []CreateBackupInputCallback
-	//OutputCallbacks are called after the CreateBackup dynamodb api operation with the dynamodb.CreateBackupOutput
+	// OutputCallbacks are called after the CreateBackup dynamodb api operation with the dynamodb.CreateBackupOutput
 	OutputCallbacks []CreateBackupOutputCallback
 }
 
@@ -68,20 +75,21 @@ func CreateBackupWithOutputCallback(cb CreateBackupOutputCallback) func(*CreateB
 // CreateBackup represents a CreateBackup operation
 type CreateBackup struct {
 	*Promise
-	client  *ddb.Client
+	//client  *ddb.DefaultClient
 	input   *ddb.CreateBackupInput
 	options CreateBackupOptions
 }
 
 // NewCreateBackup creates a new CreateBackup operation on the given client with a given CreateBackupInput and options
-func NewCreateBackup(client *ddb.Client, input *ddb.CreateBackupInput, optFns ...func(*CreateBackupOptions)) *CreateBackup {
+func NewCreateBackup(input *ddb.CreateBackupInput, optFns ...func(*CreateBackupOptions)) *CreateBackup {
 	opts := CreateBackupOptions{}
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+	
 	return &CreateBackup{
 		Promise: NewPromise(),
-		client:  client,
+		//client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -93,36 +101,40 @@ func (op *CreateBackup) Await() (*ddb.CreateBackupOutput, error) {
 	if out == nil {
 		return nil, err
 	}
+	
 	return out.(*ddb.CreateBackupOutput), err
 }
 
 // Invoke invokes the CreateBackup operation
-func (op *CreateBackup) Invoke(ctx context.Context) *CreateBackup {
-	go op.DynoInvoke(ctx)
+func (op *CreateBackup) Invoke(ctx context.Context, client *ddb.Client) *CreateBackup {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *CreateBackup) DynoInvoke(ctx context.Context) {
+func (op *CreateBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.CreateBackupOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func() { op.SetResponse(out, err) }()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.CreateBackupInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.CreateBackup(ctx, op.input); err != nil {
+
+	if out, err = client.CreateBackup(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.CreateBackupOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
-	return
 }
 
 // NewCreateBackupInput creates a CreateBackupInput with a given table name and key

@@ -7,16 +7,23 @@ import (
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// NewCreateTable creates a new CreateTable with this Client
-func (c *Client) NewCreateTable(input *ddb.CreateTableInput, optFns ...func(*CreateTableOptions)) *CreateTable {
-	return NewCreateTable(c.ddb, input, optFns...)
+// CreateTable executes a scan api call with a CreateTableInput
+func (c *DefaultClient) CreateTable(ctx context.Context, input *ddb.CreateTableInput, optFns ...func(*CreateTableOptions)) (*ddb.CreateTableOutput, error) {
+	op := NewCreateTable(input, optFns...)
+	op.DynoInvoke(ctx, c.ddb)
+
+	return op.Await()
 }
 
-// CreateTable executes a scan api call with a CreateTableInput
-func (c *Client) CreateTable(ctx context.Context, input *ddb.CreateTableInput, optFns ...func(*CreateTableOptions)) (*ddb.CreateTableOutput, error) {
-	scan := c.NewCreateTable(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
+// CreateTable executes a CreateTable operation with a CreateTableInput in this pool and returns the CreateTable for processing
+func (p *Pool) CreateTable(input *ddb.CreateTableInput, optFns ...func(*CreateTableOptions)) *CreateTable {
+	op := NewCreateTable(input, optFns...)
+
+	if err := p.Do(op); err != nil {
+		op.SetResponse(nil, err)
+	}
+
+	return op
 }
 
 // CreateTableInputCallback is a callback that is called on a given CreateTableInput before a CreateTable operation api call executes
@@ -47,9 +54,9 @@ func (cb CreateTableOutputCallbackF) CreateTableOutputCallback(ctx context.Conte
 
 // CreateTableOptions represents options passed to the CreateTable operation
 type CreateTableOptions struct {
-	//InputCallbacks are called before the CreateTable dynamodb api operation with the dynamodb.CreateTableInput
+	// InputCallbacks are called before the CreateTable dynamodb api operation with the dynamodb.CreateTableInput
 	InputCallbacks []CreateTableInputCallback
-	//OutputCallbacks are called after the CreateTable dynamodb api operation with the dynamodb.CreateTableOutput
+	// OutputCallbacks are called after the CreateTable dynamodb api operation with the dynamodb.CreateTableOutput
 	OutputCallbacks []CreateTableOutputCallback
 }
 
@@ -70,20 +77,20 @@ func CreateTableWithOutputCallback(cb CreateTableOutputCallback) func(*CreateTab
 // CreateTable represents a CreateTable operation
 type CreateTable struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.CreateTableInput
 	options CreateTableOptions
 }
 
 // NewCreateTable creates a new CreateTable operation on the given client with a given CreateTableInput and options
-func NewCreateTable(client *ddb.Client, input *ddb.CreateTableInput, optFns ...func(*CreateTableOptions)) *CreateTable {
+func NewCreateTable(input *ddb.CreateTableInput, optFns ...func(*CreateTableOptions)) *CreateTable {
 	opts := CreateTableOptions{}
+
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &CreateTable{
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -92,39 +99,44 @@ func NewCreateTable(client *ddb.Client, input *ddb.CreateTableInput, optFns ...f
 // Await waits for the Operation to be complete and then returns a CreateTableOutput and error
 func (op *CreateTable) Await() (*ddb.CreateTableOutput, error) {
 	out, err := op.Promise.Await()
+
 	if out == nil {
 		return nil, err
 	}
+
 	return out.(*ddb.CreateTableOutput), err
 }
 
 // Invoke invokes the CreateTable operation
-func (op *CreateTable) Invoke(ctx context.Context) *CreateTable {
-	go op.DynoInvoke(ctx)
+func (op *CreateTable) Invoke(ctx context.Context, client *ddb.Client) *CreateTable {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *CreateTable) DynoInvoke(ctx context.Context) {
+func (op *CreateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.CreateTableOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func(){ op.SetResponse(out, err) }()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.CreateTableInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.CreateTable(ctx, op.input); err != nil {
+
+	if out, err = client.CreateTable(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.CreateTableOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
-	return
 }
 
 // CreateTableBuilder is used to construct a CreateTableBuilder dynamically
@@ -148,7 +160,9 @@ func (bld *CreateTableBuilder) SetProvisionedThroughputCapacityUnits(rcu, wcu in
 		ReadCapacityUnits:  &rcu,
 		WriteCapacityUnits: &wcu,
 	})
+
 	bld.BillingMode = ddbTypes.BillingModeProvisioned
+
 	return bld
 }
 
@@ -176,6 +190,7 @@ func (bld *CreateTableBuilder) AddTag(key, value string) *CreateTableBuilder {
 		Key:   &key,
 		Value: &value,
 	})
+
 	return bld
 }
 
@@ -190,6 +205,7 @@ func (bld *CreateTableBuilder) AddTagsFromMap(tags map[string]string) *CreateTab
 	for key, value := range tags {
 		bld.AddTag(key, value)
 	}
+
 	return bld
 }
 
@@ -255,7 +271,6 @@ func (bld *CreateTableBuilder) SetTags(v []ddbTypes.Tag) *CreateTableBuilder {
 
 // Build builds the dynamodb.CreateTableBuilder
 func (bld *CreateTableBuilder) Build() (*ddb.CreateTableInput, error) {
-
 	if bld.pendingAttributeDefinitions != nil {
 		for _, ad := range bld.pendingAttributeDefinitions {
 			for _, attr := range bld.AttributeDefinitions {
@@ -264,6 +279,7 @@ func (bld *CreateTableBuilder) Build() (*ddb.CreateTableInput, error) {
 					if attr.AttributeType == ad.AttributeType {
 						continue
 					}
+
 					return nil, fmt.Errorf("cannot add duplicate attribute with mismatched type."+
 						"attrubuteName = %s, attributeTypes = %s, %s",
 						*attr.AttributeName, attr.AttributeType, ad.AttributeType)
@@ -271,6 +287,7 @@ func (bld *CreateTableBuilder) Build() (*ddb.CreateTableInput, error) {
 			}
 		}
 	}
+
 	if bld.GlobalSecondaryIndexes != nil {
 		for _, gsi := range bld.GlobalSecondaryIndexes {
 			if bld.BillingMode == ddbTypes.BillingModePayPerRequest {
@@ -278,5 +295,6 @@ func (bld *CreateTableBuilder) Build() (*ddb.CreateTableInput, error) {
 			}
 		}
 	}
+
 	return bld.CreateTableInput, nil
 }

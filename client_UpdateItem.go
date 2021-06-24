@@ -5,22 +5,18 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	ddbtype "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno/condition"
 	"github.com/ericmaustin/dyno/encoding"
 )
 
-// NewUpdateItem creates a new UpdateItem with this Client
-func (c *Client) NewUpdateItem(input *ddb.UpdateItemInput, optFns ...func(*UpdateItemOptions)) *UpdateItem {
-	return NewUpdateItem(c.ddb, input, optFns...)
-}
-
 // UpdateItem executes a scan api call with a UpdateItemInput
-func (c *Client) UpdateItem(ctx context.Context, input *ddb.UpdateItemInput, optFns ...func(*UpdateItemOptions)) (*ddb.UpdateItemOutput, error) {
-	scan := c.NewUpdateItem(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
+func (c *DefaultClient) UpdateItem(ctx context.Context, input *ddb.UpdateItemInput, optFns ...func(*UpdateItemOptions)) (*ddb.UpdateItemOutput, error) {
+	opt := NewUpdateItem(input, optFns...)
+	opt.DynoInvoke(ctx, c.ddb)
+
+	return opt.Await()
 }
 
 // UpdateItemInputCallback is a callback that is called on a given UpdateItemInput before a UpdateItem operation api call executes
@@ -72,20 +68,20 @@ func UpdateItemWithOutputCallback(cb UpdateItemOutputCallback) func(*UpdateItemO
 // UpdateItem represents a UpdateItem operation
 type UpdateItem struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.UpdateItemInput
 	options UpdateItemOptions
 }
 
 // NewUpdateItem creates a new UpdateItem operation on the given client with a given UpdateItemInput and options
-func NewUpdateItem(client *ddb.Client, input *ddb.UpdateItemInput, optFns ...func(*UpdateItemOptions)) *UpdateItem {
+func NewUpdateItem(input *ddb.UpdateItemInput, optFns ...func(*UpdateItemOptions)) *UpdateItem {
 	opts := UpdateItemOptions{}
+
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &UpdateItem{
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -97,44 +93,50 @@ func (op *UpdateItem) Await() (*ddb.UpdateItemOutput, error) {
 	if out == nil {
 		return nil, err
 	}
+
 	return out.(*ddb.UpdateItemOutput), err
 }
 
 // Invoke invokes the UpdateItem operation
-func (op *UpdateItem) Invoke(ctx context.Context) *UpdateItem {
-	go op.DynoInvoke(ctx)
+func (op *UpdateItem) Invoke(ctx context.Context, client *ddb.Client) *UpdateItem {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *UpdateItem) DynoInvoke(ctx context.Context) {
+func (op *UpdateItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.UpdateItemOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func() { op.SetResponse(out, err) }()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.UpdateItemInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.UpdateItem(ctx, op.input); err != nil {
+
+	if out, err = client.UpdateItem(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.UpdateItemOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
+
 	return
 }
 
 func NewUpdateItemInput(tableName *string) *ddb.UpdateItemInput {
 	return &ddb.UpdateItemInput{
 		TableName:                   tableName,
-		ReturnConsumedCapacity:      ddbtype.ReturnConsumedCapacityNone,
-		ReturnItemCollectionMetrics: ddbtype.ReturnItemCollectionMetricsNone,
-		ReturnValues:                ddbtype.ReturnValueNone,
+		ReturnConsumedCapacity:      ddbTypes.ReturnConsumedCapacityNone,
+		ReturnItemCollectionMetrics: ddbTypes.ReturnItemCollectionMetricsNone,
+		ReturnValues:                ddbTypes.ReturnValueNone,
 	}
 }
 
@@ -150,6 +152,7 @@ func NewUpdateItemBuilder(input *ddb.UpdateItemInput) *UpdateItemBuilder {
 	if input != nil {
 		return &UpdateItemBuilder{UpdateItemInput: input}
 	}
+
 	return &UpdateItemBuilder{UpdateItemInput: NewUpdateItemInput(nil)}
 }
 
@@ -160,10 +163,11 @@ func (bld *UpdateItemBuilder) Add(field string, value interface{}) *UpdateItemBu
 }
 
 // AddItem adds an add operation on this update with the given fields and values from an item
-func (bld *UpdateItemBuilder) AddItem(item map[string]ddbtype.AttributeValue) *UpdateItemBuilder {
+func (bld *UpdateItemBuilder) AddItem(item map[string]ddbTypes.AttributeValue) *UpdateItemBuilder {
 	for key, value := range item {
 		bld.updateBuilder = bld.updateBuilder.Add(expression.Name(key), expression.Value(value))
 	}
+
 	return bld
 }
 
@@ -174,10 +178,11 @@ func (bld *UpdateItemBuilder) Delete(field string, value interface{}) *UpdateIte
 }
 
 // DeleteItem adds a delete operation on this update with the given fields and values from an item
-func (bld *UpdateItemBuilder) DeleteItem(item map[string]ddbtype.AttributeValue) *UpdateItemBuilder {
+func (bld *UpdateItemBuilder) DeleteItem(item map[string]ddbTypes.AttributeValue) *UpdateItemBuilder {
 	for key, value := range item {
 		bld.updateBuilder = bld.updateBuilder.Delete(expression.Name(key), expression.Value(value))
 	}
+
 	return bld
 }
 
@@ -186,6 +191,7 @@ func (bld *UpdateItemBuilder) Remove(fields ...string) *UpdateItemBuilder {
 	for _, field := range fields {
 		bld.updateBuilder = bld.updateBuilder.Remove(expression.Name(field))
 	}
+
 	return bld
 }
 
@@ -200,6 +206,7 @@ func (bld *UpdateItemBuilder) SetItem(item map[string]dynamodb.AttributeValue) *
 	for key, value := range item {
 		bld.updateBuilder = bld.updateBuilder.Set(expression.Name(key), expression.Value(value))
 	}
+
 	return bld
 }
 
@@ -212,7 +219,7 @@ func (bld *UpdateItemBuilder) AddCondition(cnd expression.ConditionBuilder) *Upd
 }
 
 // SetAttributeUpdates sets the AttributeUpdates field's value.
-func (bld *UpdateItemBuilder) SetAttributeUpdates(v map[string]ddbtype.AttributeValueUpdate) *UpdateItemBuilder {
+func (bld *UpdateItemBuilder) SetAttributeUpdates(v map[string]ddbTypes.AttributeValueUpdate) *UpdateItemBuilder {
 	bld.AttributeUpdates = v
 	return bld
 }
@@ -224,13 +231,13 @@ func (bld *UpdateItemBuilder) SetConditionExpression(v string) *UpdateItemBuilde
 }
 
 // SetConditionalOperator sets the ConditionalOperator field's value.
-func (bld *UpdateItemBuilder) SetConditionalOperator(v ddbtype.ConditionalOperator) *UpdateItemBuilder {
+func (bld *UpdateItemBuilder) SetConditionalOperator(v ddbTypes.ConditionalOperator) *UpdateItemBuilder {
 	bld.ConditionalOperator = v
 	return bld
 }
 
 // SetExpected sets the Expected field's value.
-func (bld *UpdateItemBuilder) SetExpected(v map[string]ddbtype.ExpectedAttributeValue) *UpdateItemBuilder {
+func (bld *UpdateItemBuilder) SetExpected(v map[string]ddbTypes.ExpectedAttributeValue) *UpdateItemBuilder {
 	bld.Expected = v
 	return bld
 }
@@ -242,31 +249,31 @@ func (bld *UpdateItemBuilder) SetExpressionAttributeNames(v map[string]string) *
 }
 
 // SetExpressionAttributeValues sets the ExpressionAttributeValues field's value.
-func (bld *UpdateItemBuilder) SetExpressionAttributeValues(v map[string]ddbtype.AttributeValue) *UpdateItemBuilder {
+func (bld *UpdateItemBuilder) SetExpressionAttributeValues(v map[string]ddbTypes.AttributeValue) *UpdateItemBuilder {
 	bld.ExpressionAttributeValues = v
 	return bld
 }
 
 // SetKey sets the Key field's value.
-func (bld *UpdateItemBuilder) SetKey(v map[string]ddbtype.AttributeValue) *UpdateItemBuilder {
+func (bld *UpdateItemBuilder) SetKey(v map[string]ddbTypes.AttributeValue) *UpdateItemBuilder {
 	bld.Key = v
 	return bld
 }
 
 // SetReturnConsumedCapacity sets the ReturnConsumedCapacity field's value.
-func (bld *UpdateItemBuilder) SetReturnConsumedCapacity(v ddbtype.ReturnConsumedCapacity) *UpdateItemBuilder {
+func (bld *UpdateItemBuilder) SetReturnConsumedCapacity(v ddbTypes.ReturnConsumedCapacity) *UpdateItemBuilder {
 	bld.ReturnConsumedCapacity = v
 	return bld
 }
 
 // SetReturnItemCollectionMetrics sets the ReturnItemCollectionMetrics field's value.
-func (bld *UpdateItemBuilder) SetReturnItemCollectionMetrics(v ddbtype.ReturnItemCollectionMetrics) *UpdateItemBuilder {
+func (bld *UpdateItemBuilder) SetReturnItemCollectionMetrics(v ddbTypes.ReturnItemCollectionMetrics) *UpdateItemBuilder {
 	bld.ReturnItemCollectionMetrics = v
 	return bld
 }
 
 // SetReturnValues sets the ReturnValues field's value.
-func (bld *UpdateItemBuilder) SetReturnValues(v ddbtype.ReturnValue) *UpdateItemBuilder {
+func (bld *UpdateItemBuilder) SetReturnValues(v ddbTypes.ReturnValue) *UpdateItemBuilder {
 	bld.ReturnValues = v
 	return bld
 }

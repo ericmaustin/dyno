@@ -9,29 +9,20 @@ import (
 	"github.com/ericmaustin/dyno/encoding"
 )
 
-// NewQuery creates a new Query with this Client
-func (c *Client) NewQuery(input *ddb.QueryInput, optFns ...func(*QueryOptions)) *Query {
-	return NewQuery(c.ddb, input, optFns...)
-}
+// Query executes a scan api call with a QueryInput with this DefaultClient
+func (c *DefaultClient) Query(ctx context.Context, input *ddb.QueryInput, optFns ...func(*QueryOptions)) (*ddb.QueryOutput, error) {
+	op := NewQuery(input, optFns...)
+	op.DynoInvoke(ctx, c.ddb)
 
-// Query executes a scan api call with a QueryInput with this Client
-func (c *Client) Query(ctx context.Context, input *ddb.QueryInput, optFns ...func(*QueryOptions)) (*ddb.QueryOutput, error) {
-	scan := c.NewQuery(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
-}
-
-// NewQueryAll creates a new exhaustive QueryAll with this Client
-// that will keep running Query sequentially until LastEvaluatedKey is empty
-func (c *Client) NewQueryAll(input *ddb.QueryInput, optFns ...func(*QueryOptions)) *QueryAll {
-	return NewQueryAll(c.ddb, input, optFns...)
+	return op.Await()
 }
 
 // QueryAll executes an exhaustive api call with a QueryInput
 // that will keep running Query sequentially until LastEvaluatedKey is empty
-func (c *Client) QueryAll(ctx context.Context, input *ddb.QueryInput, optFns ...func(*QueryOptions)) ([]*ddb.QueryOutput, error) {
-	scan := c.NewQueryAll(input, optFns...)
-	scan.DynoInvoke(ctx)
+func (c *DefaultClient) QueryAll(ctx context.Context, input *ddb.QueryInput, optFns ...func(*QueryOptions)) ([]*ddb.QueryOutput, error) {
+	scan := NewQueryAll(input, optFns...)
+	scan.DynoInvoke(ctx, c.ddb)
+
 	return scan.Await()
 }
 
@@ -63,9 +54,9 @@ func (cb QueryOutputCallbackFunc) QueryOutputCallback(ctx context.Context, input
 
 // QueryOptions represents options passed to the Query operation
 type QueryOptions struct {
-	//InputCallbacks are called before the Query dynamodb api operation with the dynamodb.QueryInput
+	// InputCallbacks are called before the Query dynamodb api operation with the dynamodb.QueryInput
 	InputCallbacks []QueryInputCallback
-	//OutputCallbacks are called after the Query dynamodb api operation with the dynamodb.QueryOutput
+	// OutputCallbacks are called after the Query dynamodb api operation with the dynamodb.QueryOutput
 	OutputCallbacks []QueryOutputCallback
 }
 
@@ -86,21 +77,21 @@ func QueryWithOutputCallback(cb QueryOutputCallback) func(*QueryOptions) {
 // Query represents a Query operation
 type Query struct {
 	*Promise
-	client  ddb.QueryAPIClient
 	input   *ddb.QueryInput
 	options QueryOptions
 }
 
 // NewQuery creates a new Query operation on the given client with a given QueryInput and options
-func NewQuery(client ddb.QueryAPIClient, input *ddb.QueryInput, optFns ...func(*QueryOptions)) *Query {
+func NewQuery(input *ddb.QueryInput, optFns ...func(*QueryOptions)) *Query {
 	opts := QueryOptions{}
+
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &Query{
 		//client:  nil,
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -112,56 +103,60 @@ func (op *Query) Await() (*ddb.QueryOutput, error) {
 	if out == nil {
 		return nil, err
 	}
+
 	return out.(*ddb.QueryOutput), err
 }
 
 // Invoke invokes the Query operation
-func (op *Query) Invoke(ctx context.Context) *Query {
-	go op.DynoInvoke(ctx)
+func (op *Query) Invoke(ctx context.Context, client *ddb.Client) *Query {
+	go op.DynoInvoke(ctx, client)
+
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *Query) DynoInvoke(ctx context.Context) {
+func (op *Query) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.QueryOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func() { op.SetResponse(out, err) }()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.QueryInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.Query(ctx, op.input); err != nil {
+
+	if out, err = client.Query(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.QueryOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
-	return
 }
 
 // QueryAll represents an exhaustive Query operation
 type QueryAll struct {
 	*Promise
-	client  ddb.QueryAPIClient
 	input   *ddb.QueryInput
 	options QueryOptions
 }
 
 // NewQueryAll creates a new QueryAll operation on the given client with a given QueryInput and options
-func NewQueryAll(client ddb.QueryAPIClient, input *ddb.QueryInput, optFns ...func(*QueryOptions)) *QueryAll {
+func NewQueryAll(input *ddb.QueryInput, optFns ...func(*QueryOptions)) *QueryAll {
 	options := QueryOptions{}
 	for _, opt := range optFns {
 		opt(&options)
 	}
+
 	return &QueryAll{
 		//client:  nil,
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: options,
 	}
@@ -177,21 +172,24 @@ func (op *QueryAll) Await() ([]*ddb.QueryOutput, error) {
 }
 
 // Invoke invokes the Query operation
-func (op *QueryAll) Invoke(ctx context.Context) *QueryAll {
-	go op.DynoInvoke(ctx)
+func (op *QueryAll) Invoke(ctx context.Context, client *ddb.Client) *QueryAll {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *QueryAll) DynoInvoke(ctx context.Context) {
+func (op *QueryAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		outs []*ddb.QueryOutput
 		out  *ddb.QueryOutput
 		err  error
 	)
-	defer op.SetResponse(outs, err)
+
+	defer func() { op.SetResponse(outs, err) }()
+
 	//copy the scan so we're not mutating the original
 	input := CopyQuery(op.input)
+
 	for {
 		for _, cb := range op.options.InputCallbacks {
 			if out, err = cb.QueryInputCallback(ctx, input); out != nil || err != nil {
@@ -201,22 +199,26 @@ func (op *QueryAll) DynoInvoke(ctx context.Context) {
 				return
 			}
 		}
-		if out, err = op.client.Query(ctx, input); err != nil {
+
+		if out, err = client.Query(ctx, input); err != nil {
 			return
 		}
+
 		for _, cb := range op.options.OutputCallbacks {
 			if err = cb.QueryOutputCallback(ctx, out); err != nil {
 				return
 			}
 		}
+
 		outs = append(outs, out)
+
 		if out.LastEvaluatedKey == nil {
 			// no more work
 			break
 		}
+
 		input.ExclusiveStartKey = out.LastEvaluatedKey
 	}
-	return
 }
 
 // NewQueryInput creates a new QueryInput with a table name
@@ -248,6 +250,7 @@ func NewQueryBuilder(input *ddb.QueryInput) *QueryBuilder {
 func (bld *QueryBuilder) SetAscOrder() *QueryBuilder {
 	b := true
 	bld.ScanIndexForward = &b
+
 	return bld
 }
 
@@ -255,6 +258,7 @@ func (bld *QueryBuilder) SetAscOrder() *QueryBuilder {
 func (bld *QueryBuilder) SetDescOrder() *QueryBuilder {
 	b := false
 	bld.ScanIndexForward = &b
+
 	return bld
 }
 
@@ -268,6 +272,7 @@ func (bld *QueryBuilder) AddKeyCondition(cnd expression.KeyConditionBuilder) *Qu
 		cnd = condition.KeyAnd(*bld.keyCnd, cnd)
 		bld.keyCnd = &cnd
 	}
+
 	return bld
 }
 
@@ -293,6 +298,7 @@ func (bld *QueryBuilder) AddFilter(cnd expression.ConditionBuilder) *QueryBuilde
 // AddProjectionNames adds additional field names to the projection
 func (bld *QueryBuilder) AddProjectionNames(names ...string) *QueryBuilder {
 	nameBuilders := encoding.NameBuilders(names)
+
 	if bld.projection == nil {
 		proj := expression.ProjectionBuilder{}
 		proj = proj.AddNames(nameBuilders...)
@@ -300,6 +306,7 @@ func (bld *QueryBuilder) AddProjectionNames(names ...string) *QueryBuilder {
 	} else {
 		*bld.projection = bld.projection.AddNames(nameBuilders...)
 	}
+
 	return bld
 }
 
@@ -412,20 +419,25 @@ func (bld *QueryBuilder) Build() (*ddb.QueryInput, error) {
 		return bld.QueryInput, nil
 	}
 	builder := expression.NewBuilder()
+
 	// add projection
 	if bld.projection != nil {
 		builder = builder.WithProjection(*bld.projection)
 	}
+
 	// add key condition
 	if bld.keyCnd != nil {
 		builder = builder.WithKeyCondition(*bld.keyCnd)
 	}
+
 	// add filter
 	if bld.filter != nil {
 		builder = builder.WithFilter(*bld.filter)
 	}
+
 	// build the Expression
 	expr, err := builder.Build()
+
 	if err != nil {
 		return nil, err
 	}
@@ -435,6 +447,7 @@ func (bld *QueryBuilder) Build() (*ddb.QueryInput, error) {
 	bld.FilterExpression = expr.Filter()
 	bld.KeyConditionExpression = expr.KeyCondition()
 	bld.ProjectionExpression = expr.Projection()
+
 	return bld.QueryInput, nil
 }
 
@@ -446,70 +459,85 @@ func CopyQuery(input *ddb.QueryInput) *ddb.QueryInput {
 		ReturnConsumedCapacity: input.ReturnConsumedCapacity,
 		Select:                 input.Select,
 	}
+
 	if input.TableName != nil {
 		clone.TableName = new(string)
 		*clone.TableName = *input.TableName
 	}
+
 	if input.AttributesToGet != nil {
 		copy(clone.AttributesToGet, input.AttributesToGet)
 	}
+
 	if input.ConsistentRead != nil {
 		clone.ConsistentRead = new(bool)
 		*clone.ConsistentRead = *input.ConsistentRead
 	}
+
 	if input.ExclusiveStartKey != nil {
 		clone.ExclusiveStartKey = make(map[string]ddbTypes.AttributeValue, len(input.ExclusiveStartKey))
 		for k, v := range input.ExclusiveStartKey {
 			clone.ExclusiveStartKey[k] = CopyAttributeValue(v)
 		}
 	}
+
 	if input.ExpressionAttributeNames != nil {
 		clone.ExpressionAttributeNames = make(map[string]string, len(input.ExpressionAttributeNames))
 		for k, v := range input.ExpressionAttributeNames {
 			clone.ExpressionAttributeNames[k] = v
 		}
 	}
+
 	if input.ExpressionAttributeValues != nil {
 		clone.ExpressionAttributeValues = make(map[string]ddbTypes.AttributeValue, len(input.ExpressionAttributeValues))
 		for k, v := range input.ExpressionAttributeValues {
 			clone.ExpressionAttributeValues[k] = CopyAttributeValue(v)
 		}
 	}
+
 	if input.KeyConditions != nil {
 		clone.KeyConditions = make(map[string]ddbTypes.Condition)
 		for k, v := range input.KeyConditions {
 			clone.KeyConditions[k] = CopyCondition(v)
 		}
 	}
+
 	if input.KeyConditionExpression != nil {
 		clone.KeyConditionExpression = new(string)
 		*clone.KeyConditionExpression = *input.KeyConditionExpression
 	}
+
 	if input.FilterExpression != nil {
 		clone.FilterExpression = new(string)
 		*clone.FilterExpression = *input.FilterExpression
 	}
+
 	if input.IndexName != nil {
 		clone.IndexName = new(string)
 		*clone.IndexName = *input.IndexName
 	}
+
 	if input.Limit != nil {
 		clone.Limit = new(int32)
 		*clone.Limit = *input.Limit
 	}
+
 	if input.ProjectionExpression != nil {
 		clone.ProjectionExpression = new(string)
 		*clone.ProjectionExpression = *input.ProjectionExpression
 	}
+
 	if input.QueryFilter != nil {
 		clone.QueryFilter = make(map[string]ddbTypes.Condition, len(input.QueryFilter))
 		for k, v := range input.QueryFilter {
 			clone.QueryFilter[k] = CopyCondition(v)
 		}
 	}
+
 	if input.TableName != nil {
 		clone.TableName = new(string)
 		*clone.TableName = *input.TableName
 	}
+
 	return clone
 }

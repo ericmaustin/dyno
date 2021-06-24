@@ -3,118 +3,157 @@ package dyno
 import (
 	"context"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/awsutil"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/ericmaustin/dyno/encoding"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"sync"
 	"testing"
 	"time"
 )
 
-//PoolTestSuite used to test pool operations
+// PoolTestSuite used to test pool operations
 type PoolTestSuite struct {
 	suite.Suite
 	pool                *Pool
 	table               *Table
-	db                  *Client
+	db                  *DefaultClient
 	testItems           []*TestItem
 	testMarshalledItems []*TestItemMarshaller
 }
 
 func (suite *PoolTestSuite) SetupTest() {
 	suite.db = CreateTestClient()
+
 	fmt.Println("creating test table")
+
 	suite.table = CreateTestTable(suite.db)
-	fmt.Println("test table created:", suite.table.Name())
+
 	suite.testItems = GetTestItems(10)
 	suite.testMarshalledItems = GetMarshalledTestRecords(10)
-	fmt.Println("test table created:", suite.table.Name())
-	suite.pool = NewPool(context.Background(), suite.db, 3)
+
+	suite.pool = NewPool(context.Background(), suite.db.DynamoDBClient(), 3)
 }
 
-func getLongRunningExecutionFunc() ExecutionFunction {
-	return func(ctx context.Context, db *dynamodb.DynamoDB) (interface{}, error) {
-		time.Sleep(time.Second * 10)
-		return nil, nil
+func getLongRunningExecutionFunc(id int, wg *sync.WaitGroup) OperationF {
+	return func(_ context.Context, db *dynamodb.Client) {
+		defer wg.Done()
+
+		fmt.Printf("op [%d] started\n", id)
+		time.Sleep(time.Second * 1)
+		fmt.Printf("op [%d] is done\n", id)
 	}
 }
 
 func (suite *PoolTestSuite) TearDownSuite() {
 	fmt.Println("deleting test table", suite.table.Name())
-	if err := suite.table.Delete(suite.db); err != nil {
+
+	if _, err := suite.table.Delete().Invoke(context.Background(), suite.db.DynamoDBClient()).Await(); err != nil {
 		panic(err)
 	}
-	if err := suite.db.WaitUntilTableNotExists(suite.table.DescribeTableInput()).Await(); err != nil {
+
+	if err := suite.db.WaitForTableNotExists(context.Background(), suite.table.DescribeTableInput()); err != nil {
 		panic(err)
 	}
+
 	fmt.Println("finished deleting test table", suite.table.Name())
 }
 
 func (suite *PoolTestSuite) TestPoolConcurrency() {
-	promises := make(map[int]*Promise)
-	for i := 0; i < 10; i++ {
-		promises[i] = suite.pool.Do(getLongRunningExecutionFunc())
-		suite.LessOrEqual(suite.pool.ActiveCount(), suite.pool.Limit())
-		fmt.Println("pool active tasks", suite.pool.ActiveCount())
+	ops := make([]Operation, 10)
+
+	var wg sync.WaitGroup
+
+	cnt := 10
+
+	wg.Add(cnt)
+
+	for i := 0; i < cnt; i++ {
+		ops[i] = getLongRunningExecutionFunc(i, &wg)
 	}
-	for i, p := range promises {
-		if _, err := p.Await(); err != nil {
-			fmt.Println("promise", i, "done")
+
+	for _, op := range ops {
+		if err := suite.pool.Do(op); err != nil {
+			panic(err)
 		}
+
+		assert.LessOrEqual(suite.T(), suite.pool.ActiveCount(), uint64(3))
 	}
+
+	// wait for all operations to be done
+	wg.Wait()
 }
 
 func (suite *PoolTestSuite) TestPutItems() {
 	for _, item := range suite.testItems {
 		avMap, err := encoding.MarshalMap(item)
+
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("putting item:\n", avMap)
-		out, err := suite.pool.PutItem(
-			NewPutItemInput().
-				SetTableName(suite.table.Name()).
-				SetItem(avMap),
-		).Await()
+
+		fmt.Println("putting item:", MustYamlString(avMap))
+
+		op := NewPutItem(NewPutItemInput(suite.table.TableName, avMap))
+
+		if err = suite.pool.Do(op); err != nil {
+			panic(err)
+		}
+
+		out, err := op.Await()
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("successfully put item. output:\n", out.String())
+
+		fmt.Println("successfully put item. output:\n", MustYamlString(out))
 	}
 
 	for _, item := range suite.testMarshalledItems {
 		avMap, err := encoding.MarshalMap(item)
+
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("putting marshalled item:\n", avMap)
-		out, err := suite.pool.PutItem(
-			NewPutItemInput().
-				SetTableName(suite.table.Name()).
-				SetItem(avMap),
-		).Await()
+
+		fmt.Println("putting marshalled item:", MustYamlString(avMap))
+
+		op := NewPutItem(NewPutItemInput(suite.table.TableName, avMap))
+
+		if err = suite.pool.Do(op); err != nil {
+			panic(err)
+		}
+
+		out, err := op.Await()
+
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("successfully put marshalled item. output:\n", out.String())
+
+		fmt.Println("successfully put marshalled item. output:\n", MustYamlString(out))
 	}
 }
 
 func (suite *PoolTestSuite) TestScan() {
-	scan := NewScanInput().SetTableName(suite.table.Name())
+	scan := NewScanInput(suite.table.TableName)
 
-	fmt.Println("running scan:", scan.String())
+	fmt.Println("running scan:", MustYamlString(scan))
+
 	out, err := suite.pool.Scan(scan).Await()
+
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("scan result:", out.String())
+
+	fmt.Println("scan result:\n", MustYamlString(out))
+
 	suite.Equal(len(out.Items), len(suite.testItems)+len(suite.testMarshalledItems))
 
 	// test scan with unmarshalling
-	scan = NewScanInput().SetTableName(suite.table.Name())
+	scan = NewScanInput(suite.table.TableName)
+
 	var target []*TestItemMarshaller
-	scan.SetOutputCallback(func(ctx context.Context, output *dynamodb.ScanOutput) error {
+
+	cb := ScanOutputCallbackF(func(ctx context.Context, output *dynamodb.ScanOutput) error {
 		if len(output.Items) > 0 {
 			for _, item := range output.Items {
 				itemTarget := new(TestItemMarshaller)
@@ -126,29 +165,34 @@ func (suite *PoolTestSuite) TestScan() {
 		}
 		return nil
 	})
-	fmt.Println("running scan with unmarshalling:", scan.String())
-	_, err = suite.pool.Scan(scan).Await()
-	if err != nil {
+
+	fmt.Println("running scan with unmarshalling:", MustYamlString(scan))
+
+	if out, err = suite.pool.Scan(scan, ScanWithOutputCallback(cb)).Await(); err != nil {
 		panic(err)
 	}
-	fmt.Println("scan results:", awsutil.Prettify(target))
-	suite.Equal(len(target), len(suite.testItems)+len(suite.testMarshalledItems))
 
+	fmt.Println("scan results:\n", MustYamlString(out))
+
+	suite.Equal(len(target), len(suite.testItems)+len(suite.testMarshalledItems))
 }
 
 func TestPoolSuite(t *testing.T) {
 	// not using suite.Run() as we want to control the order
 	s := new(PoolTestSuite)
 	s.SetT(t)
+
 	defer func() {
 		err := recover()
 		// dont panic yet, we need to tear down the suite
 		s.TearDownSuite()
+
 		if err != nil {
 			// ok, now you can panic
 			panic(err)
 		}
 	}()
+
 	// run tests in correct order...
 	s.SetupTest()
 	s.Run("concurrency", func() {

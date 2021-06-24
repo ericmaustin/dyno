@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+//TODO: method to update dynamodb table
+
 // Table represents a dynamodb table
 type Table struct {
 	*types.TableDescription
@@ -31,13 +33,15 @@ func (t *Table) Name() string {
 	t.mu.RLock()
 	name := *t.TableName
 	t.mu.RUnlock()
+
 	return name
 }
 
-//IsOnDemand returns true if the table is set to On Demand pricing
+// IsOnDemand returns true if the table is set to On Demand pricing
 func (t *Table) IsOnDemand() bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	if t.BillingModeSummary == nil {
 		// default to pay per request
 		t.BillingModeSummary = new(types.BillingModeSummary)
@@ -45,6 +49,7 @@ func (t *Table) IsOnDemand() bool {
 			BillingMode: types.BillingModePayPerRequest,
 		}
 	}
+
 	return t.BillingModeSummary.BillingMode == types.BillingModePayPerRequest
 }
 
@@ -52,9 +57,11 @@ func (t *Table) IsOnDemand() bool {
 func (t *Table) RCUs() int64 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	if t.IsOnDemand() || t.ProvisionedThroughput.ReadCapacityUnits == nil {
 		return 0
 	}
+
 	return *t.ProvisionedThroughput.ReadCapacityUnits
 }
 
@@ -62,9 +69,11 @@ func (t *Table) RCUs() int64 {
 func (t *Table) WCUs() int64 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	if t.IsOnDemand() || t.ProvisionedThroughput.WriteCapacityUnits == nil {
 		return 0
 	}
+
 	return *t.ProvisionedThroughput.WriteCapacityUnits
 }
 
@@ -72,39 +81,39 @@ func (t *Table) WCUs() int64 {
 func (t *Table) Description() *types.TableDescription {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return t.TableDescription
 }
 
-//DescribeTableInput gets the DescribeTableInput for this table
+// DescribeTableInput gets the DescribeTableInput for this table
 func (t *Table) DescribeTableInput() *ddb.DescribeTableInput {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return NewDescribeTableInput(t.TableName)
 }
 
-//WaitUntilExists returns an error that will be nil if table exists
+// WaitUntilExists returns an error that will be nil if table exists
 func (t *Table) WaitUntilExists(ctx context.Context, client *ddb.Client) error {
-	return NewTableExistsWaiter(client, NewDescribeTableInput(t.TableName)).Invoke(ctx).Await()
+	return NewTableExistsWaiter(NewDescribeTableInput(t.TableName)).Invoke(ctx, client).Await()
 }
 
-//WaitUntilNotExists returns  an error that will be nil if table no longer exists
+// WaitUntilNotExists returns  an error that will be nil if table no longer exists
 func (t *Table) WaitUntilNotExists(ctx context.Context, client *ddb.Client) error {
-	return NewTableNotExistsWaiter(client, NewDescribeTableInput(t.TableName)).Invoke(ctx).Await()
+	return NewTableNotExistsWaiter(NewDescribeTableInput(t.TableName)).Invoke(ctx, client).Await()
 }
 
-// Sync updates this table's description with the remote dynamodb table
-// calls Table.syncWithContext after locking the table for writing
-func (t *Table) Sync(ctx context.Context, client *ddb.Client) error {
+// UpdateWithRemote creates a new NewTableExistsWaiter with a callback that updates the table from the remote description
+func (t *Table) UpdateWithRemote() *TableExistsWaiter {
 	cb := DescribeTableOutputCallbackF(func(ctx context.Context, output *ddb.DescribeTableOutput) error {
 		if output.Table != nil {
 			t.UpdateWithTableDescription(output.Table)
 		}
+
 		return nil
 	})
-	waiter := NewTableExistsWaiter(client, NewDescribeTableInput(t.TableName),
-		TableExistsWaiterWithOutputCallback(cb))
-	waiter.DynoInvoke(ctx)
-	return waiter.Await()
+
+	return NewTableExistsWaiter(NewDescribeTableInput(t.TableName), TableExistsWaiterWithOutputCallback(cb))
 }
 
 // setTableDescription sets the table description to the input value
@@ -124,13 +133,17 @@ func (t *Table) UpdateWithTableDescription(input *types.TableDescription) {
 func (t *Table) SortKeyName() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	if len(t.KeySchema) == 0 {
 		return ""
 	}
+
 	name := getSortKeyNameFromKeySchema(t.KeySchema)
+
 	if name == nil {
 		return ""
 	}
+
 	return *name
 }
 
@@ -138,13 +151,17 @@ func (t *Table) SortKeyName() string {
 func (t *Table) PartitionKeyName() string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	if len(t.KeySchema) == 0 {
 		return ""
 	}
+
 	name := getPartitionKeyNameFromKeySchema(t.KeySchema)
+
 	if name == nil {
 		return ""
 	}
+
 	return *name
 }
 
@@ -159,6 +176,7 @@ func (t *Table) SetPartitionKey(pkName string, attributeType types.ScalarAttribu
 		AttributeType: attributeType,
 	}
 	t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *t.PartitionKeyAttributeDefinition)
+
 	return t
 }
 
@@ -173,6 +191,7 @@ func (t *Table) SetSortKey(skName string, attributeType types.ScalarAttributeTyp
 		AttributeType: attributeType,
 	}
 	t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *t.SortKeyAttributeDefinition)
+
 	return t
 }
 
@@ -181,6 +200,7 @@ func (t *Table) SetSortKey(skName string, attributeType types.ScalarAttributeTyp
 func (t *Table) AddGSI(gsi ...*GSI) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
 	for _, g := range gsi {
 		gsiDesc := types.GlobalSecondaryIndexDescription{
 			IndexName:  g.IndexName,
@@ -206,6 +226,7 @@ func (t *Table) AddGSI(gsi ...*GSI) *Table {
 		if g.PartitionKeyAttributeDefinition != nil {
 			t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *g.PartitionKeyAttributeDefinition)
 		}
+
 		if g.SortKeyAttributeDefinition != nil {
 			t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *g.SortKeyAttributeDefinition)
 		}
@@ -219,6 +240,7 @@ func (t *Table) AddGSI(gsi ...*GSI) *Table {
 func (t *Table) AddLSI(lsi ...*LSI) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
 	for _, l := range lsi {
 		lsiDesc := types.LocalSecondaryIndexDescription{
 			IndexName:  l.IndexName,
@@ -244,6 +266,7 @@ func (t *Table) AddLSI(lsi ...*LSI) {
 func (t *Table) ExtractKeys(avMap map[string]types.AttributeValue) map[string]types.AttributeValue {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return extractKeyAttributeValuesFromKeySchema(t.KeySchema, avMap)
 }
 
@@ -251,6 +274,7 @@ func (t *Table) ExtractKeys(avMap map[string]types.AttributeValue) map[string]ty
 func (t *Table) ExtractAllKeys(avMaps []map[string]types.AttributeValue) []map[string]types.AttributeValue {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return extractAllKeyAttributeValuesFromKeySchema(t.KeySchema, avMaps)
 }
 
@@ -259,6 +283,7 @@ func (t *Table) ExtractAllKeys(avMaps []map[string]types.AttributeValue) []map[s
 func (t *Table) ExtractPartitionKeyValue(avMap map[string]types.AttributeValue) types.AttributeValue {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return extractPartitionKeyAttributeValueFromKeySchema(t.KeySchema, avMap)
 }
 
@@ -267,17 +292,20 @@ func (t *Table) ExtractPartitionKeyValue(avMap map[string]types.AttributeValue) 
 func (t *Table) ExtractSortKeyValue(avMap map[string]types.AttributeValue) types.AttributeValue {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	return extractSortKeyAttributeValueFromKeySchema(t.KeySchema, avMap)
 }
 
-//AddTag adds a tag with given key and value to the Table
+// AddTag adds a tag with given key and value to the Table
 func (t *Table) AddTag(key, value string) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
 	t.Tags = append(t.Tags, types.Tag{
 		Key:   &key,
 		Value: &value,
 	})
+
 	return t
 }
 
@@ -285,6 +313,7 @@ func (t *Table) AddTag(key, value string) *Table {
 func (t *Table) CreateTableInput() (*ddb.CreateTableInput, error) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	if t.PartitionKeyAttributeDefinition == nil {
 		return nil, fmt.Errorf("PartitionKeyAttributeDefinition must not be nil")
 	}
@@ -355,6 +384,7 @@ func (t *Table) SetName(name string) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.TableName = &name
+
 	return t
 }
 
@@ -362,10 +392,12 @@ func (t *Table) SetName(name string) *Table {
 func (t *Table) SetOnDemand() *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
 	if t.BillingModeSummary == nil {
 		t.BillingModeSummary = new(types.BillingModeSummary)
 	}
 	t.BillingModeSummary.BillingMode = types.BillingModePayPerRequest
+
 	return t
 }
 
@@ -373,14 +405,18 @@ func (t *Table) SetOnDemand() *Table {
 func (t *Table) SetReadCostUnits(costUnits int64) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
 	if t.BillingModeSummary == nil {
 		t.BillingModeSummary = new(types.BillingModeSummary)
 	}
+
 	if t.ProvisionedThroughput == nil {
 		t.ProvisionedThroughput = new(types.ProvisionedThroughputDescription)
 	}
+
 	t.BillingModeSummary.BillingMode = types.BillingModeProvisioned
 	t.ProvisionedThroughput.ReadCapacityUnits = &costUnits
+
 	return t
 }
 
@@ -388,14 +424,18 @@ func (t *Table) SetReadCostUnits(costUnits int64) *Table {
 func (t *Table) SetWriteCostUnits(costUnits int64) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
 	if t.BillingModeSummary == nil {
 		t.BillingModeSummary = new(types.BillingModeSummary)
 	}
+
 	if t.ProvisionedThroughput == nil {
 		t.ProvisionedThroughput = new(types.ProvisionedThroughputDescription)
 	}
+
 	t.BillingModeSummary.BillingMode = types.BillingModeProvisioned
 	t.ProvisionedThroughput.WriteCapacityUnits = &costUnits
+
 	return t
 }
 
@@ -403,19 +443,24 @@ func (t *Table) SetWriteCostUnits(costUnits int64) *Table {
 func (t *Table) SetCostUnits(RCUs, WCUs int64) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
 	if RCUs == 0 && WCUs == 0 {
 		t.SetOnDemand()
 		return t
 	}
+
 	if t.BillingModeSummary == nil {
 		t.BillingModeSummary = new(types.BillingModeSummary)
 	}
+
 	if t.ProvisionedThroughput == nil {
 		t.ProvisionedThroughput = new(types.ProvisionedThroughputDescription)
 	}
+
 	t.BillingModeSummary.BillingMode = types.BillingModeProvisioned
 	t.ProvisionedThroughput.ReadCapacityUnits = &RCUs
 	t.ProvisionedThroughput.WriteCapacityUnits = &WCUs
+
 	return t
 }
 
@@ -423,87 +468,45 @@ func (t *Table) SetCostUnits(RCUs, WCUs int64) *Table {
 func (t *Table) UniqueKeyCondition() *expression.ConditionBuilder {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
 	cndBuilder := new(condition.Builder)
+
 	if t.PartitionKeyAttributeDefinition == nil ||
 		t.PartitionKeyAttributeDefinition.AttributeName != nil {
 		return nil
 	}
+
 	cndBuilder.And(condition.NotExists(*t.PartitionKeyAttributeDefinition.AttributeName))
+
 	// if we have a sortKey key make sure document contains a key
 	if t.SortKeyAttributeDefinition == nil ||
 		t.SortKeyAttributeDefinition.AttributeName != nil {
 		cndBuilder.And(condition.NotExists(*t.SortKeyAttributeDefinition.AttributeName))
 	}
+
 	builder := cndBuilder.Builder()
+
 	return &builder
 }
 
-//todo: finish GetTableUpdate method
-//func (t *Table) GetTableUpdate(desc *dynamodb.TableDescription) {
-//	update := dynamodb.UpdateTableInput{
-//		AttributeDefinitions:        nil,
-//		BillingMode:                 nil,
-//		GlobalSecondaryIndexUpdates: nil,
-//		ProvisionedThroughput:       nil,
-//		ReplicaUpdates:              nil,
-//		SSESpecification:            nil,
-//		StreamSpecification:         nil,
-//		TableName:                   nil,
-//	}
-//	//TableName
-//	if desc.TableName == nil || *desc.TableName != *t.TableName {
-//		update.TableName = t.TableName
-//	}
-//	//ProvisionedThroughput
-//	if desc.ProvisionedThroughput == nil && t.ProvisionedThroughput != nil {
-//		update.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
-//			ReadCapacityUnits:  t.ProvisionedThroughput.ReadCapacityUnits,
-//			WriteCapacityUnits: t.ProvisionedThroughput.WriteCapacityUnits,
-//		}
-//	} else if desc.ProvisionedThroughput != nil && t.ProvisionedThroughput != nil {
-//		if *desc.ProvisionedThroughput.ReadCapacityUnits != *t.ProvisionedThroughput.ReadCapacityUnits {
-//			update.ProvisionedThroughput = new(dynamodb.ProvisionedThroughput)
-//			update.ProvisionedThroughput.ReadCapacityUnits = t.ProvisionedThroughput.ReadCapacityUnits
-//		}
-//		if *desc.ProvisionedThroughput.WriteCapacityUnits != *t.ProvisionedThroughput.WriteCapacityUnits {
-//			if update.ProvisionedThroughput == nil {
-//				update.ProvisionedThroughput = new(dynamodb.ProvisionedThroughput)
-//			}
-//			update.ProvisionedThroughput.WriteCapacityUnits = t.ProvisionedThroughput.WriteCapacityUnits
-//		}
-//	}
-//	//Billing Mode
-//	if desc.BillingModeSummary.BillingMode == nil && t.BillingModeSummary.BillingMode != nil {
-//		update.BillingMode = t.BillingModeSummary.BillingMode
-//	} else if t.BillingModeSummary.BillingMode != nil && *desc.BillingModeSummary.BillingMode != *t.BillingModeSummary.BillingMode {
-//		update.BillingMode = t.BillingModeSummary.BillingMode
-//	}
-//	////StreamSpecification
-//	//if desc.StreamSpecification == nil && t.StreamSpecification != nil {
-//	//	update.StreamSpecification = t.StreamSpecification
-//	//} else if desc.StreamSpecification != nil && t.StreamSpecification != nil {
-//	//	if desc.StreamSpecification.StreamEnabled != nil
-//	//}
-//}
-
-// Create creates this table in dynamodb with an api call
-// returns a channel that will return a PublishResult when table is ready
-func (t *Table) Create(ctx context.Context, client *ddb.Client) error {
+// Create creates a new CreateTable operation
+func (t *Table) Create() (*CreateTable, error) {
 	dynamodbInput, err := t.CreateTableInput()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	_, err = NewCreateTable(client, dynamodbInput, CreateTableWithOutputCallback(t)).Invoke(ctx).Await()
-	return err
+
+	return NewCreateTable(dynamodbInput, CreateTableWithOutputCallback(t)), nil
 }
 
 // CreateTableOutputCallback implements the CreateTableOutputCallback interface
 func (t *Table) CreateTableOutputCallback(_ context.Context, output *ddb.CreateTableOutput) error {
 	if output.TableDescription != nil {
+		t.mu.Lock()
 		t.setTableDescription(output.TableDescription)
+		t.mu.Unlock()
 	}
+
 	return nil
 }
 
@@ -512,16 +515,14 @@ func (t *Table) BackupInput(backupName string) *ddb.CreateBackupInput {
 	t.mu.RLock()
 	input := NewCreateBackupInput(t.TableName, &backupName)
 	t.mu.RUnlock()
+
 	return input
 }
 
-// Backup creates a backup of this table
+// NewBackup creates a backup operation for this table
 // returns a channel that will return a BackupResult when backup completes
-func (t *Table) Backup(ctx context.Context, client *ddb.Client, backupName string) (*ddb.CreateBackupOutput, error) {
-	input := t.BackupInput(backupName)
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return NewCreateBackup(client, input).Invoke(ctx).Await()
+func (t *Table) NewBackup(backupName string) *CreateBackup {
+	return NewCreateBackup(t.BackupInput(backupName))
 }
 
 // DeleteInput creates a DeleteTableInput for this table
@@ -529,17 +530,13 @@ func (t *Table) DeleteInput() *ddb.DeleteTableInput {
 	t.mu.RLock()
 	input := NewDeleteTableInput(t.TableName)
 	t.mu.RUnlock()
+
 	return input
 }
 
-// Delete deletes this table in dynamodb
-// returns a channel that will return an error (nil if successful) when complete
-func (t *Table) Delete(ctx context.Context, client *ddb.Client) error {
-	input := t.DeleteInput()
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	_, err := NewDeleteTable(client, input).Invoke(ctx).Await()
-	return err
+// Delete creates a new DeleteTable operation
+func (t *Table) Delete() *DeleteTable {
+	return NewDeleteTable(t.DeleteInput())
 }
 
 // NewScanBuilder creates a ScanBuilder with this table

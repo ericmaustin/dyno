@@ -5,6 +5,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ericmaustin/dyno/encoding"
+	"gopkg.in/yaml.v2"
 )
 
 // CopyAttributeValue creates a deep copy of an attribute value
@@ -164,4 +165,15 @@ func CopyKeysAndAttributesMap(input map[string]types.KeysAndAttributes) map[stri
 		out[k] = CopyKeysAndAttributes(v)
 	}
 	return out
+}
+
+// MustYamlString is a convenience function that generates a yaml string or panics
+func MustYamlString(in interface{}) string {
+	out, err := yaml.Marshal(in)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return string(out)
 }

@@ -6,16 +6,42 @@ import (
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// NewBatchWriteItemAll creates a new BatchWriteItemAll with this Client
-func (c *Client) NewBatchWriteItemAll(input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) *BatchWriteItemAll {
-	return NewBatchWriteItemAll(c.ddb, input, optFns...)
+// BatchWriteItem executes a scan api call with a BatchWriteItemInput
+func (c *DefaultClient) BatchWriteItem(ctx context.Context, input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) (*ddb.BatchWriteItemOutput, error) {
+	op := NewBatchWriteItem(input, optFns...)
+	op.DynoInvoke(ctx, c.ddb)
+
+	return op.Await()
+}
+
+// BatchWriteItem executes a BatchWriteItem operation with a BatchWriteItemInput in this pool and returns the BatchWriteItem for processing
+func (p *Pool) BatchWriteItem(input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) *BatchWriteItem {
+	op := NewBatchWriteItem(input, optFns...)
+
+	if err := p.Do(op); err != nil {
+		op.SetResponse(nil, err)
+	}
+
+	return op
 }
 
 // BatchWriteItemAll executes a scan api call with a BatchWriteItemInput
-func (c *Client) BatchWriteItemAll(ctx context.Context, input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) ([]*ddb.BatchWriteItemOutput, error) {
-	scan := c.NewBatchWriteItemAll(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
+func (c *DefaultClient) BatchWriteItemAll(ctx context.Context, input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) ([]*ddb.BatchWriteItemOutput, error) {
+	op := NewBatchWriteItemAll(input, optFns...)
+	op.DynoInvoke(ctx, c.ddb)
+
+	return op.Await()
+}
+
+// BatchWriteItemAll executes a BatchWriteItemAll operation with a BatchWriteItemInput in this pool and returns the BatchWriteItemAll for processing
+func (p *Pool) BatchWriteItemAll(input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) *BatchWriteItemAll {
+	op := NewBatchWriteItemAll(input, optFns...)
+
+	if err := p.Do(op); err != nil {
+		op.SetResponse(nil, err)
+	}
+
+	return op
 }
 
 // BatchWriteItemInputCallback is a callback that is called on a given BatchWriteItemInput before a BatchWriteItem operation api call executes
@@ -69,21 +95,21 @@ func BatchWriteItemWithOutputCallback(cb BatchWriteItemOutputCallback) func(*Bat
 // BatchWriteItem represents a BatchWriteItem operation
 type BatchWriteItem struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.BatchWriteItemInput
 	options BatchWriteItemOptions
 }
 
 // NewBatchWriteItem creates a new BatchWriteItem operation on the given client with a given BatchWriteItemInput and options
-func NewBatchWriteItem(client *ddb.Client, input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) *BatchWriteItem {
+func NewBatchWriteItem(input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) *BatchWriteItem {
 	opts := BatchWriteItemOptions{}
+	
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+	
 	return &BatchWriteItem{
 		//client:  nil,
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -95,60 +121,54 @@ func (op *BatchWriteItem) Await() (*ddb.BatchWriteItemOutput, error) {
 	if out == nil {
 		return nil, err
 	}
+	
 	return out.(*ddb.BatchWriteItemOutput), err
 }
 
 // Invoke invokes the BatchWriteItem operation
-func (op *BatchWriteItem) Invoke(ctx context.Context) *BatchWriteItem {
-	go op.DynoInvoke(ctx)
+func (op *BatchWriteItem) Invoke(ctx context.Context, client *ddb.Client) *BatchWriteItem {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *BatchWriteItem) DynoInvoke(ctx context.Context) {
+func (op *BatchWriteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.BatchWriteItemOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+	
+	defer func() { op.SetResponse(out, err) }()
+	
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.BatchWriteItemInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.BatchWriteItem(ctx, op.input); err != nil {
+	
+	if out, err = client.BatchWriteItem(ctx, op.input); err != nil {
 		return
 	}
+	
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.BatchWriteItemOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
+	
 	return
 }
 
-// NewBatchWriteItem creates a new BatchWriteItem with this Client
-func (c *Client) NewBatchWriteItem(input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) *BatchWriteItem {
-	return NewBatchWriteItem(c.ddb, input, optFns...)
-}
-
-// BatchWriteItem executes a scan api call with a BatchWriteItemInput
-func (c *Client) BatchWriteItem(ctx context.Context, input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) (*ddb.BatchWriteItemOutput, error) {
-	scan := c.NewBatchWriteItem(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
-}
 
 // BatchWriteItemAll represents an exhaustive BatchWriteItem operation
 type BatchWriteItemAll struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.BatchWriteItemInput
 	options BatchWriteItemOptions
 }
 
 // NewBatchWriteItemAll creates a new BatchWriteItemAll operation on the given client with a given BatchWriteItemInput and options
-func NewBatchWriteItemAll(client *ddb.Client, input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) *BatchWriteItemAll {
+func NewBatchWriteItemAll(input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) *BatchWriteItemAll {
 	options := BatchWriteItemOptions{}
 	for _, opt := range optFns {
 		opt(&options)
@@ -156,7 +176,6 @@ func NewBatchWriteItemAll(client *ddb.Client, input *ddb.BatchWriteItemInput, op
 	return &BatchWriteItemAll{
 		//client:  nil,
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: options,
 	}
@@ -168,47 +187,58 @@ func (op *BatchWriteItemAll) Await() ([]*ddb.BatchWriteItemOutput, error) {
 	if out == nil {
 		return nil, err
 	}
+	
 	return out.([]*ddb.BatchWriteItemOutput), err
 }
 
 // Invoke invokes the BatchWriteItem operation
-func (op *BatchWriteItemAll) Invoke(ctx context.Context) *BatchWriteItemAll {
-	go op.DynoInvoke(ctx)
+func (op *BatchWriteItemAll) Invoke(ctx context.Context, client *ddb.Client) *BatchWriteItemAll {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke the Operation interface
-func (op *BatchWriteItemAll) DynoInvoke(ctx context.Context) {
+func (op *BatchWriteItemAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		outs []*ddb.BatchWriteItemOutput
 		out  *ddb.BatchWriteItemOutput
 		err  error
 	)
-	defer op.SetResponse(outs, err)
+
+	defer func() { op.SetResponse(out, err) }()
+
 	//copy the scan so we're not mutating the original
 	input := CopyBatchWriteItemInput(op.input)
+
 	for {
 		for _, cb := range op.options.InputCallbacks {
 			if out, err = cb.BatchWriteItemInputCallback(ctx, input); out != nil || err != nil {
+
 				if out != nil {
 					outs = append(outs, out)
 				}
+
 				return
 			}
 		}
-		if out, err = op.client.BatchWriteItem(ctx, input); err != nil {
+
+		if out, err = client.BatchWriteItem(ctx, input); err != nil {
 			return
 		}
+
 		for _, cb := range op.options.OutputCallbacks {
 			if err = cb.BatchWriteItemOutputCallback(ctx, out); err != nil {
 				return
 			}
 		}
+
 		outs = append(outs, out)
+
 		if out.UnprocessedItems == nil {
 			// no more work
 			return
 		}
+
 		input.RequestItems = out.UnprocessedItems
 	}
 }

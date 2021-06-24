@@ -10,16 +10,42 @@ import (
 	"github.com/ericmaustin/dyno/encoding"
 )
 
-// NewScanAll creates a new ScanAll with this Client
-func (c *Client) NewScanAll(input *ddb.ScanInput, optFns ...func(*ScanOptions)) *ScanAll {
-	return NewScanAll(c.ddb, input, optFns...)
+// Scan executes a Scan operation with a ScanInput
+func (c *DefaultClient) Scan(ctx context.Context, input *ddb.ScanInput, optFns ...func(*ScanOptions)) (*ddb.ScanOutput, error) {
+	opt := NewScan(input, optFns...)
+	opt.DynoInvoke(ctx, c.ddb)
+
+	return opt.Await()
 }
 
-// ScanAll executes a scan api call with a ScanInput
-func (c *Client) ScanAll(ctx context.Context, input *ddb.ScanInput, optFns ...func(*ScanOptions)) ([]*ddb.ScanOutput, error) {
-	scan := c.NewScanAll(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
+// Scan executes a Scan operation with a ScanInput in this pool and returns the Scan for processing
+func (p *Pool) Scan(input *ddb.ScanInput, optFns ...func(*ScanOptions)) *Scan {
+	op := NewScan(input, optFns...)
+
+	if err := p.Do(op); err != nil {
+		op.SetResponse(nil, err)
+	}
+
+	return op
+}
+
+// ScanAll executes a Scan operation with a ScanInput
+func (c *DefaultClient) ScanAll(ctx context.Context, input *ddb.ScanInput, optFns ...func(*ScanOptions)) ([]*ddb.ScanOutput, error) {
+	opt := NewScanAll(input, optFns...)
+	opt.DynoInvoke(ctx, c.ddb)
+
+	return opt.Await()
+}
+
+// ScanAll executes a ScanAll operation with a ScanInput in this pool and returns the ScanAll for processing
+func (p *Pool) ScanAll(input *ddb.ScanInput, optFns ...func(*ScanOptions)) *ScanAll {
+	op := NewScanAll(input, optFns...)
+
+	if err := p.Do(op); err != nil {
+		op.SetResponse(nil, err)
+	}
+
+	return op
 }
 
 // ScanInputCallback is a callback that is called on a given ScanInput before a Scan operation api call executes
@@ -40,19 +66,19 @@ func (cb ScanInputCallbackFunc) ScanInputCallback(ctx context.Context, input *dd
 	return cb(ctx, input)
 }
 
-// ScanOutputCallbackFunc is ScanOutputCallback function
-type ScanOutputCallbackFunc func(context.Context, *ddb.ScanOutput) error
+// ScanOutputCallbackF is ScanOutputCallback function
+type ScanOutputCallbackF func(context.Context, *ddb.ScanOutput) error
 
 // ScanOutputCallback implements the ScanOutputCallback interface
-func (cb ScanOutputCallbackFunc) ScanOutputCallback(ctx context.Context, input *ddb.ScanOutput) error {
+func (cb ScanOutputCallbackF) ScanOutputCallback(ctx context.Context, input *ddb.ScanOutput) error {
 	return cb(ctx, input)
 }
 
 // ScanOptions represents options passed to the Scan operation
 type ScanOptions struct {
-	//InputCallbacks are called before the Scan dynamodb api operation with the dynamodb.ScanInput
+	// InputCallbacks are called before the Scan dynamodb api operation with the dynamodb.ScanInput
 	InputCallbacks []ScanInputCallback
-	//OutputCallbacks are called after the Scan dynamodb api operation with the dynamodb.ScanOutput
+	// OutputCallbacks are called after the Scan dynamodb api operation with the dynamodb.ScanOutput
 	OutputCallbacks []ScanOutputCallback
 }
 
@@ -73,21 +99,19 @@ func ScanWithOutputCallback(cb ScanOutputCallback) func(*ScanOptions) {
 // Scan represents a Scan operation
 type Scan struct {
 	*Promise
-	client  ddb.ScanAPIClient
 	input   *ddb.ScanInput
 	options ScanOptions
 }
 
 // NewScan creates a new Scan operation on the given client with a given ScanInput and options
-func NewScan(client ddb.ScanAPIClient, input *ddb.ScanInput, optFns ...func(*ScanOptions)) *Scan {
+func NewScan(input *ddb.ScanInput, optFns ...func(*ScanOptions)) *Scan {
 	opts := ScanOptions{}
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &Scan{
-		//client:  nil,
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -99,68 +123,61 @@ func (op *Scan) Await() (*ddb.ScanOutput, error) {
 	if out == nil {
 		return nil, err
 	}
+	fmt.Println("Scan.Await()\n", MustYamlString(out))
 	return out.(*ddb.ScanOutput), err
 }
 
 // Invoke invokes the Scan operation
-func (op *Scan) Invoke(ctx context.Context) *Scan {
-	go op.DynoInvoke(ctx)
+func (op *Scan) Invoke(ctx context.Context, client *ddb.Client) *Scan {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *Scan) DynoInvoke(ctx context.Context) {
+func (op *Scan) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.ScanOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func() {
+		op.SetResponse(out, err)
+	}()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.ScanInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.Scan(ctx, op.input); err != nil {
+
+	if out, err = client.Scan(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.ScanOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
-	return
-}
-
-// NewScan creates a new Scan with this Client
-func (c *Client) NewScan(input *ddb.ScanInput, optFns ...func(*ScanOptions)) *Scan {
-	return NewScan(c.ddb, input, optFns...)
-}
-
-// Scan executes a scan api call with a ScanInput
-func (c *Client) Scan(ctx context.Context, input *ddb.ScanInput, optFns ...func(*ScanOptions)) (*ddb.ScanOutput, error) {
-	scan := c.NewScan(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
 }
 
 // ScanAll represents an exhaustive Scan operation
 type ScanAll struct {
 	*Promise
-	client  ddb.ScanAPIClient
 	input   *ddb.ScanInput
 	options ScanOptions
 }
 
 // NewScanAll creates a new ScanAll operation on the given client with a given ScanInput and options
-func NewScanAll(client ddb.ScanAPIClient, input *ddb.ScanInput, optFns ...func(*ScanOptions)) *ScanAll {
+func NewScanAll(input *ddb.ScanInput, optFns ...func(*ScanOptions)) *ScanAll {
 	options := ScanOptions{}
 	for _, opt := range optFns {
 		opt(&options)
 	}
+	
 	return &ScanAll{
 		//client:  nil,
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: options,
 	}
@@ -172,49 +189,62 @@ func (op *ScanAll) Await() ([]*ddb.ScanOutput, error) {
 	if out == nil {
 		return nil, err
 	}
+	
 	return out.([]*ddb.ScanOutput), err
 }
 
 // Invoke invokes the Scan operation
-func (op *ScanAll) Invoke(ctx context.Context) *ScanAll {
-	go op.DynoInvoke(ctx)
+func (op *ScanAll) Invoke(ctx context.Context, client *ddb.Client) *ScanAll {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke the Operation interface
-func (op *ScanAll) DynoInvoke(ctx context.Context) {
+func (op *ScanAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		outs []*ddb.ScanOutput
 		out  *ddb.ScanOutput
 		err  error
 	)
-	defer op.SetResponse(outs, err)
+	
+	defer func() {
+		op.SetResponse(out, err)
+	}()
+	
 	//copy the scan so we're not mutating the original
 	input := CopyScan(op.input)
+	
 	for {
 		for _, cb := range op.options.InputCallbacks {
 			if out, err = cb.ScanInputCallback(ctx, input); out != nil || err != nil {
 				if out != nil {
 					outs = append(outs, out)
 				}
+				
 				return
 			}
 		}
-		if out, err = op.client.Scan(ctx, input); err != nil {
+
+		if out, err = client.Scan(ctx, input); err != nil {
 			return
 		}
+
 		for _, cb := range op.options.OutputCallbacks {
 			if err = cb.ScanOutputCallback(ctx, out); err != nil {
 				return
 			}
 		}
+
 		outs = append(outs, out)
+
 		if out.LastEvaluatedKey == nil {
 			// no more work
 			break
 		}
+
 		input.ExclusiveStartKey = out.LastEvaluatedKey
 	}
+
 	return
 }
 
@@ -257,6 +287,7 @@ func (bld *ScanBuilder) SetInput(input *ddb.ScanInput) *ScanBuilder {
 //AddProjection adds additional field names to the projection
 func (bld *ScanBuilder) AddProjection(names interface{}) *ScanBuilder {
 	nameBuilders := encoding.NameBuilders(names)
+
 	if bld.projection == nil {
 		proj := expression.ProjectionBuilder{}
 		proj = proj.AddNames(nameBuilders...)
@@ -264,6 +295,7 @@ func (bld *ScanBuilder) AddProjection(names interface{}) *ScanBuilder {
 	} else {
 		*bld.projection = bld.projection.AddNames(nameBuilders...)
 	}
+
 	return bld
 }
 
@@ -271,9 +303,11 @@ func (bld *ScanBuilder) AddProjection(names interface{}) *ScanBuilder {
 func (bld *ScanBuilder) AddProjectionNames(names ...string) *ScanBuilder {
 	//nameBuilders := encoding.NameBuilders(names)
 	nameBuilders := make([]expression.NameBuilder, len(names))
+
 	for i, name := range names {
 		nameBuilders[i] = expression.Name(name)
 	}
+
 	if bld.projection == nil {
 		proj := expression.ProjectionBuilder{}
 		proj = proj.AddNames(nameBuilders...)
@@ -281,6 +315,7 @@ func (bld *ScanBuilder) AddProjectionNames(names ...string) *ScanBuilder {
 	} else {
 		*bld.projection = bld.projection.AddNames(nameBuilders...)
 	}
+
 	return bld
 }
 
@@ -294,6 +329,7 @@ func (bld *ScanBuilder) AddFilter(cnd expression.ConditionBuilder) *ScanBuilder 
 		cnd = condition.And(*bld.filter, cnd)
 		bld.filter = &cnd
 	}
+
 	return bld
 }
 
@@ -380,16 +416,20 @@ func (bld *ScanBuilder) Build() (*ddb.ScanInput, error) {
 	if bld.projection != nil || bld.filter != nil {
 		// only use expression builder if we have a projection or a filter
 		eb := expression.NewBuilder()
+
 		// add projection
 		if bld.projection != nil {
 			eb = eb.WithProjection(*bld.projection)
 		}
+
 		// add filter
 		if bld.filter != nil {
 			eb = eb.WithFilter(*bld.filter)
 		}
+
 		// build the Expression
 		expr, err := eb.Build()
+
 		if err != nil {
 			return nil, fmt.Errorf("ScanBuilder Build() failed while attempting to build expression: %v", err)
 		}
@@ -398,10 +438,11 @@ func (bld *ScanBuilder) Build() (*ddb.ScanInput, error) {
 		bld.FilterExpression = expr.Filter()
 		bld.ProjectionExpression = expr.Projection()
 	}
+
 	return bld.ScanInput, nil
 }
 
-// BuildSegments builds the input input with included projection and creates seperate inputs for each segment
+// BuildSegments builds the input input with included projection and creates separate inputs for each segment
 func (bld *ScanBuilder) BuildSegments(segments int32, inputCB ScanInputCallback, outputCB ScanOutputCallback) ([]*ddb.ScanInput, error) {
 	input, err := bld.Build()
 
@@ -416,7 +457,7 @@ func (bld *ScanBuilder) BuildSegments(segments int32, inputCB ScanInputCallback,
 	return SplitScanIntoSegments(input, segments), nil
 }
 
-//SplitScanIntoSegments splits an input into segments, each segment is a deep copy of the original
+// SplitScanIntoSegments splits an input into segments, each segment is a deep copy of the original
 // with a unique segment number
 func SplitScanIntoSegments(input *ddb.ScanInput, segments int32) (inputs []*ddb.ScanInput) {
 	if input.TotalSegments == nil || *input.TotalSegments < 2 {
@@ -425,6 +466,7 @@ func SplitScanIntoSegments(input *ddb.ScanInput, segments int32) (inputs []*ddb.
 	}
 	// split into multiple
 	inputs = make([]*ddb.ScanInput, segments)
+
 	for i := int32(0); i < segments; i++ {
 		// copy the input
 		scanCopy := CopyScan(input)
@@ -433,6 +475,7 @@ func SplitScanIntoSegments(input *ddb.ScanInput, segments int32) (inputs []*ddb.
 		scanCopy.TotalSegments = &segments
 		inputs[i] = scanCopy
 	}
+
 	return
 }
 
@@ -444,68 +487,83 @@ func CopyScan(input *ddb.ScanInput) *ddb.ScanInput {
 		ReturnConsumedCapacity: input.ReturnConsumedCapacity,
 		Select:                 input.Select,
 	}
+
 	if input.TableName != nil {
 		clone.TableName = new(string)
 		*clone.TableName = *input.TableName
 	}
+
 	if input.AttributesToGet != nil {
 		copy(clone.AttributesToGet, input.AttributesToGet)
 	}
+
 	if input.ConsistentRead != nil {
 		clone.ConsistentRead = new(bool)
 		*clone.ConsistentRead = *input.ConsistentRead
 	}
+
 	if input.ExclusiveStartKey != nil {
 		clone.ExclusiveStartKey = make(map[string]ddbTypes.AttributeValue, len(input.ExclusiveStartKey))
 		for k, v := range input.ExclusiveStartKey {
 			clone.ExclusiveStartKey[k] = CopyAttributeValue(v)
 		}
 	}
+
 	if input.ExpressionAttributeNames != nil {
 		clone.ExpressionAttributeNames = make(map[string]string, len(input.ExpressionAttributeNames))
 		for k, v := range input.ExpressionAttributeNames {
 			clone.ExpressionAttributeNames[k] = v
 		}
 	}
+
 	if input.ExpressionAttributeValues != nil {
 		clone.ExpressionAttributeValues = make(map[string]ddbTypes.AttributeValue, len(input.ExpressionAttributeValues))
 		for k, v := range input.ExpressionAttributeValues {
 			clone.ExpressionAttributeValues[k] = CopyAttributeValue(v)
 		}
 	}
+
 	if input.FilterExpression != nil {
 		clone.FilterExpression = new(string)
 		*clone.FilterExpression = *input.FilterExpression
 	}
+
 	if input.IndexName != nil {
 		clone.IndexName = new(string)
 		*clone.IndexName = *input.IndexName
 	}
+
 	if input.Limit != nil {
 		clone.Limit = new(int32)
 		*clone.Limit = *input.Limit
 	}
+
 	if input.ProjectionExpression != nil {
 		clone.ProjectionExpression = new(string)
 		*clone.ProjectionExpression = *input.ProjectionExpression
 	}
+
 	if input.ScanFilter != nil {
 		clone.ScanFilter = make(map[string]ddbTypes.Condition, len(input.ScanFilter))
 		for k, v := range input.ScanFilter {
 			clone.ScanFilter[k] = CopyCondition(v)
 		}
 	}
+
 	if input.Segment != nil {
 		clone.Segment = new(int32)
 		*clone.Segment = *input.Segment
 	}
+
 	if input.TableName != nil {
 		clone.TableName = new(string)
 		*clone.TableName = *input.TableName
 	}
+
 	if input.TotalSegments != nil {
 		clone.TotalSegments = new(int32)
 		*clone.TotalSegments = *input.TotalSegments
 	}
+
 	return clone
 }

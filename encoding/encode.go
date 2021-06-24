@@ -10,9 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-//ValueMarshalMap allows more control over encoding types to attribute value maps
+// MapMarshaler allows more control over encoding types to attribute value maps
 type MapMarshaler interface {
-	MarshalMap(map[string]types.AttributeValue) error
+	MarshalAttributeValueMap(map[string]types.AttributeValue) error
 }
 
 var mapMarshallerReflectType = reflect.TypeOf((*MapMarshaler)(nil)).Elem()
@@ -21,13 +21,16 @@ var mapMarshallerReflectType = reflect.TypeOf((*MapMarshaler)(nil)).Elem()
 // panics if the input's kind is not a slice
 func MarshalMaps(input interface{}) ([]map[string]types.AttributeValue, error) {
 	var records []map[string]types.AttributeValue
+
 	if avMapSlice, ok := input.([]map[string]types.AttributeValue); ok {
 		// input is already a slice of attribute value maps
 		return avMapSlice, nil
 	}
+
 	if err := AppendItems(&records, input); err != nil {
 		return nil, err
 	}
+
 	return records, nil
 }
 
@@ -38,6 +41,7 @@ func MustMarshalMaps(input interface{}) []map[string]types.AttributeValue {
 	if err := AppendItems(&records, input); err != nil {
 		panic(err)
 	}
+
 	return records
 }
 
@@ -53,12 +57,14 @@ func AppendItems(items *[]map[string]types.AttributeValue, input interface{}) er
 	if rv.Type().Elem().Implements(mapMarshallerReflectType) {
 		for i := 0; i < rv.Len(); i++ {
 			avMap := make(map[string]types.AttributeValue)
-			err := rv.Index(i).Interface().(MapMarshaler).MarshalMap(avMap)
+			err := rv.Index(i).Interface().(MapMarshaler).MarshalAttributeValueMap(avMap)
 			if err != nil {
 				return err
 			}
+
 			*items = append(*items, avMap)
 		}
+
 		return nil
 	}
 
@@ -67,8 +73,10 @@ func AppendItems(items *[]map[string]types.AttributeValue, input interface{}) er
 		if err != nil {
 			return err
 		}
+
 		*items = append(*items, rec)
 	}
+
 	return nil
 }
 
@@ -77,10 +85,13 @@ func MarshalMap(input interface{}) (map[string]types.AttributeValue, error) {
 	if avMap, ok := input.(map[string]types.AttributeValue); ok {
 		return avMap, nil
 	}
+
 	if marshaller, ok := input.(MapMarshaler); ok {
 		avMap := make(map[string]types.AttributeValue)
-		return avMap, marshaller.MarshalMap(avMap)
+
+		return avMap, marshaller.MarshalAttributeValueMap(avMap)
 	}
+
 	return marshalValueToRecord(reflect.ValueOf(input))
 }
 
@@ -88,17 +99,21 @@ func MarshalMap(input interface{}) (map[string]types.AttributeValue, error) {
 // panics on error
 func MustMarshalMap(input interface{}) map[string]types.AttributeValue {
 	itemMap, err := MarshalMap(input)
+
 	if err != nil {
 		panic(err)
 	}
+
 	return itemMap
 }
 
 func marshalValueToRecord(rv reflect.Value) (map[string]types.AttributeValue, error) {
 	avMap := make(map[string]types.AttributeValue)
+
 	if err := addValuesToRecord(avMap, rv); err != nil {
 		return nil, err
 	}
+
 	return avMap, nil
 }
 
@@ -121,12 +136,14 @@ func addValuesToRecord(item map[string]types.AttributeValue, rv reflect.Value) e
 		if err != nil {
 			return err
 		}
+
 		if err := addMapToAv(iFaceMap, item); err != nil {
 			return err
 		}
 	default:
 		return errors.New("reflect value is not a Struct or Map")
 	}
+
 	return nil
 }
 
@@ -148,10 +165,12 @@ func addMapToRecord(rv reflect.Value, item map[string]types.AttributeValue, prep
 		}
 		return nil
 	}
+
 	iFaceMap, err := mapToIfaceMap(rv, prepend, append)
 	if err != nil {
 		return err
 	}
+
 	return addMapToAv(iFaceMap, item)
 }
 
@@ -160,13 +179,14 @@ func mapToIfaceMap(rv reflect.Value, prepend, append string) (map[string]interfa
 		return nil, errors.New("reflect value is not Map")
 	}
 
-	iter := rv.MapRange()
 	iFaceMap := map[string]interface{}{}
 
+	iter := rv.MapRange()
 	for iter.Next() {
 		key := Indirect(iter.Key(), false)
 		iFaceMap[prepend+ToString(key.Interface())+append] = iter.Value().Interface()
 	}
+
 	return iFaceMap, nil
 }
 
@@ -186,7 +206,9 @@ func marshalAv(rv reflect.Value, config *fieldConfig) (types.AttributeValue, err
 		}
 		return &types.AttributeValueMemberS{Value: string(yamlBytes)}, nil
 	}
+
 	encoder := attributevalue.NewEncoder()
+
 	return encoder.Encode(rv.Interface())
 }
 
@@ -237,11 +259,13 @@ func addStructToRecord(rv reflect.Value, item map[string]types.AttributeValue, p
 		if av, err = marshalAv(val, fc); err != nil {
 			return err
 		}
+
 		if av != nil {
 			fn := fieldName(fc.Name, ft.Name, prepend, append)
 			item[fn] = av
 		}
 	}
+
 	return nil
 }
 
@@ -260,6 +284,7 @@ func addMapToAv(input map[string]interface{}, item map[string]types.AttributeVal
 		}
 		item[name] = _av
 	}
+
 	return nil
 }
 
@@ -273,6 +298,7 @@ func Indirect(rv reflect.Value, decodingNil bool) reflect.Value {
 		haveAddr = true
 		rv = rv.Addr()
 	}
+
 	for {
 		// Load value from interface, but only if the result will be
 		// usefully addressable.
@@ -323,6 +349,7 @@ func IndirectType(rt reflect.Type) (reflect.Type, int) {
 	if rt.Kind() != reflect.Ptr && rt.Name() != "" {
 		haveAddr = true
 	}
+
 	for {
 		// Load value from interface, but only if the result will be
 		// usefully addressable.
@@ -364,12 +391,15 @@ func FieldNames(input interface{}) (names []string, err error) {
 			return
 		}
 	}
+
 	names, err = appendFieldNames(names, reflect.ValueOf(input))
+
 	return
 }
 
 func appendFieldNames(names []string, rv reflect.Value) (out []string, err error) {
 	rv = Indirect(rv, false)
+
 	switch rv.Kind() {
 	case reflect.Struct:
 		out, err = appendStructFieldNames(names, rv, "", "")
@@ -382,6 +412,7 @@ func appendFieldNames(names []string, rv reflect.Value) (out []string, err error
 	default:
 		return nil, errors.New("reflect value is not a Map or Struct")
 	}
+
 	return
 }
 
@@ -430,6 +461,7 @@ func appendStructFieldNames(names []string, rv reflect.Value, prependStr, append
 		}
 		names = append(names, fieldName(fc.Name, ft.Name, prependStr, appendStr))
 	}
+
 	return names, nil
 }
 
@@ -440,5 +472,6 @@ func appendMapFieldNames(names []string, rv reflect.Value, appendStr, prependStr
 		keyStr := ToString(key.Interface())
 		names = append(names, appendStr+keyStr+prependStr)
 	}
+
 	return names
 }

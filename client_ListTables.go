@@ -5,16 +5,12 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
-// NewListTables creates a new ListTables with this Client
-func (c *Client) NewListTables(input *ddb.ListTablesInput, optFns ...func(*ListTablesOptions)) *ListTables {
-	return NewListTables(c.ddb, input, optFns...)
-}
-
 // ListTables executes a scan api call with a ListTablesInput
-func (c *Client) ListTables(ctx context.Context, input *ddb.ListTablesInput, optFns ...func(*ListTablesOptions)) (*ddb.ListTablesOutput, error) {
-	scan := c.NewListTables(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
+func (c *DefaultClient) ListTables(ctx context.Context, input *ddb.ListTablesInput, optFns ...func(*ListTablesOptions)) (*ddb.ListTablesOutput, error) {
+	op := NewListTables(input, optFns...)
+	op.DynoInvoke(ctx, c.ddb)
+
+	return op.Await()
 }
 
 // ListTablesInputCallback is a callback that is called on a given ListTablesInput before a ListTables operation api call executes
@@ -45,9 +41,9 @@ func (cb ListTablesOutputCallbackFunc) ListTablesOutputCallback(ctx context.Cont
 
 // ListTablesOptions represents options passed to the ListTables operation
 type ListTablesOptions struct {
-	//InputCallbacks are called before the ListTables dynamodb api operation with the dynamodb.ListTablesInput
+	// InputCallbacks are called before the ListTables dynamodb api operation with the dynamodb.ListTablesInput
 	InputCallbacks []ListTablesInputCallback
-	//OutputCallbacks are called after the ListTables dynamodb api operation with the dynamodb.ListTablesOutput
+	// OutputCallbacks are called after the ListTables dynamodb api operation with the dynamodb.ListTablesOutput
 	OutputCallbacks []ListTablesOutputCallback
 }
 
@@ -68,20 +64,20 @@ func ListTablesWithOutputCallback(cb ListTablesOutputCallback) func(*ListTablesO
 // ListTables represents a ListTables operation
 type ListTables struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.ListTablesInput
 	options ListTablesOptions
 }
 
 // NewListTables creates a new ListTables operation on the given client with a given ListTablesInput and options
-func NewListTables(client *ddb.Client, input *ddb.ListTablesInput, optFns ...func(*ListTablesOptions)) *ListTables {
+func NewListTables(input *ddb.ListTablesInput, optFns ...func(*ListTablesOptions)) *ListTables {
 	opts := ListTablesOptions{}
+
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &ListTables{
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -90,39 +86,45 @@ func NewListTables(client *ddb.Client, input *ddb.ListTablesInput, optFns ...fun
 // Await waits for the Operation to be complete and then returns a ListTablesOutput and error
 func (op *ListTables) Await() (*ddb.ListTablesOutput, error) {
 	out, err := op.Promise.Await()
+
 	if out == nil {
 		return nil, err
 	}
+
 	return out.(*ddb.ListTablesOutput), err
 }
 
 // Invoke invokes the ListTables operation
-func (op *ListTables) Invoke(ctx context.Context) *ListTables {
-	go op.DynoInvoke(ctx)
+func (op *ListTables) Invoke(ctx context.Context, client *ddb.Client) *ListTables {
+	go op.DynoInvoke(ctx, client)
+
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ListTables) DynoInvoke(ctx context.Context) {
+func (op *ListTables) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.ListTablesOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func() { op.SetResponse(out, err) }()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.ListTablesInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.ListTables(ctx, op.input); err != nil {
+
+	if out, err = client.ListTables(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.ListTablesOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
-	return
 }
 
 // NewListTablesInput creates a new ListTablesInput

@@ -34,7 +34,9 @@ type Sleeper struct {
 func (s *Sleeper) WithAddRandom(add time.Duration) *Sleeper {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	s.randAdd = add
+
 	return s
 }
 
@@ -42,7 +44,9 @@ func (s *Sleeper) WithAddRandom(add time.Duration) *Sleeper {
 func (s *Sleeper) WithContext(ctx context.Context) *Sleeper {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	s.ctx = ctx
+
 	return s
 }
 
@@ -60,6 +64,7 @@ func NewSleeper(sleepDuration time.Duration) *Sleeper {
 func (s *Sleeper) Cancel() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	if s.done != nil {
 		s.done()
 	}
@@ -70,7 +75,9 @@ func (s *Sleeper) Cancel() {
 func (s *Sleeper) Sleep() <-chan error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	if !s.started {
+
 		if s.ctx == nil {
 			s.ctx = context.Background()
 		}
@@ -78,12 +85,15 @@ func (s *Sleeper) Sleep() <-chan error {
 		s.started = true
 	}
 	nextSleep := s.durationFunc(s.sleepDuration, s.count)
+
 	if s.randAdd > 0 {
 		nextSleep += RandomDuration(s.randAdd)
 	}
+
 	timer := time.NewTimer(nextSleep)
 	errorCh := make(chan error)
 	s.count++
+
 	go func() {
 		defer close(errorCh)
 		select {
@@ -101,11 +111,11 @@ func (s *Sleeper) Sleep() <-chan error {
 
 // NewExponentialSleeper returns a sleeper that will sleep with an exponentially increasing interval
 // useful for exponential backoff
-func NewExponentialSleeper(sleepDuration time.Duration) *Sleeper {
+func NewExponentialSleeper(sleepDuration time.Duration, alpha float64) *Sleeper {
 	return &Sleeper{
 		sleepDuration: sleepDuration,
 		durationFunc: func(sleepDuration time.Duration, count int) time.Duration {
-			return time.Duration(math.Pow(2, float64(count))) * sleepDuration
+			return time.Duration(math.Pow(alpha, float64(count))) * sleepDuration
 		},
 	}
 }

@@ -9,16 +9,24 @@ import (
 	"github.com/ericmaustin/dyno/condition"
 )
 
-// NewDeleteItem creates a new DeleteItem with this Client
-func (c *Client) NewDeleteItem(input *ddb.DeleteItemInput, optFns ...func(*DeleteItemOptions)) *DeleteItem {
-	return NewDeleteItem(c.ddb, input, optFns...)
-}
 
 // DeleteItem executes a scan api call with a DeleteItemInput
-func (c *Client) DeleteItem(ctx context.Context, input *ddb.DeleteItemInput, optFns ...func(*DeleteItemOptions)) (*ddb.DeleteItemOutput, error) {
-	scan := c.NewDeleteItem(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
+func (c *DefaultClient) DeleteItem(ctx context.Context, input *ddb.DeleteItemInput, optFns ...func(*DeleteItemOptions)) (*ddb.DeleteItemOutput, error) {
+	op := NewDeleteItem(input, optFns...)
+	op.DynoInvoke(ctx, c.ddb)
+	
+	return op.Await()
+}
+
+// DeleteItem executes a DeleteItem operation with a DeleteItemInput in this pool and returns the DeleteItem for processing
+func (p *Pool) DeleteItem(input *ddb.DeleteItemInput, optFns ...func(*DeleteItemOptions)) *DeleteItem {
+	op := NewDeleteItem(input, optFns...)
+
+	if err := p.Do(op); err != nil {
+		op.SetResponse(nil, err)
+	}
+
+	return op
 }
 
 // DeleteItemInputCallback is a callback that is called on a given DeleteItemInput before a DeleteItem operation api call executes
@@ -49,9 +57,9 @@ func (cb DeleteItemOutputCallbackFunc) DeleteItemOutputCallback(ctx context.Cont
 
 // DeleteItemOptions represents options passed to the DeleteItem operation
 type DeleteItemOptions struct {
-	//InputCallbacks are called before the DeleteItem dynamodb api operation with the dynamodb.DeleteItemInput
+	// InputCallbacks are called before the DeleteItem dynamodb api operation with the dynamodb.DeleteItemInput
 	InputCallbacks []DeleteItemInputCallback
-	//OutputCallbacks are called after the DeleteItem dynamodb api operation with the dynamodb.DeleteItemOutput
+	// OutputCallbacks are called after the DeleteItem dynamodb api operation with the dynamodb.DeleteItemOutput
 	OutputCallbacks []DeleteItemOutputCallback
 }
 
@@ -72,20 +80,20 @@ func DeleteItemWithOutputCallback(cb DeleteItemOutputCallback) func(*DeleteItemO
 // DeleteItem represents a DeleteItem operation
 type DeleteItem struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.DeleteItemInput
 	options DeleteItemOptions
 }
 
 // NewDeleteItem creates a new DeleteItem operation on the given client with a given DeleteItemInput and options
-func NewDeleteItem(client *ddb.Client, input *ddb.DeleteItemInput, optFns ...func(*DeleteItemOptions)) *DeleteItem {
+func NewDeleteItem(input *ddb.DeleteItemInput, optFns ...func(*DeleteItemOptions)) *DeleteItem {
 	opts := DeleteItemOptions{}
+
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &DeleteItem{
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -97,36 +105,40 @@ func (op *DeleteItem) Await() (*ddb.DeleteItemOutput, error) {
 	if out == nil {
 		return nil, err
 	}
+	
 	return out.(*ddb.DeleteItemOutput), err
 }
 
 // Invoke invokes the DeleteItem operation
-func (op *DeleteItem) Invoke(ctx context.Context) *DeleteItem {
-	go op.DynoInvoke(ctx)
+func (op *DeleteItem) Invoke(ctx context.Context, client *ddb.Client) *DeleteItem {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DeleteItem) DynoInvoke(ctx context.Context) {
+func (op *DeleteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.DeleteItemOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func() { op.SetResponse(out, err) }()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.DeleteItemInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.DeleteItem(ctx, op.input); err != nil {
+
+	if out, err = client.DeleteItem(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.DeleteItemOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
-	return
 }
 
 // NewDeleteItemInput creates a DeleteItemInput with a given table name and key

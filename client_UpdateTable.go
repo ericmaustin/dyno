@@ -5,16 +5,12 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
-// NewUpdateTable creates a new UpdateTable with this Client
-func (c *Client) NewUpdateTable(input *ddb.UpdateTableInput, optFns ...func(*UpdateTableOptions)) *UpdateTable {
-	return NewUpdateTable(c.ddb, input, optFns...)
-}
-
 // UpdateTable executes a scan api call with a UpdateTableInput
-func (c *Client) UpdateTable(ctx context.Context, input *ddb.UpdateTableInput, optFns ...func(*UpdateTableOptions)) (*ddb.UpdateTableOutput, error) {
-	scan := c.NewUpdateTable(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
+func (c *DefaultClient) UpdateTable(ctx context.Context, input *ddb.UpdateTableInput, optFns ...func(*UpdateTableOptions)) (*ddb.UpdateTableOutput, error) {
+	op := NewUpdateTable(input, optFns...)
+	op.DynoInvoke(ctx, c.ddb)
+
+	return op.Await()
 }
 
 // UpdateTableInputCallback is a callback that is called on a given UpdateTableInput before a UpdateTable operation api call executes
@@ -45,9 +41,9 @@ func (cb UpdateTableOutputCallbackFunc) UpdateTableOutputCallback(ctx context.Co
 
 // UpdateTableOptions represents options passed to the UpdateTable operation
 type UpdateTableOptions struct {
-	//InputCallbacks are called before the UpdateTable dynamodb api operation with the dynamodb.UpdateTableInput
+	// InputCallbacks are called before the UpdateTable dynamodb api operation with the dynamodb.UpdateTableInput
 	InputCallbacks []UpdateTableInputCallback
-	//OutputCallbacks are called after the UpdateTable dynamodb api operation with the dynamodb.UpdateTableOutput
+	// OutputCallbacks are called after the UpdateTable dynamodb api operation with the dynamodb.UpdateTableOutput
 	OutputCallbacks []UpdateTableOutputCallback
 }
 
@@ -68,20 +64,20 @@ func UpdateTableWithOutputCallback(cb UpdateTableOutputCallback) func(*UpdateTab
 // UpdateTable represents a UpdateTable operation
 type UpdateTable struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.UpdateTableInput
 	options UpdateTableOptions
 }
 
 // NewUpdateTable creates a new UpdateTable operation on the given client with a given UpdateTableInput and options
-func NewUpdateTable(client *ddb.Client, input *ddb.UpdateTableInput, optFns ...func(*UpdateTableOptions)) *UpdateTable {
+func NewUpdateTable(input *ddb.UpdateTableInput, optFns ...func(*UpdateTableOptions)) *UpdateTable {
 	opts := UpdateTableOptions{}
+
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &UpdateTable{
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -93,36 +89,40 @@ func (op *UpdateTable) Await() (*ddb.UpdateTableOutput, error) {
 	if out == nil {
 		return nil, err
 	}
+
 	return out.(*ddb.UpdateTableOutput), err
 }
 
 // Invoke invokes the UpdateTable operation
-func (op *UpdateTable) Invoke(ctx context.Context) *UpdateTable {
-	go op.DynoInvoke(ctx)
+func (op *UpdateTable) Invoke(ctx context.Context, client *ddb.Client) *UpdateTable {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *UpdateTable) DynoInvoke(ctx context.Context) {
+func (op *UpdateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.UpdateTableOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func() { op.SetResponse(out, err) }()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.UpdateTableInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.UpdateTable(ctx, op.input); err != nil {
+
+	if out, err = client.UpdateTable(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.UpdateTableOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
-	return
 }
 
 // NewUpdateTableInput creates a new UpdateTableInput

@@ -31,7 +31,7 @@ func TestIntUnmarshaller(t *testing.T) {
 		"Bar": IntUnmarshaler(&bar),
 	})
 
-	if err := decoderMap.UnmarshalMap(avMap); err != nil {
+	if err := decoderMap.UnmarshalAttributeValueMap(avMap); err != nil {
 		panic(err)
 	}
 
@@ -63,7 +63,7 @@ func TestInt64Unmarshaller(t *testing.T) {
 		"Bar": Int64Unmarshaler(&bar),
 	})
 
-	if err := decoderMap.UnmarshalMap(avMap); err != nil {
+	if err := decoderMap.UnmarshalAttributeValueMap(avMap); err != nil {
 		panic(err)
 	}
 
@@ -95,7 +95,7 @@ func TestStringUnmarshaller(t *testing.T) {
 		"Bar": StringUnmarshaler(&bar),
 	})
 
-	if err := decoderMap.UnmarshalMap(avMap); err != nil {
+	if err := decoderMap.UnmarshalAttributeValueMap(avMap); err != nil {
 		panic(err)
 	}
 
@@ -127,7 +127,7 @@ func TestFloat64Unmarshaller(t *testing.T) {
 		"Bar": Float64Unmarshaler(&bar),
 	})
 
-	if err := decoderMap.UnmarshalMap(avMap); err != nil {
+	if err := decoderMap.UnmarshalAttributeValueMap(avMap); err != nil {
 		panic(err)
 	}
 

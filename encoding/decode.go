@@ -10,9 +10,9 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-//MapUnmarshaller allows more control over decoding structs from attribute value maps
+// MapUnmarshaller allows more control over decoding structs from attribute value maps
 type MapUnmarshaller interface {
-	UnmarshalMap(avMap map[string]ddb.AttributeValue) error
+	UnmarshalAttributeValueMap(avMap map[string]ddb.AttributeValue) error
 }
 
 var itemUnmarshallerReflectType = reflect.TypeOf((*MapUnmarshaller)(nil)).Elem()
@@ -41,17 +41,19 @@ func UnmarshalMaps(items []map[string]ddb.AttributeValue, input interface{}) err
 			// create a new value from the slice's element type
 			target := reflect.New(indirectType)
 			// run the unmarshaller
-			if err := target.Interface().(MapUnmarshaller).UnmarshalMap(item); err != nil {
+			if err := target.Interface().(MapUnmarshaller).UnmarshalAttributeValueMap(item); err != nil {
 				return err
 			}
+
 			for i := 0; i < steps-1; i++ {
-				//add ptrs till we go back to the same number of ptrs as target should have
+				// add ptrs till we go back to the same number of ptrs as target should have
 				newTarget := reflect.New(target.Type())
 				newTarget.Elem().Set(target)
 				target = newTarget
 			}
 			sliceVal.Set(reflect.Append(sliceVal, target))
 		}
+
 		return nil
 	}
 
@@ -61,11 +63,14 @@ func UnmarshalMaps(items []map[string]ddb.AttributeValue, input interface{}) err
 			// create a new value from the slice's element type
 			target := reflect.New(sliceVal.Type().Elem()).Elem()
 			target = reflect.New(Indirect(target, false).Type())
+
 			if err := unmarshalMapToValue(item, target); err != nil {
 				return err
 			}
+
 			sliceVal.Set(reflect.Append(sliceVal, target))
 		}
+
 		return nil
 	}
 
@@ -74,9 +79,11 @@ func UnmarshalMaps(items []map[string]ddb.AttributeValue, input interface{}) err
 		// create a new value from the slice's element type
 		target := reflect.New(sliceVal.Type().Elem())
 		target = reflect.New(Indirect(target, false).Type())
+
 		if err := unmarshalMapToValue(item, target); err != nil {
 			return err
 		}
+
 		sliceVal.Set(reflect.Append(sliceVal, target))
 	}
 
@@ -87,8 +94,9 @@ func UnmarshalMaps(items []map[string]ddb.AttributeValue, input interface{}) err
 // if the item is a map, the map must have the keys already set in the map
 func UnmarshalMap(item map[string]ddb.AttributeValue, input interface{}) error {
 	if unmarshaller, ok := input.(MapUnmarshaller); ok {
-		return unmarshaller.UnmarshalMap(item)
+		return unmarshaller.UnmarshalAttributeValueMap(item)
 	}
+
 	return unmarshalMapToValue(item, reflect.ValueOf(input))
 }
 
@@ -96,6 +104,7 @@ func unmarshalMapToValue(rec map[string]ddb.AttributeValue, rv reflect.Value) er
 	if rv.Kind() != reflect.Ptr || rv.IsNil() || !rv.IsValid() {
 		return errors.New("reflect value is not valid")
 	}
+
 	switch rv.Elem().Kind() {
 	case reflect.Struct:
 		if err := unmarshalMapToStruct(rec, rv, "", ""); err != nil {
@@ -108,6 +117,7 @@ func unmarshalMapToValue(rec map[string]ddb.AttributeValue, rv reflect.Value) er
 	default:
 		return errors.New("reflect value is not a Struct or Map")
 	}
+
 	return nil
 }
 
@@ -115,9 +125,11 @@ func unmarshalMapToStruct(item map[string]ddb.AttributeValue, rv reflect.Value, 
 	if rv.Kind() != reflect.Ptr {
 		return errors.New("reflect value is not a Ptr")
 	}
+
 	if rv.Elem().Kind() != reflect.Struct {
 		return errors.New("reflect value is not a Struct")
 	}
+
 	if item == nil {
 		return nil
 	}
@@ -178,6 +190,7 @@ func unmarshalMapToStruct(item map[string]ddb.AttributeValue, rv reflect.Value, 
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -187,6 +200,7 @@ func unmarshalMapToEmbededMap(item map[string]ddb.AttributeValue, rv reflect.Val
 	if rv.Kind() != reflect.Map {
 		return errors.New("reflect value is not a Map")
 	}
+
 	if item == nil {
 		return nil
 	}
@@ -214,6 +228,7 @@ func unmarshalMap(item ddb.AttributeValue, rv reflect.Value, conf *fieldConfig) 
 	if item == nil {
 		return nil
 	}
+
 	if _, ok := item.(*ddb.AttributeValueMemberNULL); ok {
 		// skip null types
 		return nil
@@ -251,6 +266,8 @@ func unmarshalMap(item ddb.AttributeValue, rv reflect.Value, conf *fieldConfig) 
 	if err := attributevalue.Unmarshal(item, target.Interface()); err != nil {
 		return err
 	}
+
 	rv.Set(Indirect(target, false))
+
 	return nil
 }

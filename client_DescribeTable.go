@@ -9,39 +9,27 @@ import (
 	"time"
 )
 
-// NewDescribeTable creates a new DescribeTable with this Client
-func (c *Client) NewDescribeTable(input *ddb.DescribeTableInput, optFns ...func(*DescribeTableOptions)) *DescribeTable {
-	return NewDescribeTable(c.ddb, input, optFns...)
-}
-
 // DescribeTable executes a scan api call with a DescribeTableInput
-func (c *Client) DescribeTable(ctx context.Context, input *ddb.DescribeTableInput, optFns ...func(*DescribeTableOptions)) (*ddb.DescribeTableOutput, error) {
-	scan := c.NewDescribeTable(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
-}
+func (c *DefaultClient) DescribeTable(ctx context.Context, input *ddb.DescribeTableInput, optFns ...func(*DescribeTableOptions)) (*ddb.DescribeTableOutput, error) {
+	op := NewDescribeTable(input, optFns...)
+	op.DynoInvoke(ctx, c.ddb)
 
-// NewTableExistsWaiter creates a new TableExistsWaiter operation on the given client with a given DescribeTableInput and options
-func (c *Client) NewTableExistsWaiter(input *ddb.DescribeTableInput, optFns ...func(*TableExistsWaiterOptions)) *TableExistsWaiter {
-	return NewTableExistsWaiter(c.ddb, input, optFns...)
+	return op.Await()
 }
 
 // WaitForTableExists waits for a table to exist
-func (c *Client) WaitForTableExists(ctx context.Context, input *ddb.DescribeTableInput, optFns ...func(*TableExistsWaiterOptions)) error {
-	waiter := NewTableExistsWaiter(c.ddb, input, optFns...)
-	waiter.DynoInvoke(ctx)
+func (c *DefaultClient) WaitForTableExists(ctx context.Context, input *ddb.DescribeTableInput, optFns ...func(*TableExistsWaiterOptions)) error {
+	waiter := NewTableExistsWaiter(input, optFns...)
+	waiter.DynoInvoke(ctx, c.ddb)
+
 	return waiter.Await()
 }
 
-// NewTableNotExistsWaiter creates a new TableNotExistsWaiter operation on the given client with a given DescribeTableInput and options
-func (c *Client) NewTableNotExistsWaiter(input *ddb.DescribeTableInput, optFns ...func(options *TableNotExistsWaiterOptions)) *TableNotExistsWaiter {
-	return NewTableNotExistsWaiter(c.ddb, input, optFns...)
-}
-
 // WaitForTableNotExists waits for a table to not exist
-func (c *Client) WaitForTableNotExists(ctx context.Context, input *ddb.DescribeTableInput, optFns ...func(*TableExistsWaiterOptions)) error {
-	waiter := NewTableExistsWaiter(c.ddb, input, optFns...)
-	waiter.DynoInvoke(ctx)
+func (c *DefaultClient) WaitForTableNotExists(ctx context.Context, input *ddb.DescribeTableInput, optFns ...func(*TableNotExistsWaiterOptions)) error {
+	waiter := NewTableNotExistsWaiter(input, optFns...)
+	waiter.DynoInvoke(ctx, c.ddb)
+
 	return waiter.Await()
 }
 
@@ -73,9 +61,9 @@ func (cb DescribeTableOutputCallbackF) DescribeTableOutputCallback(ctx context.C
 
 // DescribeTableOptions represents options passed to the DescribeTable operation
 type DescribeTableOptions struct {
-	//InputCallbacks are called before the DescribeTable dynamodb api operation with the dynamodb.DescribeTableInput
+	// InputCallbacks are called before the DescribeTable dynamodb api operation with the dynamodb.DescribeTableInput
 	InputCallbacks []DescribeTableInputCallback
-	//OutputCallbacks are called after the DescribeTable dynamodb api operation with the dynamodb.DescribeTableOutput
+	// OutputCallbacks are called after the DescribeTable dynamodb api operation with the dynamodb.DescribeTableOutput
 	OutputCallbacks []DescribeTableOutputCallback
 }
 
@@ -96,20 +84,20 @@ func DescribeTableWithOutputCallback(cb DescribeTableOutputCallback) func(*Descr
 // DescribeTable represents a DescribeTable operation
 type DescribeTable struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.DescribeTableInput
 	options DescribeTableOptions
 }
 
 // NewDescribeTable creates a new DescribeTable operation on the given client with a given DescribeTableInput and options
-func NewDescribeTable(client *ddb.Client, input *ddb.DescribeTableInput, optFns ...func(*DescribeTableOptions)) *DescribeTable {
+func NewDescribeTable(input *ddb.DescribeTableInput, optFns ...func(*DescribeTableOptions)) *DescribeTable {
 	opts := DescribeTableOptions{}
+
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &DescribeTable{
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -118,38 +106,46 @@ func NewDescribeTable(client *ddb.Client, input *ddb.DescribeTableInput, optFns 
 // Await waits for the Operation to be complete and then returns a DescribeTableOutput and error
 func (op *DescribeTable) Await() (*ddb.DescribeTableOutput, error) {
 	out, err := op.Promise.Await()
+
 	if out == nil {
 		return nil, err
 	}
+
 	return out.(*ddb.DescribeTableOutput), err
 }
 
 // Invoke invokes the DescribeTable operation
-func (op *DescribeTable) Invoke(ctx context.Context) *DescribeTable {
-	go op.DynoInvoke(ctx)
+func (op *DescribeTable) Invoke(ctx context.Context, client *ddb.Client) *DescribeTable {
+	go op.DynoInvoke(ctx, client)
+
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeTable) DynoInvoke(ctx context.Context) {
+func (op *DescribeTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.DescribeTableOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func() { op.SetResponse(out, err) }()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.DescribeTableInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.DescribeTable(ctx, op.input); err != nil {
+
+	if out, err = client.DescribeTable(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.DescribeTableOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
+
 	return
 }
 
@@ -158,7 +154,8 @@ type TableExistsWaiterOptions struct {
 	Timeout      time.Duration
 	RetryDelay   time.Duration
 	RetrySleeper *timer.Sleeper
-	//OutputCallbacks are called after the DescribeTable dynamodb api operation with the dynamodb.DescribeTableOutput
+
+	// OutputCallbacks are called after the DescribeTable dynamodb api operation with the dynamodb.DescribeTableOutput
 	OutputCallbacks []DescribeTableOutputCallback
 }
 
@@ -179,23 +176,23 @@ func TableExistsWaiterWithOutputCallback(cb DescribeTableOutputCallback) func(*T
 // TableExistsWaiter represents an operation that waits for a table to exist
 type TableExistsWaiter struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.DescribeTableInput
 	options TableExistsWaiterOptions
 }
 
 // NewTableExistsWaiter creates a new TableExistsWaiter operation on the given client with a given DescribeTableInput and options
-func NewTableExistsWaiter(client *ddb.Client, input *ddb.DescribeTableInput, optFns ...func(*TableExistsWaiterOptions)) *TableExistsWaiter {
+func NewTableExistsWaiter(input *ddb.DescribeTableInput, optFns ...func(*TableExistsWaiterOptions)) *TableExistsWaiter {
 	opts := TableExistsWaiterOptions{
 		Timeout:    time.Minute * 5,
 		RetryDelay: time.Second,
 	}
+
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &TableExistsWaiter{
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -208,24 +205,27 @@ func (op *TableExistsWaiter) Await() error {
 }
 
 // Invoke invokes the TableExistsWaiter operation
-func (op *TableExistsWaiter) Invoke(ctx context.Context) *TableExistsWaiter {
-	go op.DynoInvoke(ctx)
+func (op *TableExistsWaiter) Invoke(ctx context.Context, client *ddb.Client) *TableExistsWaiter {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *TableExistsWaiter) DynoInvoke(ctx context.Context) {
+func (op *TableExistsWaiter) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out     *ddb.DescribeTableOutput
 		sleeper *timer.Sleeper
 		retry   bool
 		err     error
 	)
+
 	defer func() {
 		op.SetResponse(nil, err)
+
 		if out == nil {
 			return
 		}
+
 		for _, cb := range op.options.OutputCallbacks {
 			if err = cb.DescribeTableOutputCallback(ctx, out); err != nil {
 				return
@@ -234,20 +234,23 @@ func (op *TableExistsWaiter) DynoInvoke(ctx context.Context) {
 	}()
 
 	ctx, cancel := context.WithTimeout(ctx, op.options.Timeout)
+
 	defer cancel()
 
 	if op.options.RetrySleeper != nil {
 		sleeper = op.options.RetrySleeper.WithContext(ctx)
 	} else {
-		sleeper = timer.NewExponentialSleeper(op.options.RetryDelay).WithContext(ctx)
+		sleeper = timer.NewSleeper(op.options.RetryDelay).WithContext(ctx)
 	}
 
 	for {
-		out, err = op.client.DescribeTable(ctx, op.input)
+		out, err = client.DescribeTable(ctx, op.input)
 		retry, err = tableExistsRetryState(out, err)
-		if !retry {
+
+		if !retry || err != nil  {
 			return
 		}
+
 		if err = <-sleeper.Sleep(); err != nil {
 			return
 		}
@@ -278,24 +281,24 @@ func TableNotExistsWaiterWithRetrySleeper(sleeper *timer.Sleeper) func(*TableNot
 // TableNotExistsWaiter represents an operation that waits for a table to exist
 type TableNotExistsWaiter struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.DescribeTableInput
 	options TableNotExistsWaiterOptions
 }
 
 // NewTableNotExistsWaiter creates a new TableNotExistsWaiter operation on the given client with a given DescribeTableInput and options
-func NewTableNotExistsWaiter(client *ddb.Client, input *ddb.DescribeTableInput, optFns ...func(*TableNotExistsWaiterOptions)) *TableNotExistsWaiter {
+func NewTableNotExistsWaiter(input *ddb.DescribeTableInput, optFns ...func(*TableNotExistsWaiterOptions)) *TableNotExistsWaiter {
 	opts := TableNotExistsWaiterOptions{
 		Timeout:      time.Minute * 5,
 		RetryDelay:   time.Second,
 		RetrySleeper: nil,
 	}
+
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &TableNotExistsWaiter{
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -304,40 +307,46 @@ func NewTableNotExistsWaiter(client *ddb.Client, input *ddb.DescribeTableInput, 
 // Await waits for the Operation to be complete and then returns a DescribeTableOutput and error
 func (op *TableNotExistsWaiter) Await() error {
 	_, err := op.Promise.Await()
+
 	return err
 }
 
 // Invoke invokes the TableNotExistsWaiter operation
-func (op *TableNotExistsWaiter) Invoke(ctx context.Context) *TableNotExistsWaiter {
-	go op.DynoInvoke(ctx)
+func (op *TableNotExistsWaiter) Invoke(ctx context.Context, client *ddb.Client) *TableNotExistsWaiter {
+	go op.DynoInvoke(ctx, client)
+
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *TableNotExistsWaiter) DynoInvoke(ctx context.Context) {
+func (op *TableNotExistsWaiter) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out     *ddb.DescribeTableOutput
 		retry   bool
 		err     error
 		sleeper *timer.Sleeper
 	)
-	defer op.SetResponse(nil, err)
+
+	defer func() { op.SetResponse(nil, err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, op.options.Timeout)
+
 	defer cancel()
 
 	if op.options.RetrySleeper != nil {
 		sleeper = op.options.RetrySleeper.WithContext(ctx)
 	} else {
-		sleeper = timer.NewExponentialSleeper(op.options.RetryDelay).WithContext(ctx)
+		sleeper = timer.NewSleeper(op.options.RetryDelay).WithContext(ctx)
 	}
 
 	for {
-		out, err = op.client.DescribeTable(ctx, op.input)
+		out, err = client.DescribeTable(ctx, op.input)
 		retry, err = tableNotExistsRetryState(out, err)
-		if !retry {
+
+		if !retry || err != nil {
 			return
 		}
+
 		if err = <-sleeper.Sleep(); err != nil {
 			return
 		}

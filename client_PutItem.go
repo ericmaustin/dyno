@@ -8,16 +8,12 @@ import (
 	"github.com/ericmaustin/dyno/condition"
 )
 
-// NewPutItem creates a new PutItem with this Client
-func (c *Client) NewPutItem(input *ddb.PutItemInput, optFns ...func(*PutItemOptions)) *PutItem {
-	return NewPutItem(c.ddb, input, optFns...)
-}
-
 // PutItem executes a scan api call with a PutItemInput
-func (c *Client) PutItem(ctx context.Context, input *ddb.PutItemInput, optFns ...func(*PutItemOptions)) (*ddb.PutItemOutput, error) {
-	scan := c.NewPutItem(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
+func (c *DefaultClient) PutItem(ctx context.Context, input *ddb.PutItemInput, optFns ...func(*PutItemOptions)) (*ddb.PutItemOutput, error) {
+	opt := NewPutItem(input, optFns...)
+	opt.DynoInvoke(ctx, c.ddb)
+
+	return opt.Await()
 }
 
 // PutItemInputCallback is a callback that is called on a given PutItemInput before a PutItem operation api call executes
@@ -50,7 +46,7 @@ func (cb PutItemOutputCallbackFunc) PutItemOutputCallback(ctx context.Context, i
 type PutItemOptions struct {
 	//InputCallbacks are called before the PutItem dynamodb api operation with the dynamodb.PutItemInput
 	InputCallbacks []PutItemInputCallback
-	//OutputCallbacks are called after the PutItem dynamodb api operation with the dynamodb.PutItemOutput
+	// OutputCallbacks are called after the PutItem dynamodb api operation with the dynamodb.PutItemOutput
 	OutputCallbacks []PutItemOutputCallback
 }
 
@@ -71,20 +67,20 @@ func PutItemWithOutputCallback(cb PutItemOutputCallback) func(*PutItemOptions) {
 // PutItem represents a PutItem operation
 type PutItem struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.PutItemInput
 	options PutItemOptions
 }
 
 // NewPutItem creates a new PutItem operation on the given client with a given PutItemInput and options
-func NewPutItem(client *ddb.Client, input *ddb.PutItemInput, optFns ...func(*PutItemOptions)) *PutItem {
+func NewPutItem(input *ddb.PutItemInput, optFns ...func(*PutItemOptions)) *PutItem {
 	opts := PutItemOptions{}
+
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+
 	return &PutItem{
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -93,39 +89,44 @@ func NewPutItem(client *ddb.Client, input *ddb.PutItemInput, optFns ...func(*Put
 // Await waits for the Operation to be complete and then returns a PutItemOutput and error
 func (op *PutItem) Await() (*ddb.PutItemOutput, error) {
 	out, err := op.Promise.Await()
+
 	if out == nil {
 		return nil, err
 	}
+
 	return out.(*ddb.PutItemOutput), err
 }
 
 // Invoke invokes the PutItem operation
-func (op *PutItem) Invoke(ctx context.Context) *PutItem {
-	go op.DynoInvoke(ctx)
+func (op *PutItem) Invoke(ctx context.Context, client *ddb.Client) *PutItem {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *PutItem) DynoInvoke(ctx context.Context) {
+func (op *PutItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.PutItemOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func() { op.SetResponse(out, err) }()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.PutItemInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.PutItem(ctx, op.input); err != nil {
+
+	if out, err = client.PutItem(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.PutItemOutputCallback(ctx, out); err != nil {
 			return
 		}
 	}
-	return
 }
 
 // PutItemBuilder allows for dynamic building of a PutItem input
@@ -139,6 +140,7 @@ func NewPutItemBuilder(input *ddb.PutItemInput) *PutItemBuilder {
 	if input != nil {
 		return &PutItemBuilder{PutItemInput: input}
 	}
+
 	return &PutItemBuilder{PutItemInput: NewPutItemInput(nil, nil)}
 }
 
@@ -218,10 +220,12 @@ func (bld *PutItemBuilder) Build() (*ddb.PutItemInput, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		bld.ConditionExpression = b.Condition()
 		bld.ExpressionAttributeNames = b.Names()
 		bld.ExpressionAttributeValues = b.Values()
 	}
+
 	return bld.PutItemInput, nil
 }
 

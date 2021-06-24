@@ -20,8 +20,8 @@ func (d UnmarshalerFunc) UnmarshalDynamoDBAttributeValue(v ddb.AttributeValue) e
 // ValueUnmarshalerMap represents a map of attributevalue.Unmarshaler
 type ValueUnmarshalerMap map[string]ddbav.Unmarshaler
 
-// UnmarshalMap runs all the attributevalue.Unmarshalers in the UnmarshalerFunc map
-func (dm ValueUnmarshalerMap) UnmarshalMap(m map[string]ddb.AttributeValue) error {
+// UnmarshalAttributeValueMap runs all the attributevalue.Unmarshalers in the UnmarshalerFunc map
+func (dm ValueUnmarshalerMap) UnmarshalAttributeValueMap(m map[string]ddb.AttributeValue) error {
 	for key, decoder := range dm {
 		if av, ok := m[key]; ok {
 			if err := decoder.UnmarshalDynamoDBAttributeValue(av); err != nil {
@@ -29,6 +29,7 @@ func (dm ValueUnmarshalerMap) UnmarshalMap(m map[string]ddb.AttributeValue) erro
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -38,11 +39,15 @@ func UnmarshalInt(av ddb.AttributeValue, v *int) error {
 	if !ok {
 		return errors.New("cannot decode AttributeValue to int")
 	}
+
 	i, err := strconv.Atoi(nv.Value)
+
 	if err != nil {
 		return err
 	}
+
 	*v = i
+
 	return nil
 }
 
@@ -56,14 +61,19 @@ func IntUnmarshaler(v *int) UnmarshalerFunc {
 // UnmarshalInt64 unmarshals an AttributeValue into the given value
 func UnmarshalInt64(av ddb.AttributeValue, v *int64) error {
 	nv, ok := av.(*ddb.AttributeValueMemberN)
+
 	if !ok {
 		return errors.New("cannot decode AttributeValue to int64")
 	}
+
 	i, err := strconv.ParseInt(nv.Value, 10, 64)
+
 	if err != nil {
 		return err
 	}
+
 	*v = i
+
 	return nil
 }
 
@@ -77,14 +87,19 @@ func Int64Unmarshaler(v *int64) UnmarshalerFunc {
 // UnmarshalFloat32 unmarshals an AttributeValue into the given value
 func UnmarshalFloat32(av ddb.AttributeValue, v *float32) error {
 	nv, ok := av.(*ddb.AttributeValueMemberN)
+
 	if !ok {
 		return errors.New("cannot decode AttributeValue to int64")
 	}
+
 	i, err := strconv.ParseFloat(nv.Value, 32)
+
 	if err != nil {
 		return err
 	}
+
 	*v = float32(i)
+
 	return nil
 }
 
@@ -98,14 +113,19 @@ func Float32Unmarshaler(v *float32) UnmarshalerFunc {
 // UnmarshalFloat64 unmarshals an AttributeValue into the given value
 func UnmarshalFloat64(av ddb.AttributeValue, v *float64) error {
 	nv, ok := av.(*ddb.AttributeValueMemberN)
+
 	if !ok {
 		return errors.New("cannot decode AttributeValue to int64")
 	}
+
 	i, err := strconv.ParseFloat(nv.Value, 64)
+
 	if err != nil {
 		return err
 	}
+
 	*v = i
+
 	return nil
 }
 
@@ -136,10 +156,13 @@ func BoolUnmarshaler(v *bool) UnmarshalerFunc {
 // UnmarshalString unmarshals an AttributeValue into the given value
 func UnmarshalString(av ddb.AttributeValue, v *string) error {
 	nv, ok := av.(*ddb.AttributeValueMemberS)
+
 	if !ok {
 		return errors.New("cannot decode AttributeValue to string")
 	}
+
 	*v = nv.Value
+
 	return nil
 }
 
@@ -192,11 +215,15 @@ func JSONUnmarshaler(v interface{}) UnmarshalerFunc {
 // UnmarshalUnixNano unmarshals an AttributeValue into the given value
 func UnmarshalUnixNano(av ddb.AttributeValue, v *time.Time) error {
 	intV := int64(0)
+
 	if err := UnmarshalInt64(av, &intV); err != nil {
 		return err
 	}
+
 	t := time.Unix(0, intV)
+
 	*v = t
+
 	return nil
 }
 
@@ -210,11 +237,14 @@ func UnixNanoUnmarshaler(v *time.Time) UnmarshalerFunc {
 // UnmarshalUnix unmarshals an AttributeValue into the given value
 func UnmarshalUnix(av ddb.AttributeValue, v *time.Time) error {
 	intV := int64(0)
+
 	if err := UnmarshalInt64(av, &intV); err != nil {
 		return err
 	}
+
 	t := time.Unix(intV, 0)
 	*v = t
+
 	return nil
 }
 

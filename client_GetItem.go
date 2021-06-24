@@ -8,16 +8,12 @@ import (
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// NewGetItem creates a new GetItem with this Client
-func (c *Client) NewGetItem(input *ddb.GetItemInput, optFns ...func(*GetItemOptions)) *GetItem {
-	return NewGetItem(c.ddb, input, optFns...)
-}
-
 // GetItem executes a scan api call with a GetItemInput
-func (c *Client) GetItem(ctx context.Context, input *ddb.GetItemInput, optFns ...func(*GetItemOptions)) (*ddb.GetItemOutput, error) {
-	scan := c.NewGetItem(input, optFns...)
-	scan.DynoInvoke(ctx)
-	return scan.Await()
+func (c *DefaultClient) GetItem(ctx context.Context, input *ddb.GetItemInput, optFns ...func(*GetItemOptions)) (*ddb.GetItemOutput, error) {
+	op := NewGetItem(input, optFns...)
+	op.DynoInvoke(ctx, c.ddb)
+
+	return op.Await()
 }
 
 // GetItemInputCallback is a callback that is called on a given GetItemInput before a GetItem operation api call executes
@@ -48,9 +44,9 @@ func (cb GetItemOutputCallbackFunc) GetItemOutputCallback(ctx context.Context, i
 
 // GetItemOptions represents options passed to the GetItem operation
 type GetItemOptions struct {
-	//InputCallbacks are called before the GetItem dynamodb api operation with the dynamodb.GetItemInput
+	// InputCallbacks are called before the GetItem dynamodb api operation with the dynamodb.GetItemInput
 	InputCallbacks []GetItemInputCallback
-	//OutputCallbacks are called after the GetItem dynamodb api operation with the dynamodb.GetItemOutput
+	// OutputCallbacks are called after the GetItem dynamodb api operation with the dynamodb.GetItemOutput
 	OutputCallbacks []GetItemOutputCallback
 }
 
@@ -71,20 +67,19 @@ func GetItemWithOutputCallback(cb GetItemOutputCallback) func(*GetItemOptions) {
 // GetItem represents a GetItem operation
 type GetItem struct {
 	*Promise
-	client  *ddb.Client
 	input   *ddb.GetItemInput
 	options GetItemOptions
 }
 
 // NewGetItem creates a new GetItem operation on the given client with a given GetItemInput and options
-func NewGetItem(client *ddb.Client, input *ddb.GetItemInput, optFns ...func(*GetItemOptions)) *GetItem {
+func NewGetItem(input *ddb.GetItemInput, optFns ...func(*GetItemOptions)) *GetItem {
 	opts := GetItemOptions{}
 	for _, opt := range optFns {
 		opt(&opts)
 	}
+	
 	return &GetItem{
 		Promise: NewPromise(),
-		client:  client,
 		input:   input,
 		options: opts,
 	}
@@ -96,30 +91,35 @@ func (op *GetItem) Await() (*ddb.GetItemOutput, error) {
 	if out == nil {
 		return nil, err
 	}
+	
 	return out.(*ddb.GetItemOutput), err
 }
 
 // Invoke invokes the GetItem operation
-func (op *GetItem) Invoke(ctx context.Context) *GetItem {
-	go op.DynoInvoke(ctx)
+func (op *GetItem) Invoke(ctx context.Context, client *ddb.Client) *GetItem {
+	go op.DynoInvoke(ctx, client)
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *GetItem) DynoInvoke(ctx context.Context) {
+func (op *GetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	var (
 		out *ddb.GetItemOutput
 		err error
 	)
-	defer op.SetResponse(out, err)
+
+	defer func() { op.SetResponse(out, err) }()
+
 	for _, cb := range op.options.InputCallbacks {
 		if out, err = cb.GetItemInputCallback(ctx, op.input); out != nil || err != nil {
 			return
 		}
 	}
-	if out, err = op.client.GetItem(ctx, op.input); err != nil {
+
+	if out, err = client.GetItem(ctx, op.input); err != nil {
 		return
 	}
+
 	for _, cb := range op.options.OutputCallbacks {
 		if err = cb.GetItemOutputCallback(ctx, out); err != nil {
 			return
@@ -148,6 +148,7 @@ func NewGetItemBuilder(input *ddb.GetItemInput) *GetItemBuilder {
 	if input != nil {
 		return &GetItemBuilder{GetItemInput: input}
 	}
+	
 	return &GetItemBuilder{GetItemInput: NewGetItemInput(nil, nil)}
 }
 
