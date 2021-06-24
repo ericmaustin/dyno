@@ -15,8 +15,6 @@ import (
 	"github.com/ericmaustin/dyno/condition"
 )
 
-//TODO: update this to sdk-v2
-
 const (
 	// LeaseFieldName is the name of the fields that specifies the lock lease duration for a lock
 	LeaseFieldName = "dynoLockLeaseDuration"
@@ -118,7 +116,8 @@ func (dl *Lock) Acquire() (err error) {
 
 			updateOutput, err := dl.DB.UpdateItem(ctx, updateInput)
 			if err != nil {
-				if dyno.IsAwsErrorCode(err, dynamodb.ErrCodeConditionalCheckFailedException) {
+				var conditionalCheckError *types.ConditionalCheckFailedException
+				if errors.As(err, &conditionalCheckError) {
 					// conditional check failed... another process/routine holds the lock
 					continue // keep looping
 				} else {
@@ -138,7 +137,7 @@ func (dl *Lock) Acquire() (err error) {
 			//  update went through
 			if _, ok := updateOutput.Attributes[VersionFieldName]; ok {
 				// double check against expected ID string
-				if *updateOutput.Attributes[VersionFieldName].S == sessionID {
+				if updateOutput.Attributes[VersionFieldName].(*types.AttributeValueMemberS).Value == sessionID {
 					// if sessionID is the current session id then we've got the lock
 					// start the heartbeat check
 					dl.HasLock = true
@@ -211,10 +210,10 @@ func (dl *Lock) StartHeartbeat() {
 }
 
 func (dl *Lock) getUpdateBuilder() *dyno.UpdateItemBuilder {
-	return dyno.NewUpdateItemBuilder().
+	return dyno.NewUpdateItemBuilder(nil).
 		SetTableName(dl.TableName).
 		SetKey(dl.Key).
-		SetReturnValues(dynamodb.ReturnValueUpdatedNew)
+		SetReturnValues(types.ReturnValueUpdatedNew)
 }
 
 // renew renews the lease for this lock
@@ -263,13 +262,14 @@ func (dl *Lock) clear() {
 	updateInput, err := dyno.NewUpdateItemBuilder(nil).
 		SetTableName(dl.TableName).
 		SetKey(dl.Key).
-		SetReturnValues(dynamodb.ReturnValueUpdatedNew).
+		SetReturnValues(types.ReturnValueUpdatedNew).
 		Set(ExpiresFieldName, 0).
 		AddCondition(condition.Equal(VersionFieldName, *dl.SessionID)).
 		Build()
 
-	if _, err = dl.DB.UpdateItem(updateInput).Await(); err != nil {
-		if !dyno.IsAwsErrorCode(err, dynamodb.ErrCodeConditionalCheckFailedException) {
+	if _, err = dl.DB.UpdateItem(context.Background(), updateInput); err != nil {
+		var conditionalCheckErr *types.ConditionalCheckFailedException
+		if !errors.As(err, &conditionalCheckErr) {
 			panic(ErrCodeConditionalCheckFailedException)
 		}
 	}
