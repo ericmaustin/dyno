@@ -44,11 +44,11 @@ func (cb QueryInputCallbackFunc) QueryInputCallback(ctx context.Context, input *
 	return cb(ctx, input)
 }
 
-// QueryOutputCallbackFunc is QueryOutputCallback function
-type QueryOutputCallbackFunc func(context.Context, *ddb.QueryOutput) error
+// QueryOutputCallbackF is QueryOutputCallback function
+type QueryOutputCallbackF func(context.Context, *ddb.QueryOutput) error
 
 // QueryOutputCallback implements the QueryOutputCallback interface
-func (cb QueryOutputCallbackFunc) QueryOutputCallback(ctx context.Context, input *ddb.QueryOutput) error {
+func (cb QueryOutputCallbackF) QueryOutputCallback(ctx context.Context, input *ddb.QueryOutput) error {
 	return cb(ctx, input)
 }
 
