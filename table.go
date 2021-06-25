@@ -1,7 +1,6 @@
 package dyno
 
 import (
-	"context"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -93,27 +92,19 @@ func (t *Table) DescribeTableInput() *ddb.DescribeTableInput {
 	return NewDescribeTableInput(t.TableName)
 }
 
-// WaitUntilExists returns an error that will be nil if table exists
-func (t *Table) WaitUntilExists(ctx context.Context, client *ddb.Client) error {
-	return NewTableExistsWaiter(NewDescribeTableInput(t.TableName)).Invoke(ctx, client).Await()
+// TableExistsWaiter returns a new TableExistsWaiter for this table
+func (t *Table) TableExistsWaiter() *TableExistsWaiter {
+	return NewTableExistsWaiter(NewDescribeTableInput(t.TableName))
 }
 
-// WaitUntilNotExists returns  an error that will be nil if table no longer exists
-func (t *Table) WaitUntilNotExists(ctx context.Context, client *ddb.Client) error {
-	return NewTableNotExistsWaiter(NewDescribeTableInput(t.TableName)).Invoke(ctx, client).Await()
+// TableNotExistsWaiter returns a new TableExistsWaiter for this table
+func (t *Table) TableNotExistsWaiter() *TableNotExistsWaiter {
+	return NewTableNotExistsWaiter(NewDescribeTableInput(t.TableName))
 }
 
 // UpdateWithRemote creates a new NewTableExistsWaiter with a callback that updates the table from the remote description
 func (t *Table) UpdateWithRemote() *TableExistsWaiter {
-	cb := DescribeTableOutputCallbackF(func(ctx context.Context, output *ddb.DescribeTableOutput) error {
-		if output.Table != nil {
-			t.UpdateWithTableDescription(output.Table)
-		}
-
-		return nil
-	})
-
-	return NewTableExistsWaiter(NewDescribeTableInput(t.TableName), TableExistsWaiterWithOutputCallback(cb))
+	return NewTableExistsWaiter(NewDescribeTableInput(t.TableName), t.TableExistsWaiterMiddleWare())
 }
 
 // setTableDescription sets the table description to the input value
@@ -496,18 +487,36 @@ func (t *Table) Create() (*CreateTable, error) {
 		return nil, err
 	}
 
-	return NewCreateTable(dynamodbInput, CreateTableWithOutputCallback(t)), nil
+	return NewCreateTable(dynamodbInput, t.CreateTableMiddleWare()), nil
 }
 
-// CreateTableOutputCallback implements the CreateTableOutputCallback interface
-func (t *Table) CreateTableOutputCallback(_ context.Context, output *ddb.CreateTableOutput) error {
-	if output.TableDescription != nil {
-		t.mu.Lock()
-		t.setTableDescription(output.TableDescription)
-		t.mu.Unlock()
+// CreateTableMiddleWare returns a CreateTableMiddleWare that will update this table from the create table
+// operation output
+func (t *Table) CreateTableMiddleWare() CreateTableMiddleWare {
+	return func(next CreateTableHandler) CreateTableHandler {
+		return CreateTableHandlerFunc(func(ctx *CreateTableContext, promise *CreateTablePromise) {
+			next.HandleCreateTable(ctx, promise)
+			out, rErr := promise.GetResponse()
+			if rErr == nil {
+				t.UpdateWithTableDescription(out.TableDescription)
+			}
+		})
 	}
+}
 
-	return nil
+
+// TableExistsWaiterMiddleWare returns a TableExistsWaiterMiddleWare that will update this table from the describe table
+// operation output
+func (t *Table) TableExistsWaiterMiddleWare() TableExistsWaiterMiddleWare {
+	return func(next TableExistsWaiterHandler) TableExistsWaiterHandler {
+		return TableExistsWaiterHandlerFunc(func(ctx *DescribeTableContext, promise *TableExistsWaiterPromise) {
+			next.HandleTableExistsWaiter(ctx, promise)
+			out, rErr := promise.GetResponse()
+			if rErr == nil {
+				t.UpdateWithTableDescription(out.Table)
+			}
+		})
+	}
 }
 
 // BackupInput creates a CreateBackupInput for this table with a given backup name

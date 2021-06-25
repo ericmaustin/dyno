@@ -35,6 +35,17 @@ type CreateTablePromise struct {
 	*Promise
 }
 
+// GetResponse returns the GetResponse output and error
+// if Output has not been set yet nil is returned
+func (p *CreateTablePromise) GetResponse() (*ddb.CreateTableOutput, error) {
+	out, err := p.Promise.GetResponse()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.CreateTableOutput), err
+}
+
 // Await waits for the CreateTablePromise to be fulfilled and then returns a CreateTableOutput and error
 func (p *CreateTablePromise) Await() (*ddb.CreateTableOutput, error) {
 	out, err := p.Promise.Await()
@@ -64,7 +75,7 @@ func (h CreateTableHandlerFunc) HandleCreateTable(ctx *CreateTableContext, promi
 }
 
 // CreateTableMiddleWare is a middleware function use for wrapping CreateTableHandler requests
-type CreateTableMiddleWare func(handler CreateTableHandler) CreateTableHandler
+type CreateTableMiddleWare func(next CreateTableHandler) CreateTableHandler
 
 // CreateTableFinalHandler returns the final CreateTableHandler that executes a dynamodb CreateTable operation
 func CreateTableFinalHandler() CreateTableHandler {

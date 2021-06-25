@@ -122,11 +122,14 @@ func NewExponentialSleeper(sleepDuration time.Duration, alpha float64) *Sleeper 
 
 // NewLinearSleeper returns a sleeper that will sleep with an linearly increasing interval
 // useful for linear backoff
-func NewLinearSleeper(sleepDuration time.Duration, alpha int) *Sleeper {
+func NewLinearSleeper(sleepDuration time.Duration, alpha int64) *Sleeper {
 	return &Sleeper{
 		sleepDuration: sleepDuration,
 		durationFunc: func(sleepDuration time.Duration, count int) time.Duration {
-			return time.Duration(alpha*count) * sleepDuration
+			if count == 0 {
+				return sleepDuration
+			}
+			return time.Duration(count << alpha) * sleepDuration
 		},
 	}
 }

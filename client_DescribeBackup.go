@@ -96,7 +96,6 @@ func (op *DescribeBackup) Invoke(ctx context.Context, client *ddb.Client) *Descr
 
 // DynoInvoke implements the Operation interface
 func (op *DescribeBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
-
 	requestCtx := &DescribeBackupContext{
 		Context: ctx,
 		client:  client,
