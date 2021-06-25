@@ -5,135 +5,115 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
-// DeleteBackup executes a scan api call with a DeleteBackupInput
-func (c *Client) DeleteBackup(ctx context.Context, input *ddb.DeleteBackupInput, optFns ...func(*DeleteBackupOptions)) (*ddb.DeleteBackupOutput, error) {
-	op := NewDeleteBackup(input, optFns...)
-	op.DynoInvoke(ctx, c.ddb)
-
-	return op.Await()
+// DeleteBackup executes DeleteBackup operation and returns a DeleteBackupPromise
+func (c *Client) DeleteBackup(ctx context.Context, input *ddb.DeleteBackupInput, mw ...DeleteBackupMiddleWare) *DeleteBackupPromise {
+	return NewDeleteBackup(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// DeleteBackup executes a DeleteBackup operation with a DeleteBackupInput in this pool and returns the DeleteBackup for processing
-func (p *Pool) DeleteBackup(input *ddb.DeleteBackupInput, optFns ...func(*DeleteBackupOptions)) *DeleteBackup {
-	op := NewDeleteBackup(input, optFns...)
+// DeleteBackup executes a DeleteBackup operation with a DeleteBackupInput in this pool and returns the DeleteBackupPromise
+func (p *Pool) DeleteBackup(input *ddb.DeleteBackupInput, mw ...DeleteBackupMiddleWare) *DeleteBackupPromise {
+	op := NewDeleteBackup(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.SetResponse(nil, err)
+		op.promise.SetResponse(nil, err)
 	}
 
-	return op
+	return op.promise
 }
 
-// DeleteBackupInputCallback is a callback that is called on a given DeleteBackupInput before a DeleteBackup operation api call executes
-type DeleteBackupInputCallback interface {
-	DeleteBackupInputCallback(context.Context, *ddb.DeleteBackupInput) (*ddb.DeleteBackupOutput, error)
+// DeleteBackupContext represents an exhaustive DeleteBackup operation request context
+type DeleteBackupContext struct {
+	context.Context
+	input  *ddb.DeleteBackupInput
+	client *ddb.Client
 }
 
-// DeleteBackupOutputCallback is a callback that is called on a given DeleteBackupOutput after a DeleteBackup operation api call executes
-type DeleteBackupOutputCallback interface {
-	DeleteBackupOutputCallback(context.Context, *ddb.DeleteBackupOutput) error
+// DeleteBackupPromise represents a promise for the DeleteBackup
+type DeleteBackupPromise struct {
+	*Promise
 }
 
-// DeleteBackupInputCallbackFunc is DeleteBackupOutputCallback function
-type DeleteBackupInputCallbackFunc func(context.Context, *ddb.DeleteBackupInput) (*ddb.DeleteBackupOutput, error)
-
-// DeleteBackupInputCallback implements the DeleteBackupOutputCallback interface
-func (cb DeleteBackupInputCallbackFunc) DeleteBackupInputCallback(ctx context.Context, input *ddb.DeleteBackupInput) (*ddb.DeleteBackupOutput, error) {
-	return cb(ctx, input)
-}
-
-// DeleteBackupOutputCallbackFunc is DeleteBackupOutputCallback function
-type DeleteBackupOutputCallbackFunc func(context.Context, *ddb.DeleteBackupOutput) error
-
-// DeleteBackupOutputCallback implements the DeleteBackupOutputCallback interface
-func (cb DeleteBackupOutputCallbackFunc) DeleteBackupOutputCallback(ctx context.Context, input *ddb.DeleteBackupOutput) error {
-	return cb(ctx, input)
-}
-
-// DeleteBackupOptions represents options passed to the DeleteBackup operation
-type DeleteBackupOptions struct {
-	// InputCallbacks are called before the DeleteBackup dynamodb api operation with the dynamodb.DeleteBackupInput
-	InputCallbacks []DeleteBackupInputCallback
-	// OutputCallbacks are called after the DeleteBackup dynamodb api operation with the dynamodb.DeleteBackupOutput
-	OutputCallbacks []DeleteBackupOutputCallback
-}
-
-// DeleteBackupWithInputCallback adds a DeleteBackupInputCallbackFunc to the InputCallbacks
-func DeleteBackupWithInputCallback(cb DeleteBackupInputCallbackFunc) func(*DeleteBackupOptions) {
-	return func(opt *DeleteBackupOptions) {
-		opt.InputCallbacks = append(opt.InputCallbacks, cb)
+// Await waits for the DeleteBackupPromise to be fulfilled and then returns a DeleteBackupOutput and error
+func (p *DeleteBackupPromise) Await() (*ddb.DeleteBackupOutput, error) {
+	out, err := p.Promise.Await()
+	if out == nil {
+		return nil, err
 	}
+
+	return out.(*ddb.DeleteBackupOutput), err
 }
 
-// DeleteBackupWithOutputCallback adds a DeleteBackupOutputCallback to the OutputCallbacks
-func DeleteBackupWithOutputCallback(cb DeleteBackupOutputCallback) func(*DeleteBackupOptions) {
-	return func(opt *DeleteBackupOptions) {
-		opt.OutputCallbacks = append(opt.OutputCallbacks, cb)
-	}
+// newDeleteBackupPromise returns a new DeleteBackupPromise
+func newDeleteBackupPromise() *DeleteBackupPromise {
+	return &DeleteBackupPromise{NewPromise()}
+}
+
+// DeleteBackupHandler represents a handler for DeleteBackup requests
+type DeleteBackupHandler interface {
+	HandleDeleteBackup(ctx *DeleteBackupContext, promise *DeleteBackupPromise)
+}
+
+// DeleteBackupHandlerFunc is a DeleteBackupHandler function
+type DeleteBackupHandlerFunc func(ctx *DeleteBackupContext, promise *DeleteBackupPromise)
+
+// HandleDeleteBackup implements DeleteBackupHandler
+func (h DeleteBackupHandlerFunc) HandleDeleteBackup(ctx *DeleteBackupContext, promise *DeleteBackupPromise) {
+	h(ctx, promise)
+}
+
+// DeleteBackupMiddleWare is a middleware function use for wrapping DeleteBackupHandler requests
+type DeleteBackupMiddleWare func(handler DeleteBackupHandler) DeleteBackupHandler
+
+// DeleteBackupFinalHandler returns the final DeleteBackupHandler that executes a dynamodb DeleteBackup operation
+func DeleteBackupFinalHandler() DeleteBackupHandler {
+	return DeleteBackupHandlerFunc(func(ctx *DeleteBackupContext, promise *DeleteBackupPromise) {
+		promise.SetResponse(ctx.client.DeleteBackup(ctx, ctx.input))
+	})
 }
 
 // DeleteBackup represents a DeleteBackup operation
 type DeleteBackup struct {
-	*Promise
-	input   *ddb.DeleteBackupInput
-	options DeleteBackupOptions
+	promise     *DeleteBackupPromise
+	input       *ddb.DeleteBackupInput
+	middleWares []DeleteBackupMiddleWare
 }
 
-// NewDeleteBackup creates a new DeleteBackup operation on the given client with a given DeleteBackupInput and options
-func NewDeleteBackup(input *ddb.DeleteBackupInput, optFns ...func(*DeleteBackupOptions)) *DeleteBackup {
-	opts := DeleteBackupOptions{}
-
-	for _, opt := range optFns {
-		opt(&opts)
-	}
-
+// NewDeleteBackup creates a new DeleteBackup
+func NewDeleteBackup(input *ddb.DeleteBackupInput, mws ...DeleteBackupMiddleWare) *DeleteBackup {
 	return &DeleteBackup{
-		Promise: NewPromise(),
-		input:   input,
-		options: opts,
+		input:       input,
+		middleWares: mws,
+		promise:     newDeleteBackupPromise(),
 	}
 }
 
-// Await waits for the Operation to be complete and then returns a DeleteBackupOutput and error
-func (op *DeleteBackup) Await() (*ddb.DeleteBackupOutput, error) {
-	out, err := op.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-	
-	return out.(*ddb.DeleteBackupOutput), err
-}
-
-// Invoke invokes the DeleteBackup operation
-func (op *DeleteBackup) Invoke(ctx context.Context, client *ddb.Client) *DeleteBackup {
+// Invoke invokes the DeleteBackup operation and returns a DeleteBackupPromise
+func (op *DeleteBackup) Invoke(ctx context.Context, client *ddb.Client) *DeleteBackupPromise {
 	go op.DynoInvoke(ctx, client)
-	return op
+
+	return op.promise
 }
 
 // DynoInvoke implements the Operation interface
 func (op *DeleteBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		out *ddb.DeleteBackupOutput
-		err error
-	)
 
-	defer func() { op.SetResponse(out, err) }()
+	requestCtx := &DeleteBackupContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
 
-	for _, cb := range op.options.InputCallbacks {
-		if out, err = cb.DeleteBackupInputCallback(ctx, op.input); out != nil || err != nil {
-			return
+	h := DeleteBackupFinalHandler()
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i](h)
 		}
 	}
 
-	if out, err = client.DeleteBackup(ctx, op.input); err != nil {
-		return
-	}
-
-	for _, cb := range op.options.OutputCallbacks {
-		if err = cb.DeleteBackupOutputCallback(ctx, out); err != nil {
-			return
-		}
-	}
+	h.HandleDeleteBackup(requestCtx, op.promise)
 }
 
 // NewDeleteBackupInput creates a DeleteBackupInput with a given table name and key
