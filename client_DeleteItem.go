@@ -10,135 +10,115 @@ import (
 )
 
 
-// DeleteItem executes a scan api call with a DeleteItemInput
-func (c *Client) DeleteItem(ctx context.Context, input *ddb.DeleteItemInput, optFns ...func(*DeleteItemOptions)) (*ddb.DeleteItemOutput, error) {
-	op := NewDeleteItem(input, optFns...)
-	op.DynoInvoke(ctx, c.ddb)
-	
-	return op.Await()
+// DeleteItem executes DeleteItem operation and returns a DeleteItemPromise
+func (c *Client) DeleteItem(ctx context.Context, input *ddb.DeleteItemInput, mw ...DeleteItemMiddleWare) *DeleteItemPromise {
+	return NewDeleteItem(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// DeleteItem executes a DeleteItem operation with a DeleteItemInput in this pool and returns the DeleteItem for processing
-func (p *Pool) DeleteItem(input *ddb.DeleteItemInput, optFns ...func(*DeleteItemOptions)) *DeleteItem {
-	op := NewDeleteItem(input, optFns...)
+// DeleteItem executes a DeleteItem operation with a DeleteItemInput in this pool and returns the DeleteItemPromise
+func (p *Pool) DeleteItem(input *ddb.DeleteItemInput, mw ...DeleteItemMiddleWare) *DeleteItemPromise {
+	op := NewDeleteItem(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.SetResponse(nil, err)
+		op.promise.SetResponse(nil, err)
 	}
 
-	return op
+	return op.promise
 }
 
-// DeleteItemInputCallback is a callback that is called on a given DeleteItemInput before a DeleteItem operation api call executes
-type DeleteItemInputCallback interface {
-	DeleteItemInputCallback(context.Context, *ddb.DeleteItemInput) (*ddb.DeleteItemOutput, error)
+// DeleteItemContext represents an exhaustive DeleteItem operation request context
+type DeleteItemContext struct {
+	context.Context
+	input  *ddb.DeleteItemInput
+	client *ddb.Client
 }
 
-// DeleteItemOutputCallback is a callback that is called on a given DeleteItemOutput after a DeleteItem operation api call executes
-type DeleteItemOutputCallback interface {
-	DeleteItemOutputCallback(context.Context, *ddb.DeleteItemOutput) error
+// DeleteItemPromise represents a promise for the DeleteItem
+type DeleteItemPromise struct {
+	*Promise
 }
 
-// DeleteItemInputCallbackFunc is DeleteItemOutputCallback function
-type DeleteItemInputCallbackFunc func(context.Context, *ddb.DeleteItemInput) (*ddb.DeleteItemOutput, error)
-
-// DeleteItemInputCallback implements the DeleteItemOutputCallback interface
-func (cb DeleteItemInputCallbackFunc) DeleteItemInputCallback(ctx context.Context, input *ddb.DeleteItemInput) (*ddb.DeleteItemOutput, error) {
-	return cb(ctx, input)
-}
-
-// DeleteItemOutputCallbackFunc is DeleteItemOutputCallback function
-type DeleteItemOutputCallbackFunc func(context.Context, *ddb.DeleteItemOutput) error
-
-// DeleteItemOutputCallback implements the DeleteItemOutputCallback interface
-func (cb DeleteItemOutputCallbackFunc) DeleteItemOutputCallback(ctx context.Context, input *ddb.DeleteItemOutput) error {
-	return cb(ctx, input)
-}
-
-// DeleteItemOptions represents options passed to the DeleteItem operation
-type DeleteItemOptions struct {
-	// InputCallbacks are called before the DeleteItem dynamodb api operation with the dynamodb.DeleteItemInput
-	InputCallbacks []DeleteItemInputCallback
-	// OutputCallbacks are called after the DeleteItem dynamodb api operation with the dynamodb.DeleteItemOutput
-	OutputCallbacks []DeleteItemOutputCallback
-}
-
-// DeleteItemWithInputCallback adds a DeleteItemInputCallbackFunc to the InputCallbacks
-func DeleteItemWithInputCallback(cb DeleteItemInputCallbackFunc) func(*DeleteItemOptions) {
-	return func(opt *DeleteItemOptions) {
-		opt.InputCallbacks = append(opt.InputCallbacks, cb)
+// Await waits for the DeleteItemPromise to be fulfilled and then returns a DeleteItemOutput and error
+func (p *DeleteItemPromise) Await() (*ddb.DeleteItemOutput, error) {
+	out, err := p.Promise.Await()
+	if out == nil {
+		return nil, err
 	}
+
+	return out.(*ddb.DeleteItemOutput), err
 }
 
-// DeleteItemWithOutputCallback adds a DeleteItemOutputCallback to the OutputCallbacks
-func DeleteItemWithOutputCallback(cb DeleteItemOutputCallback) func(*DeleteItemOptions) {
-	return func(opt *DeleteItemOptions) {
-		opt.OutputCallbacks = append(opt.OutputCallbacks, cb)
-	}
+// newDeleteItemPromise returns a new DeleteItemPromise
+func newDeleteItemPromise() *DeleteItemPromise {
+	return &DeleteItemPromise{NewPromise()}
+}
+
+// DeleteItemHandler represents a handler for DeleteItem requests
+type DeleteItemHandler interface {
+	HandleDeleteItem(ctx *DeleteItemContext, promise *DeleteItemPromise)
+}
+
+// DeleteItemHandlerFunc is a DeleteItemHandler function
+type DeleteItemHandlerFunc func(ctx *DeleteItemContext, promise *DeleteItemPromise)
+
+// HandleDeleteItem implements DeleteItemHandler
+func (h DeleteItemHandlerFunc) HandleDeleteItem(ctx *DeleteItemContext, promise *DeleteItemPromise) {
+	h(ctx, promise)
+}
+
+// DeleteItemMiddleWare is a middleware function use for wrapping DeleteItemHandler requests
+type DeleteItemMiddleWare func(handler DeleteItemHandler) DeleteItemHandler
+
+// DeleteItemFinalHandler returns the final DeleteItemHandler that executes a dynamodb DeleteItem operation
+func DeleteItemFinalHandler() DeleteItemHandler {
+	return DeleteItemHandlerFunc(func(ctx *DeleteItemContext, promise *DeleteItemPromise) {
+		promise.SetResponse(ctx.client.DeleteItem(ctx, ctx.input))
+	})
 }
 
 // DeleteItem represents a DeleteItem operation
 type DeleteItem struct {
-	*Promise
-	input   *ddb.DeleteItemInput
-	options DeleteItemOptions
+	promise     *DeleteItemPromise
+	input       *ddb.DeleteItemInput
+	middleWares []DeleteItemMiddleWare
 }
 
-// NewDeleteItem creates a new DeleteItem operation on the given client with a given DeleteItemInput and options
-func NewDeleteItem(input *ddb.DeleteItemInput, optFns ...func(*DeleteItemOptions)) *DeleteItem {
-	opts := DeleteItemOptions{}
-
-	for _, opt := range optFns {
-		opt(&opts)
-	}
-
+// NewDeleteItem creates a new DeleteItem
+func NewDeleteItem(input *ddb.DeleteItemInput, mws ...DeleteItemMiddleWare) *DeleteItem {
 	return &DeleteItem{
-		Promise: NewPromise(),
-		input:   input,
-		options: opts,
+		input:       input,
+		middleWares: mws,
+		promise:     newDeleteItemPromise(),
 	}
 }
 
-// Await waits for the Operation to be complete and then returns a DeleteItemOutput and error
-func (op *DeleteItem) Await() (*ddb.DeleteItemOutput, error) {
-	out, err := op.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-	
-	return out.(*ddb.DeleteItemOutput), err
-}
-
-// Invoke invokes the DeleteItem operation
-func (op *DeleteItem) Invoke(ctx context.Context, client *ddb.Client) *DeleteItem {
+// Invoke invokes the DeleteItem operation and returns a DeleteItemPromise
+func (op *DeleteItem) Invoke(ctx context.Context, client *ddb.Client) *DeleteItemPromise {
 	go op.DynoInvoke(ctx, client)
-	return op
+
+	return op.promise
 }
 
 // DynoInvoke implements the Operation interface
 func (op *DeleteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		out *ddb.DeleteItemOutput
-		err error
-	)
 
-	defer func() { op.SetResponse(out, err) }()
+	requestCtx := &DeleteItemContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
 
-	for _, cb := range op.options.InputCallbacks {
-		if out, err = cb.DeleteItemInputCallback(ctx, op.input); out != nil || err != nil {
-			return
+	h := DeleteItemFinalHandler()
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i](h)
 		}
 	}
 
-	if out, err = client.DeleteItem(ctx, op.input); err != nil {
-		return
-	}
-
-	for _, cb := range op.options.OutputCallbacks {
-		if err = cb.DeleteItemOutputCallback(ctx, out); err != nil {
-			return
-		}
-	}
+	h.HandleDeleteItem(requestCtx, op.promise)
 }
 
 // NewDeleteItemInput creates a DeleteItemInput with a given table name and key
