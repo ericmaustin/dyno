@@ -50,6 +50,17 @@ type BatchWriteItemPromise struct {
 	*Promise
 }
 
+// GetResponse returns the GetResponse output and error
+// if Output has not been set yet nil is returned
+func (p *BatchWriteItemPromise) GetResponse() (*ddb.BatchWriteItemOutput, error) {
+	out, err := p.Promise.GetResponse()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.BatchWriteItemOutput), err
+}
+
 // Await waits for the BatchWriteItemPromise to be fulfilled and then returns a BatchWriteItemOutput and error
 func (p *BatchWriteItemPromise) Await() (*ddb.BatchWriteItemOutput, error) {
 	out, err := p.Promise.Await()
@@ -79,7 +90,7 @@ func (h BatchWriteItemHandlerFunc) HandleBatchWriteItem(ctx *BatchWriteItemConte
 }
 
 // BatchWriteItemMiddleWare is a middleware function use for wrapping BatchWriteItemHandler requests
-type BatchWriteItemMiddleWare func(handler BatchWriteItemHandler) BatchWriteItemHandler
+type BatchWriteItemMiddleWare func(next BatchWriteItemHandler) BatchWriteItemHandler
 
 // BatchWriteItemFinalHandler returns the final BatchWriteItemHandler that executes a dynamodb BatchWriteItem operation
 func BatchWriteItemFinalHandler() BatchWriteItemHandler {
@@ -143,6 +154,17 @@ type BatchWriteItemAllContext struct {
 // BatchWriteItemAllPromise represents a promise for the BatchWriteItemAll
 type BatchWriteItemAllPromise struct {
 	*Promise
+}
+
+// GetResponse returns the GetResponse output and error
+// if Output has not been set yet nil is returned
+func (p *BatchWriteItemAllPromise) GetResponse() (*ddb.BatchWriteItemOutput, error) {
+	out, err := p.Promise.GetResponse()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.BatchWriteItemOutput), err
 }
 
 // Await waits for the BatchWriteItemAllPromise to be fulfilled and then returns a BatchWriteItemAllOutput and error
@@ -312,14 +334,20 @@ type BatchWriteItemBuilder struct {
 }
 
 // NewBatchWriteItemBuilder creates a new BatchWriteItemBuilder
-func NewBatchWriteItemBuilder() *BatchWriteItemBuilder {
-	return &BatchWriteItemBuilder{
+func NewBatchWriteItemBuilder(input *ddb.BatchWriteItemInput) *BatchWriteItemBuilder {
+	b := &BatchWriteItemBuilder{
 		BatchWriteItemInput: &ddb.BatchWriteItemInput{
 			RequestItems:                make(map[string][]ddbTypes.WriteRequest),
 			ReturnConsumedCapacity:      ddbTypes.ReturnConsumedCapacityNone,
 			ReturnItemCollectionMetrics: ddbTypes.ReturnItemCollectionMetricsNone,
 		},
 	}
+
+	if input != nil {
+		b.BatchWriteItemInput = input
+	}
+
+	return b
 }
 
 // SetRequestItems sets the RequestItems field's value.

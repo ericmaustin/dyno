@@ -37,7 +37,7 @@ func MarshalMaps(input interface{}) ([]map[string]types.AttributeValue, error) {
 // MustMarshalMaps marshals an input slice into a slice of attribute value maps
 // panics on error
 func MustMarshalMaps(input interface{}) []map[string]types.AttributeValue {
-	records := make([]map[string]types.AttributeValue, 0)
+	var records []map[string]types.AttributeValue
 	if err := AppendItems(&records, input); err != nil {
 		panic(err)
 	}
@@ -57,8 +57,7 @@ func AppendItems(items *[]map[string]types.AttributeValue, input interface{}) er
 	if rv.Type().Elem().Implements(mapMarshallerReflectType) {
 		for i := 0; i < rv.Len(); i++ {
 			avMap := make(map[string]types.AttributeValue)
-			err := rv.Index(i).Interface().(MapMarshaler).MarshalAttributeValueMap(avMap)
-			if err != nil {
+			if err := rv.Index(i).Interface().(MapMarshaler).MarshalAttributeValueMap(avMap); err != nil {
 				return err
 			}
 
@@ -118,7 +117,13 @@ func marshalValueToRecord(rv reflect.Value) (map[string]types.AttributeValue, er
 }
 
 func addValuesToRecord(item map[string]types.AttributeValue, rv reflect.Value) error {
+	var (
+		err      error
+		iFaceMap map[string]interface{}
+	)
+
 	rv = Indirect(rv, false)
+
 	switch rv.Kind() {
 	case reflect.Struct:
 		if err := addStructToRecord(rv, item, "", ""); err != nil {
@@ -132,12 +137,12 @@ func addValuesToRecord(item map[string]types.AttributeValue, rv reflect.Value) e
 			}
 			return nil
 		}
-		iFaceMap, err := mapToIfaceMap(rv, "", "")
-		if err != nil {
+
+		if iFaceMap, err = mapToIfaceMap(rv, "", ""); err != nil {
 			return err
 		}
 
-		if err := addMapToAv(iFaceMap, item); err != nil {
+		if err = addMapToAv(iFaceMap, item); err != nil {
 			return err
 		}
 	default:
@@ -149,10 +154,10 @@ func addValuesToRecord(item map[string]types.AttributeValue, rv reflect.Value) e
 
 func structToRecord(input interface{}) (map[string]types.AttributeValue, error) {
 	av := make(map[string]types.AttributeValue)
-	err := addStructToRecord(Indirect(reflect.ValueOf(input), false), av, "", "")
-	if err != nil {
+	if err := addStructToRecord(Indirect(reflect.ValueOf(input), false), av, "", ""); err != nil {
 		return nil, err
 	}
+
 	return av, nil
 }
 

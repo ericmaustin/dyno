@@ -9,8 +9,9 @@ import (
 func TestCreateNewTableDeleteTable(t *testing.T) {
 	client := CreateTestClient()
 	tbl := CreateTestTable(client)
+
 	// delete the table
-	_, err := client.DeleteTable(context.Background(), tbl.DeleteInput())
+	_, err := client.DeleteTable(context.Background(), tbl.DeleteInput()).Await()
 	if err != nil {
 		panic(err)
 	}

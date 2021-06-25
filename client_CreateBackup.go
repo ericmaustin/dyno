@@ -33,6 +33,17 @@ type CreateBackupPromise struct {
 	*Promise
 }
 
+// GetResponse returns the GetResponse output and error
+// if Output has not been set yet nil is returned
+func (p *CreateBackupPromise) GetResponse() (*ddb.CreateBackupOutput, error) {
+	out, err := p.Promise.GetResponse()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.CreateBackupOutput), err
+}
+
 // Await waits for the CreateBackupPromise to be fulfilled and then returns a CreateBackupOutput and error
 func (p *CreateBackupPromise) Await() (*ddb.CreateBackupOutput, error) {
 	out, err := p.Promise.Await()

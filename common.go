@@ -20,22 +20,30 @@ func CopyAttributeValue(av types.AttributeValue) types.AttributeValue {
 	case *types.AttributeValueMemberB:
 		newB := make([]byte, len(v.Value))
 		copy(newB, v.Value)
+
 		return &types.AttributeValueMemberB{Value: newB}
+
 	case *types.AttributeValueMemberSS:
 		newSS := make([]string, len(v.Value))
 		copy(newSS, v.Value)
+
 		return &types.AttributeValueMemberSS{Value: newSS}
+
 	case *types.AttributeValueMemberNS:
 		newNS := make([]string, len(v.Value))
 		copy(newNS, v.Value)
+
 		return &types.AttributeValueMemberNS{Value: newNS}
+
 	case *types.AttributeValueMemberBS:
 		newBS := make([][]byte, len(v.Value))
 		for i, b := range v.Value {
 			newBS[i] = make([]byte, len(b))
 			copy(newBS[i], b)
 		}
+
 		return &types.AttributeValueMemberBS{Value: newBS}
+
 	case *types.AttributeValueMemberM:
 		return &types.AttributeValueMemberM{Value: CopyAttributeValueMap(v.Value)}
 	case *types.AttributeValueMemberL:
@@ -43,7 +51,9 @@ func CopyAttributeValue(av types.AttributeValue) types.AttributeValue {
 		for i, _v := range v.Value {
 			l[i] = CopyAttributeValue(_v)
 		}
+
 		return &types.AttributeValueMemberL{Value: l}
+
 	case *types.AttributeValueMemberNULL:
 		return &types.AttributeValueMemberNULL{Value: v.Value}
 	}

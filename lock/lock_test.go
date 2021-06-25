@@ -33,14 +33,13 @@ func TestLock(t *testing.T) {
 		panic(err)
 	}
 
-	_, err = op.Invoke(context.Background(), client.DynamoDBClient()).Await()
+	_, err = op.Invoke(context.Background(), client.DynamoDB()).Await()
 	if err != nil {
 		panic(err)
 	}
 
-
 	defer func() {
-		if err := tbl.Delete().Invoke(context.Background(), client.DynamoDBClient()); err != nil {
+		if err := tbl.Delete().Invoke(context.Background(), client.DynamoDB()); err != nil {
 			panic(err)
 		}
 	}()
@@ -78,7 +77,6 @@ func TestLock(t *testing.T) {
 		panic(err)
 	}
 
-
 	cb := dyno.QueryOutputCallbackF(func(ctx context.Context, output *dynamodb.QueryOutput) error {
 
 		if len(output.Items) < 0 {
@@ -95,7 +93,6 @@ func TestLock(t *testing.T) {
 
 		return nil
 	})
-
 
 	queryOutput, err := client.Query(context.Background(), queryInput, dyno.QueryWithOutputCallback(cb))
 	assert.NoError(t, err)

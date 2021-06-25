@@ -142,7 +142,9 @@ func UnmarshalBool(av ddb.AttributeValue, v *bool) error {
 	if !ok {
 		return errors.New("cannot decode AttributeValue to bool")
 	}
+
 	*v = bv.Value
+
 	return nil
 }
 
@@ -179,7 +181,9 @@ func UnmarshalBytes(av ddb.AttributeValue, v *[]byte) error {
 	if !ok {
 		return errors.New("cannot decode AttributeValue to bytes")
 	}
+
 	*v = bv.Value
+
 	return nil
 }
 

@@ -31,10 +31,11 @@ type Client struct {
 	ddb *ddb.Client
 }
 
-// DynamoDBClient gets a dynamo dynamodb.Client
-func (c *Client) DynamoDBClient() *ddb.Client {
+// DynamoDB gets a dynamo dynamodb.Client
+func (c *Client) DynamoDB() *ddb.Client {
 	return c.ddb
 }
+
 // Operation used to mark a type as being an Operation
 type Operation interface {
 	DynoInvoke(context.Context, *ddb.Client)
@@ -47,7 +48,6 @@ type OperationF func(context.Context, *ddb.Client)
 func (op OperationF) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	op(ctx, client)
 }
-
 
 //type RedisClient struct {
 //	*Client
@@ -70,13 +70,12 @@ func (op OperationF) DynoInvoke(ctx context.Context, client *ddb.Client) {
 //	}
 //}
 
-
 // RedisCallback wraps calls with redis and back-fills cache misses
 type RedisCallback struct {
-	rd *redis.Client
-	key string
+	rd        *redis.Client
+	key       string
 	clientKey string
-	ttl time.Duration
+	ttl       time.Duration
 }
 
 func (cb *RedisCallback) BatchGetItemInputCallback(ctx context.Context, input *ddb.BatchGetItemInput) (*ddb.BatchGetItemOutput, error) {

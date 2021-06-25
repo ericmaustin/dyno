@@ -32,7 +32,7 @@ func (suite *PoolTestSuite) SetupTest() {
 	suite.testItems = GetTestItems(10)
 	suite.testMarshalledItems = GetMarshalledTestRecords(10)
 
-	suite.pool = NewPool(context.Background(), suite.db.DynamoDBClient(), 3)
+	suite.pool = NewPool(context.Background(), suite.db.DynamoDB(), 3)
 }
 
 func getLongRunningExecutionFunc(id int, wg *sync.WaitGroup) OperationF {
@@ -48,11 +48,11 @@ func getLongRunningExecutionFunc(id int, wg *sync.WaitGroup) OperationF {
 func (suite *PoolTestSuite) TearDownSuite() {
 	fmt.Println("deleting test table", suite.table.Name())
 
-	if _, err := suite.table.Delete().Invoke(context.Background(), suite.db.DynamoDBClient()).Await(); err != nil {
+	if _, err := suite.table.Delete().Invoke(context.Background(), suite.db.DynamoDB()).Await(); err != nil {
 		panic(err)
 	}
 
-	if err := suite.db.WaitForTableNotExists(context.Background(), suite.table.DescribeTableInput()); err != nil {
+	if err := suite.db.TableNotExistsWaiter(context.Background(), suite.table.DescribeTableInput()).Await(); err != nil {
 		panic(err)
 	}
 

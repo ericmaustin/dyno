@@ -10,242 +10,272 @@ import (
 	"github.com/ericmaustin/dyno/encoding"
 )
 
-// Scan executes a Scan operation with a ScanInput
-func (c *Client) Scan(ctx context.Context, input *ddb.ScanInput, optFns ...func(*ScanOptions)) (*ddb.ScanOutput, error) {
-	opt := NewScan(input, optFns...)
-	opt.DynoInvoke(ctx, c.ddb)
-
-	return opt.Await()
+// Scan executes Scan operation and returns a ScanPromise
+func (c *Client) Scan(ctx context.Context, input *ddb.ScanInput, mw ...ScanMiddleWare) *ScanPromise {
+	return NewScan(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// Scan executes a Scan operation with a ScanInput in this pool and returns the Scan for processing
-func (p *Pool) Scan(input *ddb.ScanInput, optFns ...func(*ScanOptions)) *Scan {
-	op := NewScan(input, optFns...)
+// Scan executes a Scan operation with a ScanInput in this pool and returns the ScanPromise
+func (p *Pool) Scan(input *ddb.ScanInput, mw ...ScanMiddleWare) *ScanPromise {
+	op := NewScan(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.SetResponse(nil, err)
+		op.promise.SetResponse(nil, err)
 	}
 
-	return op
+	return op.promise
 }
 
-// ScanAll executes a Scan operation with a ScanInput
-func (c *Client) ScanAll(ctx context.Context, input *ddb.ScanInput, optFns ...func(*ScanOptions)) ([]*ddb.ScanOutput, error) {
-	opt := NewScanAll(input, optFns...)
-	opt.DynoInvoke(ctx, c.ddb)
-
-	return opt.Await()
+// ScanAll executes ScanAll operation and returns a ScanAllPromise
+func (c *Client) ScanAll(ctx context.Context, input *ddb.ScanInput, mw ...ScanAllMiddleWare) *ScanAllPromise {
+	return NewScanAll(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// ScanAll executes a ScanAll operation with a ScanInput in this pool and returns the ScanAll for processing
-func (p *Pool) ScanAll(input *ddb.ScanInput, optFns ...func(*ScanOptions)) *ScanAll {
-	op := NewScanAll(input, optFns...)
+// ScanAll executes a ScanAll operation with a ScanInput in this pool and returns the ScanAllPromise
+func (p *Pool) ScanAll(input *ddb.ScanInput, mw ...ScanAllMiddleWare) *ScanAllPromise {
+	op := NewScanAll(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.SetResponse(nil, err)
+		op.promise.SetResponse(nil, err)
 	}
 
-	return op
+	return op.promise
 }
 
-// ScanInputCallback is a callback that is called on a given ScanInput before a Scan operation api call executes
-type ScanInputCallback interface {
-	ScanInputCallback(context.Context, *ddb.ScanInput) (*ddb.ScanOutput, error)
+// ScanContext represents an exhaustive Scan operation request context
+type ScanContext struct {
+	context.Context
+	input  *ddb.ScanInput
+	client *ddb.Client
 }
 
-// ScanOutputCallback is a callback that is called on a given ScanOutput after a Scan operation api call executes
-type ScanOutputCallback interface {
-	ScanOutputCallback(context.Context, *ddb.ScanOutput) error
+// ScanPromise represents a promise for the Scan
+type ScanPromise struct {
+	*Promise
 }
 
-// ScanInputCallbackFunc is ScanOutputCallback function
-type ScanInputCallbackFunc func(context.Context, *ddb.ScanInput) (*ddb.ScanOutput, error)
-
-// ScanInputCallback implements the ScanOutputCallback interface
-func (cb ScanInputCallbackFunc) ScanInputCallback(ctx context.Context, input *ddb.ScanInput) (*ddb.ScanOutput, error) {
-	return cb(ctx, input)
-}
-
-// ScanOutputCallbackF is ScanOutputCallback function
-type ScanOutputCallbackF func(context.Context, *ddb.ScanOutput) error
-
-// ScanOutputCallback implements the ScanOutputCallback interface
-func (cb ScanOutputCallbackF) ScanOutputCallback(ctx context.Context, input *ddb.ScanOutput) error {
-	return cb(ctx, input)
-}
-
-// ScanOptions represents options passed to the Scan operation
-type ScanOptions struct {
-	// InputCallbacks are called before the Scan dynamodb api operation with the dynamodb.ScanInput
-	InputCallbacks []ScanInputCallback
-	// OutputCallbacks are called after the Scan dynamodb api operation with the dynamodb.ScanOutput
-	OutputCallbacks []ScanOutputCallback
-}
-
-// ScanWithInputCallback adds a ScanInputCallbackFunc to the InputCallbacks
-func ScanWithInputCallback(cb ScanInputCallbackFunc) func(*ScanOptions) {
-	return func(opt *ScanOptions) {
-		opt.InputCallbacks = append(opt.InputCallbacks, cb)
+// GetResponse returns the GetResponse output and error
+// if Output has not been set yet nil is returned
+func (p *ScanPromise) GetResponse() (*ddb.ScanOutput, error) {
+	out, err := p.Promise.GetResponse()
+	if out == nil {
+		return nil, err
 	}
+
+	return out.(*ddb.ScanOutput), err
 }
 
-// ScanWithOutputCallback adds a ScanOutputCallback to the OutputCallbacks
-func ScanWithOutputCallback(cb ScanOutputCallback) func(*ScanOptions) {
-	return func(opt *ScanOptions) {
-		opt.OutputCallbacks = append(opt.OutputCallbacks, cb)
+// Await waits for the ScanPromise to be fulfilled and then returns a ScanOutput and error
+func (p *ScanPromise) Await() (*ddb.ScanOutput, error) {
+	out, err := p.Promise.Await()
+	if out == nil {
+		return nil, err
 	}
+
+	return out.(*ddb.ScanOutput), err
+}
+
+// newScanPromise returns a new ScanPromise
+func newScanPromise() *ScanPromise {
+	return &ScanPromise{NewPromise()}
+}
+
+// ScanHandler represents a handler for Scan requests
+type ScanHandler interface {
+	HandleScan(ctx *ScanContext, promise *ScanPromise)
+}
+
+// ScanHandlerFunc is a ScanHandler function
+type ScanHandlerFunc func(ctx *ScanContext, promise *ScanPromise)
+
+// HandleScan implements ScanHandler
+func (h ScanHandlerFunc) HandleScan(ctx *ScanContext, promise *ScanPromise) {
+	h(ctx, promise)
+}
+
+// ScanMiddleWare is a middleware function use for wrapping ScanHandler requests
+type ScanMiddleWare func(handler ScanHandler) ScanHandler
+
+// ScanFinalHandler returns the final ScanHandler that executes a dynamodb Scan operation
+func ScanFinalHandler() ScanHandler {
+	return ScanHandlerFunc(func(ctx *ScanContext, promise *ScanPromise) {
+		promise.SetResponse(ctx.client.Scan(ctx, ctx.input))
+	})
 }
 
 // Scan represents a Scan operation
 type Scan struct {
-	*Promise
-	input   *ddb.ScanInput
-	options ScanOptions
+	promise     *ScanPromise
+	input       *ddb.ScanInput
+	middleWares []ScanMiddleWare
 }
 
-// NewScan creates a new Scan operation on the given client with a given ScanInput and options
-func NewScan(input *ddb.ScanInput, optFns ...func(*ScanOptions)) *Scan {
-	opts := ScanOptions{}
-	for _, opt := range optFns {
-		opt(&opts)
-	}
-
+// NewScan creates a new Scan
+func NewScan(input *ddb.ScanInput, mws ...ScanMiddleWare) *Scan {
 	return &Scan{
-		Promise: NewPromise(),
-		input:   input,
-		options: opts,
+		input:       input,
+		middleWares: mws,
+		promise:     newScanPromise(),
 	}
 }
 
-// Await waits for the Operation to be complete and then returns a ScanOutput and error
-func (op *Scan) Await() (*ddb.ScanOutput, error) {
-	out, err := op.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-	fmt.Println("Scan.Await()\n", MustYamlString(out))
-	return out.(*ddb.ScanOutput), err
-}
-
-// Invoke invokes the Scan operation
-func (op *Scan) Invoke(ctx context.Context, client *ddb.Client) *Scan {
+// Invoke invokes the Scan operation and returns a ScanPromise
+func (op *Scan) Invoke(ctx context.Context, client *ddb.Client) *ScanPromise {
 	go op.DynoInvoke(ctx, client)
-	return op
+
+	return op.promise
 }
 
 // DynoInvoke implements the Operation interface
 func (op *Scan) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		out *ddb.ScanOutput
-		err error
-	)
 
-	defer func() {
-		op.SetResponse(out, err)
-	}()
+	requestCtx := &ScanContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
 
-	for _, cb := range op.options.InputCallbacks {
-		if out, err = cb.ScanInputCallback(ctx, op.input); out != nil || err != nil {
-			return
+	h := ScanFinalHandler()
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i](h)
 		}
 	}
 
-	if out, err = client.Scan(ctx, op.input); err != nil {
-		return
-	}
-
-	for _, cb := range op.options.OutputCallbacks {
-		if err = cb.ScanOutputCallback(ctx, out); err != nil {
-			return
-		}
-	}
+	h.HandleScan(requestCtx, op.promise)
 }
 
-// ScanAll represents an exhaustive Scan operation
-type ScanAll struct {
+// ScanAllContext represents an exhaustive ScanAll operation request context
+type ScanAllContext struct {
+	context.Context
+	input  *ddb.ScanInput
+	client *ddb.Client
+}
+
+// ScanAllPromise represents a promise for the ScanAll
+type ScanAllPromise struct {
 	*Promise
-	input   *ddb.ScanInput
-	options ScanOptions
 }
 
-// NewScanAll creates a new ScanAll operation on the given client with a given ScanInput and options
-func NewScanAll(input *ddb.ScanInput, optFns ...func(*ScanOptions)) *ScanAll {
-	options := ScanOptions{}
-	for _, opt := range optFns {
-		opt(&options)
-	}
-	
-	return &ScanAll{
-		//client:  nil,
-		Promise: NewPromise(),
-		input:   input,
-		options: options,
-	}
-}
-
-// Await waits for the Operation to be complete and then returns a ScanOutput and error
-func (op *ScanAll) Await() ([]*ddb.ScanOutput, error) {
-	out, err := op.Promise.Await()
+// GetResponse returns the GetResponse output and error
+// if Output has not been set yet nil is returned
+func (p *ScanAllPromise) GetResponse() ([]*ddb.ScanOutput, error) {
+	out, err := p.Promise.GetResponse()
 	if out == nil {
 		return nil, err
 	}
-	
+
 	return out.([]*ddb.ScanOutput), err
 }
 
-// Invoke invokes the Scan operation
-func (op *ScanAll) Invoke(ctx context.Context, client *ddb.Client) *ScanAll {
+// Await waits for the ScanAllPromise to be fulfilled and then returns a ScanAllOutput and error
+func (p *ScanAllPromise) Await() ([]*ddb.ScanOutput, error) {
+	out, err := p.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.([]*ddb.ScanOutput), err
+}
+
+// newScanAllPromise returns a new ScanAllPromise
+func newScanAllPromise() *ScanAllPromise {
+	return &ScanAllPromise{NewPromise()}
+}
+
+// ScanAllHandler represents a handler for ScanAll requests
+type ScanAllHandler interface {
+	HandleScanAll(ctx *ScanAllContext, promise *ScanAllPromise)
+}
+
+// ScanAllHandlerFunc is a ScanAllHandler function
+type ScanAllHandlerFunc func(ctx *ScanAllContext, promise *ScanAllPromise)
+
+// HandleScanAll implements ScanAllHandler
+func (h ScanAllHandlerFunc) HandleScanAll(ctx *ScanAllContext, promise *ScanAllPromise) {
+	h(ctx, promise)
+}
+
+// ScanAllMiddleWare is a middleware function use for wrapping ScanAllHandler requests
+type ScanAllMiddleWare func(handler ScanAllHandler) ScanAllHandler
+
+// ScanAllFinalHandler returns the final ScanAllHandler that executes a dynamodb ScanAll operation
+func ScanAllFinalHandler() ScanAllHandler {
+	return ScanAllHandlerFunc(func(ctx *ScanAllContext, promise *ScanAllPromise) {
+		var (
+			outs []*ddb.ScanOutput
+			out  *ddb.ScanOutput
+			err  error
+		)
+
+		defer func() { promise.SetResponse(outs, err) }()
+
+		// copy the scan so we're not mutating the original
+		input := CopyScan(ctx.input)
+
+		for {
+
+			if out, err = ctx.client.Scan(ctx, input); err != nil {
+				return
+			}
+
+			outs = append(outs, out)
+
+			if out.LastEvaluatedKey == nil {
+				// no more work
+				break
+			}
+
+			input.ExclusiveStartKey = out.LastEvaluatedKey
+		}
+	})
+}
+
+// ScanAll represents a ScanAll operation
+type ScanAll struct {
+	promise     *ScanAllPromise
+	input       *ddb.ScanInput
+	middleWares []ScanAllMiddleWare
+}
+
+// NewScanAll creates a new ScanAll
+func NewScanAll(input *ddb.ScanInput, mws ...ScanAllMiddleWare) *ScanAll {
+	return &ScanAll{
+		input:       input,
+		middleWares: mws,
+		promise:     newScanAllPromise(),
+	}
+}
+
+// Invoke invokes the ScanAll operation and returns a ScanAllPromise
+func (op *ScanAll) Invoke(ctx context.Context, client *ddb.Client) *ScanAllPromise {
 	go op.DynoInvoke(ctx, client)
-	return op
+
+	return op.promise
 }
 
 // DynoInvoke the Operation interface
 func (op *ScanAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		outs []*ddb.ScanOutput
-		out  *ddb.ScanOutput
-		err  error
-	)
-	
-	defer func() {
-		op.SetResponse(out, err)
-	}()
-	
-	//copy the scan so we're not mutating the original
-	input := CopyScan(op.input)
-	
-	for {
-		for _, cb := range op.options.InputCallbacks {
-			if out, err = cb.ScanInputCallback(ctx, input); out != nil || err != nil {
-				if out != nil {
-					outs = append(outs, out)
-				}
-				
-				return
-			}
-		}
-
-		if out, err = client.Scan(ctx, input); err != nil {
-			return
-		}
-
-		for _, cb := range op.options.OutputCallbacks {
-			if err = cb.ScanOutputCallback(ctx, out); err != nil {
-				return
-			}
-		}
-
-		outs = append(outs, out)
-
-		if out.LastEvaluatedKey == nil {
-			// no more work
-			break
-		}
-
-		input.ExclusiveStartKey = out.LastEvaluatedKey
+	requestCtx := &ScanAllContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
 	}
 
-	return
+	h := ScanAllFinalHandler()
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i](h)
+		}
+	}
+
+	h.HandleScanAll(requestCtx, op.promise)
 }
 
 // NewScanInput creates a new ScanInput with a table name
@@ -443,7 +473,7 @@ func (bld *ScanBuilder) Build() (*ddb.ScanInput, error) {
 }
 
 // BuildSegments builds the input input with included projection and creates separate inputs for each segment
-func (bld *ScanBuilder) BuildSegments(segments int32, inputCB ScanInputCallback, outputCB ScanOutputCallback) ([]*ddb.ScanInput, error) {
+func (bld *ScanBuilder) BuildSegments(segments int32) ([]*ddb.ScanInput, error) {
 	input, err := bld.Build()
 
 	if err != nil {

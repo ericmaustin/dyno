@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ericmaustin/dyno/condition"
 	"sync"
 	"time"
@@ -14,15 +14,15 @@ import (
 
 // Table represents a dynamodb table
 type Table struct {
-	*types.TableDescription
+	*ddbTypes.TableDescription
 	LastSync time.Time
 	// map of global secondary indexes
 	GSIs map[string]*GSI
 	// map of local secondary indexes
 	LSIs                            map[string]*LSI
-	PartitionKeyAttributeDefinition *types.AttributeDefinition
-	SortKeyAttributeDefinition      *types.AttributeDefinition
-	Tags                            []types.Tag
+	PartitionKeyAttributeDefinition *ddbTypes.AttributeDefinition
+	SortKeyAttributeDefinition      *ddbTypes.AttributeDefinition
+	Tags                            []ddbTypes.Tag
 	mu                              sync.RWMutex
 }
 
@@ -43,13 +43,13 @@ func (t *Table) IsOnDemand() bool {
 
 	if t.BillingModeSummary == nil {
 		// default to pay per request
-		t.BillingModeSummary = new(types.BillingModeSummary)
-		t.BillingModeSummary = &types.BillingModeSummary{
-			BillingMode: types.BillingModePayPerRequest,
+		t.BillingModeSummary = new(ddbTypes.BillingModeSummary)
+		t.BillingModeSummary = &ddbTypes.BillingModeSummary{
+			BillingMode: ddbTypes.BillingModePayPerRequest,
 		}
 	}
 
-	return t.BillingModeSummary.BillingMode == types.BillingModePayPerRequest
+	return t.BillingModeSummary.BillingMode == ddbTypes.BillingModePayPerRequest
 }
 
 // RCUs returns the read cost units for this table
@@ -77,7 +77,7 @@ func (t *Table) WCUs() int64 {
 }
 
 // Description returns the table description
-func (t *Table) Description() *types.TableDescription {
+func (t *Table) Description() *ddbTypes.TableDescription {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -108,13 +108,13 @@ func (t *Table) UpdateWithRemote() *TableExistsWaiter {
 }
 
 // setTableDescription sets the table description to the input value
-func (t *Table) setTableDescription(input *types.TableDescription) {
+func (t *Table) setTableDescription(input *ddbTypes.TableDescription) {
 	t.LastSync = time.Now()
 	*t.TableDescription = *input
 }
 
 // UpdateWithTableDescription sets the table description to the input value
-func (t *Table) UpdateWithTableDescription(input *types.TableDescription) {
+func (t *Table) UpdateWithTableDescription(input *ddbTypes.TableDescription) {
 	t.mu.Lock()
 	t.setTableDescription(input)
 	t.mu.Unlock()
@@ -157,12 +157,12 @@ func (t *Table) PartitionKeyName() string {
 }
 
 // SetPartitionKey sets the partition key for this table
-func (t *Table) SetPartitionKey(pkName string, attributeType types.ScalarAttributeType) *Table {
+func (t *Table) SetPartitionKey(pkName string, attributeType ddbTypes.ScalarAttributeType) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	t.KeySchema = addPartitionKeyToKeySchema(t.KeySchema, pkName)
-	t.PartitionKeyAttributeDefinition = &types.AttributeDefinition{
+	t.PartitionKeyAttributeDefinition = &ddbTypes.AttributeDefinition{
 		AttributeName: &pkName,
 		AttributeType: attributeType,
 	}
@@ -172,12 +172,12 @@ func (t *Table) SetPartitionKey(pkName string, attributeType types.ScalarAttribu
 }
 
 // SetSortKey sets the sortKey key for this table
-func (t *Table) SetSortKey(skName string, attributeType types.ScalarAttributeType) *Table {
+func (t *Table) SetSortKey(skName string, attributeType ddbTypes.ScalarAttributeType) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	t.KeySchema = addSortKeyToKeySchema(t.KeySchema, skName)
-	t.SortKeyAttributeDefinition = &types.AttributeDefinition{
+	t.SortKeyAttributeDefinition = &ddbTypes.AttributeDefinition{
 		AttributeName: &skName,
 		AttributeType: attributeType,
 	}
@@ -193,14 +193,14 @@ func (t *Table) AddGSI(gsi ...*GSI) *Table {
 	defer t.mu.Unlock()
 
 	for _, g := range gsi {
-		gsiDesc := types.GlobalSecondaryIndexDescription{
+		gsiDesc := ddbTypes.GlobalSecondaryIndexDescription{
 			IndexName:  g.IndexName,
 			KeySchema:  g.KeySchema,
 			Projection: g.Projection,
 		}
 
 		if g.ProvisionedThroughput != nil {
-			gsiDesc.ProvisionedThroughput = &types.ProvisionedThroughputDescription{
+			gsiDesc.ProvisionedThroughput = &ddbTypes.ProvisionedThroughputDescription{
 				ReadCapacityUnits:  g.ProvisionedThroughput.ReadCapacityUnits,
 				WriteCapacityUnits: g.ProvisionedThroughput.WriteCapacityUnits,
 			}
@@ -233,7 +233,7 @@ func (t *Table) AddLSI(lsi ...*LSI) {
 	defer t.mu.Unlock()
 
 	for _, l := range lsi {
-		lsiDesc := types.LocalSecondaryIndexDescription{
+		lsiDesc := ddbTypes.LocalSecondaryIndexDescription{
 			IndexName:  l.IndexName,
 			KeySchema:  l.KeySchema,
 			Projection: l.Projection,
@@ -254,7 +254,7 @@ func (t *Table) AddLSI(lsi ...*LSI) {
 }
 
 // ExtractKeys extracts key values from a dynamodb.AttributeValue map
-func (t *Table) ExtractKeys(avMap map[string]types.AttributeValue) map[string]types.AttributeValue {
+func (t *Table) ExtractKeys(avMap map[string]ddbTypes.AttributeValue) map[string]ddbTypes.AttributeValue {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -262,7 +262,7 @@ func (t *Table) ExtractKeys(avMap map[string]types.AttributeValue) map[string]ty
 }
 
 // ExtractAllKeys extracts all key values from a slice of dynamodb.AttributeValue maps
-func (t *Table) ExtractAllKeys(avMaps []map[string]types.AttributeValue) []map[string]types.AttributeValue {
+func (t *Table) ExtractAllKeys(avMaps []map[string]ddbTypes.AttributeValue) []map[string]ddbTypes.AttributeValue {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -271,7 +271,7 @@ func (t *Table) ExtractAllKeys(avMaps []map[string]types.AttributeValue) []map[s
 
 // ExtractPartitionKeyValue extracts this table's partition key attribute value from a given input
 // panics if this table does not have a partition key
-func (t *Table) ExtractPartitionKeyValue(avMap map[string]types.AttributeValue) types.AttributeValue {
+func (t *Table) ExtractPartitionKeyValue(avMap map[string]ddbTypes.AttributeValue) ddbTypes.AttributeValue {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -280,7 +280,7 @@ func (t *Table) ExtractPartitionKeyValue(avMap map[string]types.AttributeValue) 
 
 // ExtractSortKeyValue extracts this table's sort key attribute value from a given input
 // panics if this table does not have a partition key
-func (t *Table) ExtractSortKeyValue(avMap map[string]types.AttributeValue) types.AttributeValue {
+func (t *Table) ExtractSortKeyValue(avMap map[string]ddbTypes.AttributeValue) ddbTypes.AttributeValue {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -292,7 +292,7 @@ func (t *Table) AddTag(key, value string) *Table {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	t.Tags = append(t.Tags, types.Tag{
+	t.Tags = append(t.Tags, ddbTypes.Tag{
 		Key:   &key,
 		Value: &value,
 	})
@@ -313,7 +313,7 @@ func (t *Table) CreateTableInput() (*ddb.CreateTableInput, error) {
 		return nil, fmt.Errorf("PartitionKeyAttributeDefinition.AttributeName must not be nil")
 	}
 
-	attributeDefinitionMap := map[string]*types.AttributeDefinition{
+	attributeDefinitionMap := map[string]*ddbTypes.AttributeDefinition{
 		*t.PartitionKeyAttributeDefinition.AttributeName: t.PartitionKeyAttributeDefinition,
 	}
 
@@ -327,7 +327,7 @@ func (t *Table) CreateTableInput() (*ddb.CreateTableInput, error) {
 	}
 
 	if t.ProvisionedThroughput != nil {
-		in.ProvisionedThroughput = &types.ProvisionedThroughput{
+		in.ProvisionedThroughput = &ddbTypes.ProvisionedThroughput{
 			ReadCapacityUnits:  t.ProvisionedThroughput.ReadCapacityUnits,
 			WriteCapacityUnits: t.ProvisionedThroughput.WriteCapacityUnits,
 		}
@@ -360,10 +360,10 @@ func (t *Table) CreateTableInput() (*ddb.CreateTableInput, error) {
 func NewTable(name string) *Table {
 	// create a table with given table key
 	return &Table{
-		TableDescription: &types.TableDescription{
+		TableDescription: &ddbTypes.TableDescription{
 			AttributeDefinitions: nil,
-			BillingModeSummary: &types.BillingModeSummary{
-				BillingMode: types.BillingModePayPerRequest,
+			BillingModeSummary: &ddbTypes.BillingModeSummary{
+				BillingMode: ddbTypes.BillingModePayPerRequest,
 			},
 			TableName: &name,
 		},
@@ -385,9 +385,9 @@ func (t *Table) SetOnDemand() *Table {
 	defer t.mu.Unlock()
 
 	if t.BillingModeSummary == nil {
-		t.BillingModeSummary = new(types.BillingModeSummary)
+		t.BillingModeSummary = new(ddbTypes.BillingModeSummary)
 	}
-	t.BillingModeSummary.BillingMode = types.BillingModePayPerRequest
+	t.BillingModeSummary.BillingMode = ddbTypes.BillingModePayPerRequest
 
 	return t
 }
@@ -398,14 +398,14 @@ func (t *Table) SetReadCostUnits(costUnits int64) *Table {
 	defer t.mu.Unlock()
 
 	if t.BillingModeSummary == nil {
-		t.BillingModeSummary = new(types.BillingModeSummary)
+		t.BillingModeSummary = new(ddbTypes.BillingModeSummary)
 	}
 
 	if t.ProvisionedThroughput == nil {
-		t.ProvisionedThroughput = new(types.ProvisionedThroughputDescription)
+		t.ProvisionedThroughput = new(ddbTypes.ProvisionedThroughputDescription)
 	}
 
-	t.BillingModeSummary.BillingMode = types.BillingModeProvisioned
+	t.BillingModeSummary.BillingMode = ddbTypes.BillingModeProvisioned
 	t.ProvisionedThroughput.ReadCapacityUnits = &costUnits
 
 	return t
@@ -417,14 +417,14 @@ func (t *Table) SetWriteCostUnits(costUnits int64) *Table {
 	defer t.mu.Unlock()
 
 	if t.BillingModeSummary == nil {
-		t.BillingModeSummary = new(types.BillingModeSummary)
+		t.BillingModeSummary = new(ddbTypes.BillingModeSummary)
 	}
 
 	if t.ProvisionedThroughput == nil {
-		t.ProvisionedThroughput = new(types.ProvisionedThroughputDescription)
+		t.ProvisionedThroughput = new(ddbTypes.ProvisionedThroughputDescription)
 	}
 
-	t.BillingModeSummary.BillingMode = types.BillingModeProvisioned
+	t.BillingModeSummary.BillingMode = ddbTypes.BillingModeProvisioned
 	t.ProvisionedThroughput.WriteCapacityUnits = &costUnits
 
 	return t
@@ -441,14 +441,14 @@ func (t *Table) SetCostUnits(RCUs, WCUs int64) *Table {
 	}
 
 	if t.BillingModeSummary == nil {
-		t.BillingModeSummary = new(types.BillingModeSummary)
+		t.BillingModeSummary = new(ddbTypes.BillingModeSummary)
 	}
 
 	if t.ProvisionedThroughput == nil {
-		t.ProvisionedThroughput = new(types.ProvisionedThroughputDescription)
+		t.ProvisionedThroughput = new(ddbTypes.ProvisionedThroughputDescription)
 	}
 
-	t.BillingModeSummary.BillingMode = types.BillingModeProvisioned
+	t.BillingModeSummary.BillingMode = ddbTypes.BillingModeProvisioned
 	t.ProvisionedThroughput.ReadCapacityUnits = &RCUs
 	t.ProvisionedThroughput.WriteCapacityUnits = &WCUs
 
@@ -504,7 +504,6 @@ func (t *Table) CreateTableMiddleWare() CreateTableMiddleWare {
 	}
 }
 
-
 // TableExistsWaiterMiddleWare returns a TableExistsWaiterMiddleWare that will update this table from the describe table
 // operation output
 func (t *Table) TableExistsWaiterMiddleWare() TableExistsWaiterMiddleWare {
@@ -543,22 +542,50 @@ func (t *Table) DeleteInput() *ddb.DeleteTableInput {
 	return input
 }
 
-// Delete creates a new DeleteTable operation
+// Delete returns a new DeleteTable operation for this table
 func (t *Table) Delete() *DeleteTable {
 	return NewDeleteTable(t.DeleteInput())
 }
 
-// NewScanBuilder creates a ScanBuilder with this table
-func (t *Table) NewScanBuilder() *ScanBuilder {
+// ScanBuilder returns a new ScanBuilder for this table
+func (t *Table) ScanBuilder() *ScanBuilder {
 	return NewScanBuilder(nil).SetTableName(t.Name())
 }
 
-// NewQueryBuilder creates a QueryBuilder with this table
-func (t *Table) NewQueryBuilder() *QueryBuilder {
+// QueryBuilder returns a new QueryBuilder for this table
+func (t *Table) QueryBuilder() *QueryBuilder {
 	return NewQueryBuilder(nil).SetTableName(t.Name())
 }
 
-// NewPutItemBuilder creates a PutBuilder with this table
+// NewPutItemBuilder creates a PutBuilder for this table
 func (t *Table) NewPutItemBuilder() *PutItemBuilder {
 	return NewPutItemBuilder(nil).SetTableName(t.Name())
+}
+
+// BatchGet returns a new BatchGetItem for this table with given key items
+func (t *Table) BatchGet(items []map[string]ddbTypes.AttributeValue, mws ...BatchGetItemAllMiddleWare) *BatchGetItemAll {
+	keys := t.ExtractAllKeys(items)
+	input, err := NewBatchGetBuilder(nil).AddKey(t.Name(), keys...).Build()
+
+	if err != nil {
+		// this shouldn't happen when we're only adding keys
+		panic(err)
+	}
+
+	return NewBatchGetItemAll(input, mws...)
+}
+
+// BatchPut returns a new BatchWriteItem for this table with put requests provided items
+func (t *Table) BatchPut(items []map[string]ddbTypes.AttributeValue, mws ...BatchWriteItemAllMiddleWare) *BatchWriteItemAll {
+	input := NewBatchWriteItemBuilder(nil).AddPuts(t.Name(), items...).Build()
+
+	return NewBatchWriteItemAll(input, mws...)
+}
+
+// BatchDelete returns a new  BatchWriteItem for this table with delete requests for  provided items
+func (t *Table) BatchDelete(items []map[string]ddbTypes.AttributeValue, mws ...BatchWriteItemAllMiddleWare) *BatchWriteItemAll {
+	keys := t.ExtractAllKeys(items)
+	input := NewBatchWriteItemBuilder(nil).AddDeletes(t.Name(), keys...).Build()
+
+	return NewBatchWriteItemAll(input, mws...)
 }

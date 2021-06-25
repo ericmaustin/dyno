@@ -193,6 +193,7 @@ func MarshalString(v *string, mode NilMode) ddb.AttributeValue {
 	if v == nil {
 		return stringNil(mode)
 	}
+
 	return &ddb.AttributeValueMemberS{Value: *v}
 }
 
@@ -208,6 +209,7 @@ func MarshalBytes(v []byte, mode NilMode) ddb.AttributeValue {
 	if len(v) < 1 {
 		return bytesNil(mode)
 	}
+
 	return &ddb.AttributeValueMemberB{Value: v}
 }
 
@@ -224,6 +226,7 @@ func MarshalJSON(v interface{}) (ddb.AttributeValue, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &ddb.AttributeValueMemberS{Value: string(b)}, nil
 }
 
@@ -239,7 +242,9 @@ func MarshalUnixNano(v *time.Time, mode NilMode) ddb.AttributeValue {
 	if v == nil {
 		return numericNil(mode)
 	}
+
 	intV := v.UnixNano()
+
 	return MarshalInt64(&intV, mode)
 }
 

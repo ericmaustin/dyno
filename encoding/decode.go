@@ -111,7 +111,7 @@ func unmarshalMapToValue(rec map[string]ddb.AttributeValue, rv reflect.Value) er
 			return err
 		}
 	case reflect.Map:
-		if err := unmarshalMapToEmbededMap(rec, rv, "", ""); err != nil {
+		if err := unmarshalMapToEmbeddedMap(rec, rv, "", ""); err != nil {
 			return err
 		}
 	default:
@@ -143,7 +143,6 @@ func unmarshalMapToStruct(item map[string]ddb.AttributeValue, rv reflect.Value, 
 	typ := rv.Elem().Type()
 
 	for i := 0; i < rv.Elem().NumField(); i++ {
-
 		// gets us the struct field
 		ft = typ.Field(i)
 		if fc, err = parseTag(ft.Tag.Get(FieldStructTagName)); err != nil {
@@ -169,7 +168,7 @@ func unmarshalMapToStruct(item map[string]ddb.AttributeValue, rv reflect.Value, 
 				}
 				fv.Set(Indirect(targetVal, false))
 			case reflect.Map:
-				if err = unmarshalMapToEmbededMap(item, fv, fc.Prepend, fc.Append); err != nil {
+				if err = unmarshalMapToEmbeddedMap(item, fv, fc.Prepend, fc.Append); err != nil {
 					return err
 				}
 			default:
@@ -194,8 +193,8 @@ func unmarshalMapToStruct(item map[string]ddb.AttributeValue, rv reflect.Value, 
 	return nil
 }
 
-// unmarshalMapToEmbededMap rv must be a map and must have index keys set that match the avMap
-func unmarshalMapToEmbededMap(item map[string]ddb.AttributeValue, rv reflect.Value, prepend, append string) error {
+// unmarshalMapToEmbeddedMap rv must be a map and must have index keys set that match the avMap
+func unmarshalMapToEmbeddedMap(item map[string]ddb.AttributeValue, rv reflect.Value, prepend, append string) error {
 
 	if rv.Kind() != reflect.Map {
 		return errors.New("reflect value is not a Map")
@@ -245,21 +244,28 @@ func unmarshalMap(item ddb.AttributeValue, rv reflect.Value, conf *fieldConfig) 
 			// string is empty, no json data to unmarshal
 			return nil
 		}
+
 		if err := json.Unmarshal([]byte(sMember.Value), target.Interface()); err != nil {
 			return err
 		}
+
 		rv.Set(Indirect(target, false))
+
 		return nil
+
 	case MarshalAsYAML:
 		sMember, ok := item.(*ddb.AttributeValueMemberS)
 		if !ok || len(sMember.Value) < 1 {
 			// string is empty, no json data to unmarshal
 			return nil
 		}
+
 		if err := yaml.Unmarshal([]byte(sMember.Value), target.Interface()); err != nil {
 			return err
 		}
+
 		rv.Set(Indirect(target, false))
+
 		return nil
 	}
 

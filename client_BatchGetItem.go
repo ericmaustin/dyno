@@ -25,7 +25,7 @@ func (p *Pool) BatchGetItem(input *ddb.BatchGetItemInput, mw ...BatchGetItemMidd
 }
 
 // BatchGetItemAll executes BatchGetItemAll operation and returns a BatchGetItemAllPromise
-func (c *Client) BatchGetItemAll(ctx context.Context, input *ddb.BatchGetItemInput,  mw ...BatchGetItemAllMiddleWare) *BatchGetItemAllPromise {
+func (c *Client) BatchGetItemAll(ctx context.Context, input *ddb.BatchGetItemInput, mw ...BatchGetItemAllMiddleWare) *BatchGetItemAllPromise {
 	return NewBatchGetItemAll(input, mw...).Invoke(ctx, c.ddb)
 }
 
@@ -50,6 +50,17 @@ type BatchGetItemContext struct {
 // BatchGetItemPromise represents a promise for the BatchGetItem
 type BatchGetItemPromise struct {
 	*Promise
+}
+
+// GetResponse returns the GetResponse output and error
+// if Output has not been set yet nil is returned
+func (p *BatchGetItemPromise) GetResponse() (*ddb.BatchGetItemOutput, error) {
+	out, err := p.Promise.GetResponse()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.BatchGetItemOutput), err
 }
 
 // Await waits for the BatchGetItemPromise to be fulfilled and then returns a BatchGetItemOutput and error
@@ -135,7 +146,6 @@ func (op *BatchGetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	h.HandleBatchGetItem(requestCtx, op.promise)
 }
 
-
 // BatchGetItemAllContext represents an exhaustive BatchGetItemAll operation request context
 type BatchGetItemAllContext struct {
 	context.Context
@@ -146,6 +156,17 @@ type BatchGetItemAllContext struct {
 // BatchGetItemAllPromise represents a promise for the BatchGetItemAll
 type BatchGetItemAllPromise struct {
 	*Promise
+}
+
+// GetResponse returns the GetResponse output and error
+// if Output has not been set yet nil is returned
+func (p *BatchGetItemAllPromise) GetResponse() ([]*ddb.BatchGetItemOutput, error) {
+	out, err := p.Promise.GetResponse()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.([]*ddb.BatchGetItemOutput), err
 }
 
 // Await waits for the BatchGetItemAllPromise to be fulfilled and then returns a BatchGetItemAllOutput and error
@@ -188,7 +209,7 @@ func BatchGetItemAllFinalHandler() BatchGetItemAllHandler {
 			err  error
 		)
 
-		defer func() {promise.SetResponse(outs, err)}()
+		defer func() { promise.SetResponse(outs, err) }()
 
 		// copy the scan so we're not mutating the original
 		input := CopyBatchGetItem(ctx.input)

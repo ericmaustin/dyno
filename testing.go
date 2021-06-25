@@ -145,7 +145,7 @@ func CreateTestTable(db *Client) *Table {
 		panic(err)
 	}
 
-	out, err := input.Invoke(context.Background(), db.DynamoDBClient()).Await()
+	out, err := input.Invoke(context.Background(), db.DynamoDB()).Await()
 	if err != nil {
 		panic(err)
 	}
@@ -153,7 +153,7 @@ func CreateTestTable(db *Client) *Table {
 	fmt.Println("create table output:\n", MustYamlString(out))
 
 	// update the local table (also waits for table to exist)
-	if err = table.UpdateWithRemote().Invoke(context.Background(), db.ddb).Await(); err != nil {
+	if _, err = table.UpdateWithRemote().Invoke(context.Background(), db.ddb).Await(); err != nil {
 		panic(err)
 	}
 
