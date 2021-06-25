@@ -5,136 +5,115 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
-// CreateBackup executes a scan api call with a CreateBackupInput
-func (c *Client) CreateBackup(ctx context.Context, input *ddb.CreateBackupInput, optFns ...func(*CreateBackupOptions)) (*ddb.CreateBackupOutput, error) {
-	op := NewCreateBackup(input, optFns...)
-	op.DynoInvoke(ctx, c.ddb)
-
-	return op.Await()
+// CreateBackup executes CreateBackup operation and returns a CreateBackupPromise
+func (c *Client) CreateBackup(ctx context.Context, input *ddb.CreateBackupInput, mw ...CreateBackupMiddleWare) *CreateBackupPromise {
+	return NewCreateBackup(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// CreateBackup executes a CreateBackup operation with a CreateBackupInput in this pool and returns the CreateBackup for processing
-func (p *Pool) CreateBackup(input *ddb.CreateBackupInput, optFns ...func(*CreateBackupOptions)) *CreateBackup {
-	op := NewCreateBackup(input, optFns...)
+// CreateBackup executes a CreateBackup operation with a CreateBackupInput in this pool and returns the CreateBackupPromise
+func (p *Pool) CreateBackup(input *ddb.CreateBackupInput, mw ...CreateBackupMiddleWare) *CreateBackupPromise {
+	op := NewCreateBackup(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.SetResponse(nil, err)
+		op.promise.SetResponse(nil, err)
 	}
 
-	return op
+	return op.promise
 }
 
-// CreateBackupInputCallback is a callback that is called on a given CreateBackupInput before a CreateBackup operation api call executes
-type CreateBackupInputCallback interface {
-	CreateBackupInputCallback(context.Context, *ddb.CreateBackupInput) (*ddb.CreateBackupOutput, error)
+// CreateBackupContext represents an exhaustive CreateBackup operation request context
+type CreateBackupContext struct {
+	context.Context
+	input  *ddb.CreateBackupInput
+	client *ddb.Client
 }
 
-// CreateBackupOutputCallback is a callback that is called on a given CreateBackupOutput after a CreateBackup operation api call executes
-type CreateBackupOutputCallback interface {
-	CreateBackupOutputCallback(context.Context, *ddb.CreateBackupOutput) error
+// CreateBackupPromise represents a promise for the CreateBackup
+type CreateBackupPromise struct {
+	*Promise
 }
 
-// CreateBackupInputCallbackFunc is CreateBackupOutputCallback function
-type CreateBackupInputCallbackFunc func(context.Context, *ddb.CreateBackupInput) (*ddb.CreateBackupOutput, error)
-
-// CreateBackupInputCallback implements the CreateBackupOutputCallback interface
-func (cb CreateBackupInputCallbackFunc) CreateBackupInputCallback(ctx context.Context, input *ddb.CreateBackupInput) (*ddb.CreateBackupOutput, error) {
-	return cb(ctx, input)
-}
-
-// CreateBackupOutputCallbackFunc is CreateBackupOutputCallback function
-type CreateBackupOutputCallbackFunc func(context.Context, *ddb.CreateBackupOutput) error
-
-// CreateBackupOutputCallback implements the CreateBackupOutputCallback interface
-func (cb CreateBackupOutputCallbackFunc) CreateBackupOutputCallback(ctx context.Context, input *ddb.CreateBackupOutput) error {
-	return cb(ctx, input)
-}
-
-// CreateBackupOptions represents options passed to the CreateBackup operation
-type CreateBackupOptions struct {
-	// InputCallbacks are called before the CreateBackup dynamodb api operation with the dynamodb.CreateBackupInput
-	InputCallbacks []CreateBackupInputCallback
-	// OutputCallbacks are called after the CreateBackup dynamodb api operation with the dynamodb.CreateBackupOutput
-	OutputCallbacks []CreateBackupOutputCallback
-}
-
-// CreateBackupWithInputCallback adds a CreateBackupInputCallbackFunc to the InputCallbacks
-func CreateBackupWithInputCallback(cb CreateBackupInputCallbackFunc) func(*CreateBackupOptions) {
-	return func(opt *CreateBackupOptions) {
-		opt.InputCallbacks = append(opt.InputCallbacks, cb)
+// Await waits for the CreateBackupPromise to be fulfilled and then returns a CreateBackupOutput and error
+func (p *CreateBackupPromise) Await() (*ddb.CreateBackupOutput, error) {
+	out, err := p.Promise.Await()
+	if out == nil {
+		return nil, err
 	}
+
+	return out.(*ddb.CreateBackupOutput), err
 }
 
-// CreateBackupWithOutputCallback adds a CreateBackupOutputCallback to the OutputCallbacks
-func CreateBackupWithOutputCallback(cb CreateBackupOutputCallback) func(*CreateBackupOptions) {
-	return func(opt *CreateBackupOptions) {
-		opt.OutputCallbacks = append(opt.OutputCallbacks, cb)
-	}
+// newCreateBackupPromise returns a new CreateBackupPromise
+func newCreateBackupPromise() *CreateBackupPromise {
+	return &CreateBackupPromise{NewPromise()}
+}
+
+// CreateBackupHandler represents a handler for CreateBackup requests
+type CreateBackupHandler interface {
+	HandleCreateBackup(ctx *CreateBackupContext, promise *CreateBackupPromise)
+}
+
+// CreateBackupHandlerFunc is a CreateBackupHandler function
+type CreateBackupHandlerFunc func(ctx *CreateBackupContext, promise *CreateBackupPromise)
+
+// HandleCreateBackup implements CreateBackupHandler
+func (h CreateBackupHandlerFunc) HandleCreateBackup(ctx *CreateBackupContext, promise *CreateBackupPromise) {
+	h(ctx, promise)
+}
+
+// CreateBackupMiddleWare is a middleware function use for wrapping CreateBackupHandler requests
+type CreateBackupMiddleWare func(handler CreateBackupHandler) CreateBackupHandler
+
+// CreateBackupFinalHandler returns the final CreateBackupHandler that executes a dynamodb CreateBackup operation
+func CreateBackupFinalHandler() CreateBackupHandler {
+	return CreateBackupHandlerFunc(func(ctx *CreateBackupContext, promise *CreateBackupPromise) {
+		promise.SetResponse(ctx.client.CreateBackup(ctx, ctx.input))
+	})
 }
 
 // CreateBackup represents a CreateBackup operation
 type CreateBackup struct {
-	*Promise
-	//client  *ddb.Client
-	input   *ddb.CreateBackupInput
-	options CreateBackupOptions
+	promise     *CreateBackupPromise
+	input       *ddb.CreateBackupInput
+	middleWares []CreateBackupMiddleWare
 }
 
-// NewCreateBackup creates a new CreateBackup operation on the given client with a given CreateBackupInput and options
-func NewCreateBackup(input *ddb.CreateBackupInput, optFns ...func(*CreateBackupOptions)) *CreateBackup {
-	opts := CreateBackupOptions{}
-	for _, opt := range optFns {
-		opt(&opts)
-	}
-	
+// NewCreateBackup creates a new CreateBackup
+func NewCreateBackup(input *ddb.CreateBackupInput, mws ...CreateBackupMiddleWare) *CreateBackup {
 	return &CreateBackup{
-		Promise: NewPromise(),
-		//client:  client,
-		input:   input,
-		options: opts,
+		input:       input,
+		middleWares: mws,
+		promise:     newCreateBackupPromise(),
 	}
 }
 
-// Await waits for the Operation to be complete and then returns a CreateBackupOutput and error
-func (op *CreateBackup) Await() (*ddb.CreateBackupOutput, error) {
-	out, err := op.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-	
-	return out.(*ddb.CreateBackupOutput), err
-}
-
-// Invoke invokes the CreateBackup operation
-func (op *CreateBackup) Invoke(ctx context.Context, client *ddb.Client) *CreateBackup {
+// Invoke invokes the CreateBackup operation and returns a CreateBackupPromise
+func (op *CreateBackup) Invoke(ctx context.Context, client *ddb.Client) *CreateBackupPromise {
 	go op.DynoInvoke(ctx, client)
-	return op
+
+	return op.promise
 }
 
 // DynoInvoke implements the Operation interface
 func (op *CreateBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		out *ddb.CreateBackupOutput
-		err error
-	)
 
-	defer func() { op.SetResponse(out, err) }()
+	requestCtx := &CreateBackupContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
 
-	for _, cb := range op.options.InputCallbacks {
-		if out, err = cb.CreateBackupInputCallback(ctx, op.input); out != nil || err != nil {
-			return
+	h := CreateBackupFinalHandler()
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i](h)
 		}
 	}
 
-	if out, err = client.CreateBackup(ctx, op.input); err != nil {
-		return
-	}
-
-	for _, cb := range op.options.OutputCallbacks {
-		if err = cb.CreateBackupOutputCallback(ctx, out); err != nil {
-			return
-		}
-	}
+	h.HandleCreateBackup(requestCtx, op.promise)
 }
 
 // NewCreateBackupInput creates a CreateBackupInput with a given table name and key
