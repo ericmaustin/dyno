@@ -9,7 +9,7 @@ import (
 )
 
 // PutItem executes a scan api call with a PutItemInput
-func (c *DefaultClient) PutItem(ctx context.Context, input *ddb.PutItemInput, optFns ...func(*PutItemOptions)) (*ddb.PutItemOutput, error) {
+func (c *Client) PutItem(ctx context.Context, input *ddb.PutItemInput, optFns ...func(*PutItemOptions)) (*ddb.PutItemOutput, error) {
 	opt := NewPutItem(input, optFns...)
 	opt.DynoInvoke(ctx, c.ddb)
 

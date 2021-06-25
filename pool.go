@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 )
 
-// NewPool creates a new pool with a context DefaultClient connection and limit
+// NewPool creates a new pool with a context Client connection and limit
 // the context is used for all Executions
 func NewPool(ctx context.Context, client *ddb.Client, limit uint64) *Pool {
 	return &Pool{

@@ -11,7 +11,7 @@ import (
 
 
 // DeleteItem executes a scan api call with a DeleteItemInput
-func (c *DefaultClient) DeleteItem(ctx context.Context, input *ddb.DeleteItemInput, optFns ...func(*DeleteItemOptions)) (*ddb.DeleteItemOutput, error) {
+func (c *Client) DeleteItem(ctx context.Context, input *ddb.DeleteItemInput, optFns ...func(*DeleteItemOptions)) (*ddb.DeleteItemOutput, error) {
 	op := NewDeleteItem(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 	

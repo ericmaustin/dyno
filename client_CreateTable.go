@@ -8,7 +8,7 @@ import (
 )
 
 // CreateTable executes a scan api call with a CreateTableInput
-func (c *DefaultClient) CreateTable(ctx context.Context, input *ddb.CreateTableInput, optFns ...func(*CreateTableOptions)) (*ddb.CreateTableOutput, error) {
+func (c *Client) CreateTable(ctx context.Context, input *ddb.CreateTableInput, optFns ...func(*CreateTableOptions)) (*ddb.CreateTableOutput, error) {
 	op := NewCreateTable(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 

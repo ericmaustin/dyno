@@ -6,7 +6,7 @@ import (
 )
 
 // ListTables executes a scan api call with a ListTablesInput
-func (c *DefaultClient) ListTables(ctx context.Context, input *ddb.ListTablesInput, optFns ...func(*ListTablesOptions)) (*ddb.ListTablesOutput, error) {
+func (c *Client) ListTables(ctx context.Context, input *ddb.ListTablesInput, optFns ...func(*ListTablesOptions)) (*ddb.ListTablesOutput, error) {
 	op := NewListTables(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 

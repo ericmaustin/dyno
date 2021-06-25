@@ -11,7 +11,7 @@ import (
 )
 
 // Scan executes a Scan operation with a ScanInput
-func (c *DefaultClient) Scan(ctx context.Context, input *ddb.ScanInput, optFns ...func(*ScanOptions)) (*ddb.ScanOutput, error) {
+func (c *Client) Scan(ctx context.Context, input *ddb.ScanInput, optFns ...func(*ScanOptions)) (*ddb.ScanOutput, error) {
 	opt := NewScan(input, optFns...)
 	opt.DynoInvoke(ctx, c.ddb)
 
@@ -30,7 +30,7 @@ func (p *Pool) Scan(input *ddb.ScanInput, optFns ...func(*ScanOptions)) *Scan {
 }
 
 // ScanAll executes a Scan operation with a ScanInput
-func (c *DefaultClient) ScanAll(ctx context.Context, input *ddb.ScanInput, optFns ...func(*ScanOptions)) ([]*ddb.ScanOutput, error) {
+func (c *Client) ScanAll(ctx context.Context, input *ddb.ScanInput, optFns ...func(*ScanOptions)) ([]*ddb.ScanOutput, error) {
 	opt := NewScanAll(input, optFns...)
 	opt.DynoInvoke(ctx, c.ddb)
 

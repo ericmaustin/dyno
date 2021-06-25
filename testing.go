@@ -118,7 +118,7 @@ func TestTableName() string {
 }
 
 // CreateTestClient crates a dyo session for testing
-func CreateTestClient() *DefaultClient {
+func CreateTestClient() *Client {
 	// create the aws session
 	c, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
@@ -129,7 +129,7 @@ func CreateTestClient() *DefaultClient {
 }
 
 // CreateTestTable creates the test table
-func CreateTestTable(db *DefaultClient) *Table {
+func CreateTestTable(db *Client) *Table {
 	// test table contains an example of a GSI and an LSI with
 	table := NewTable(TestTableName())
 	table.SetPartitionKey("id", "S")

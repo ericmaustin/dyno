@@ -6,7 +6,7 @@ import (
 )
 
 // RestoreTableFromBackup executes a scan api call with a RestoreTableFromBackupInput
-func (c *DefaultClient) RestoreTableFromBackup(ctx context.Context, input *ddb.RestoreTableFromBackupInput, optFns ...func(*RestoreTableFromBackupOptions)) (*ddb.RestoreTableFromBackupOutput, error) {
+func (c *Client) RestoreTableFromBackup(ctx context.Context, input *ddb.RestoreTableFromBackupInput, optFns ...func(*RestoreTableFromBackupOptions)) (*ddb.RestoreTableFromBackupOutput, error) {
 	opt := NewRestoreTableFromBackup(input, optFns...)
 	opt.DynoInvoke(ctx, c.ddb)
 

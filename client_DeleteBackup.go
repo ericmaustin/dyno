@@ -6,7 +6,7 @@ import (
 )
 
 // DeleteBackup executes a scan api call with a DeleteBackupInput
-func (c *DefaultClient) DeleteBackup(ctx context.Context, input *ddb.DeleteBackupInput, optFns ...func(*DeleteBackupOptions)) (*ddb.DeleteBackupOutput, error) {
+func (c *Client) DeleteBackup(ctx context.Context, input *ddb.DeleteBackupInput, optFns ...func(*DeleteBackupOptions)) (*ddb.DeleteBackupOutput, error) {
 	op := NewDeleteBackup(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 

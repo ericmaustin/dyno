@@ -4,38 +4,35 @@ import (
 	"context"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/ericmaustin/dyno/hash"
+	"github.com/go-redis/redis/v8"
+	"github.com/vmihailenco/msgpack/v5"
+	"time"
 )
 
 // TODO: add the rest of the interface methods to Client
 
-type Client interface {
-	BatchGetItem(ctx context.Context, input *ddb.BatchGetItemInput, optFns ...func(*BatchGetItemOptions)) (*ddb.BatchGetItemOutput, error)
-	BatchWriteItem(ctx context.Context, input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) (*ddb.BatchWriteItemOutput, error)
-	CreateBackup(ctx context.Context, input *ddb.CreateBackupInput, optFns ...func(*CreateBackupOptions)) (*ddb.CreateBackupOutput, error)
-	Scan(ctx context.Context, input *ddb.ScanInput, optFns ...func(*ScanOptions)) (*ddb.ScanOutput, error)
-}
-
-// NewDefaultClient creates a new DefaultClient with provided dynamodb DefaultClient
-func NewDefaultClient(client *ddb.Client) *DefaultClient {
-	return &DefaultClient{
+// NewDefaultClient creates a new Client with provided dynamodb Client
+func NewDefaultClient(client *ddb.Client) *Client {
+	return &Client{
 		ddb: client,
 	}
 }
 
-// NewClientFromConfig creates a new DefaultClient with provided config
-func NewClientFromConfig(config aws.Config, optFns ...func(*ddb.Options)) *DefaultClient {
-	return &DefaultClient{
+// NewClientFromConfig creates a new Client with provided config
+func NewClientFromConfig(config aws.Config, optFns ...func(*ddb.Options)) *Client {
+	return &Client{
 		ddb: ddb.NewFromConfig(config, optFns...),
 	}
 }
 
-// DefaultClient represents a client to interact with both dynamodb and dax endpoints
-type DefaultClient struct {
+// Client represents a client to interact with both dynamodb and dax endpoints
+type Client struct {
 	ddb *ddb.Client
 }
 
 // DynamoDBClient gets a dynamo dynamodb.Client
-func (c *DefaultClient) DynamoDBClient() *ddb.Client {
+func (c *Client) DynamoDBClient() *ddb.Client {
 	return c.ddb
 }
 // Operation used to mark a type as being an Operation
@@ -50,12 +47,12 @@ type OperationF func(context.Context, *ddb.Client)
 func (op OperationF) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	op(ctx, client)
 }
-//
-//
+
+
 //type RedisClient struct {
-//	*DefaultClient
+//	*Client
 //	key string
-//	rd  *redis.DefaultClient
+//	rd  *redis.Client
 //	ttl time.Duration
 //}
 //
@@ -72,54 +69,40 @@ func (op OperationF) DynoInvoke(ctx context.Context, client *ddb.Client) {
 //		ttl:       c.ttl,
 //	}
 //}
-//
-//
-//type RedisCallback struct {
-//	rd *redis.DefaultClient
-//	key string
-//	clientKey string
-//	ttl time.Duration
-//}
-//
-//func (cb *RedisCallback) BatchGetItemInputCallback(ctx context.Context, input *ddb.BatchGetItemInput) (*ddb.BatchGetItemOutput, error) {
-//	cb.key = cb.clientKey + hash.NewBuffer().WriteBatchGetItemInput(input).SHA256String()
-//	raw, err := cb.rd.Get(ctx, cb.key).Bytes()
-//
-//	if err == redis.Nil {
-//		return nil, nil
-//	}
-//
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	out := new(ddb.BatchGetItemOutput)
-//	err = msgpack.Unmarshal(raw, out)
-//
-//	return out, err
-//}
-//
-//func (cb *RedisCallback) BatchGetItemOutputCallback(ctx context.Context, output *ddb.BatchGetItemOutput) error {
-//	b, err := msgpack.Marshal(output)
-//
-//	if err != nil {
-//		return err
-//	}
-//
-//	return cb.rd.Set(ctx, cb.key, b, cb.ttl).Err()
-//}
-//
-//
-//// BatchGetItem executes a scan api call with a BatchGetItemInput
-//func (c *RedisClient) BatchGetItem(ctx context.Context, input *ddb.BatchGetItemInput, optFns ...func(*BatchGetItemOptions)) (*ddb.BatchGetItemOutput, error) {
-//
-//	redisCallback := c.RedisCallback()
-//
-//	op := NewBatchGetItem(input, append(optFns, []func(*BatchGetItemOptions){
-//		BatchGetItemWithInputCallback(redisCallback),
-//		BatchGetItemWithOutputCallback(redisCallback),
-//	}...)...)
-//
-//	op.DynoInvoke(ctx, c.ddb)
-//	return op.Await()
-//}
+
+
+// RedisCallback wraps calls with redis and back-fills cache misses
+type RedisCallback struct {
+	rd *redis.Client
+	key string
+	clientKey string
+	ttl time.Duration
+}
+
+func (cb *RedisCallback) BatchGetItemInputCallback(ctx context.Context, input *ddb.BatchGetItemInput) (*ddb.BatchGetItemOutput, error) {
+	cb.key = cb.clientKey + hash.NewBuffer().WriteBatchGetItemInput(input).SHA256String()
+	raw, err := cb.rd.Get(ctx, cb.key).Bytes()
+
+	if err == redis.Nil {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	out := new(ddb.BatchGetItemOutput)
+	err = msgpack.Unmarshal(raw, out)
+
+	return out, err
+}
+
+func (cb *RedisCallback) BatchGetItemOutputCallback(ctx context.Context, output *ddb.BatchGetItemOutput) error {
+	b, err := msgpack.Marshal(output)
+
+	if err != nil {
+		return err
+	}
+
+	return cb.rd.Set(ctx, cb.key, b, cb.ttl).Err()
+}

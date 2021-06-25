@@ -6,7 +6,7 @@ import (
 )
 
 // DescribeBackup executes a scan api call with a DescribeBackupInput
-func (c *DefaultClient) DescribeBackup(ctx context.Context, input *ddb.DescribeBackupInput, optFns ...func(*DescribeBackupOptions)) (*ddb.DescribeBackupOutput, error) {
+func (c *Client) DescribeBackup(ctx context.Context, input *ddb.DescribeBackupInput, optFns ...func(*DescribeBackupOptions)) (*ddb.DescribeBackupOutput, error) {
 	op := NewDescribeBackup(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 	

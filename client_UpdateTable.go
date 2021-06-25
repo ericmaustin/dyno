@@ -6,7 +6,7 @@ import (
 )
 
 // UpdateTable executes a scan api call with a UpdateTableInput
-func (c *DefaultClient) UpdateTable(ctx context.Context, input *ddb.UpdateTableInput, optFns ...func(*UpdateTableOptions)) (*ddb.UpdateTableOutput, error) {
+func (c *Client) UpdateTable(ctx context.Context, input *ddb.UpdateTableInput, optFns ...func(*UpdateTableOptions)) (*ddb.UpdateTableOutput, error) {
 	op := NewUpdateTable(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 

@@ -7,7 +7,7 @@ import (
 )
 
 // BatchWriteItem executes a scan api call with a BatchWriteItemInput
-func (c *DefaultClient) BatchWriteItem(ctx context.Context, input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) (*ddb.BatchWriteItemOutput, error) {
+func (c *Client) BatchWriteItem(ctx context.Context, input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) (*ddb.BatchWriteItemOutput, error) {
 	op := NewBatchWriteItem(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 
@@ -26,7 +26,7 @@ func (p *Pool) BatchWriteItem(input *ddb.BatchWriteItemInput, optFns ...func(*Ba
 }
 
 // BatchWriteItemAll executes a scan api call with a BatchWriteItemInput
-func (c *DefaultClient) BatchWriteItemAll(ctx context.Context, input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) ([]*ddb.BatchWriteItemOutput, error) {
+func (c *Client) BatchWriteItemAll(ctx context.Context, input *ddb.BatchWriteItemInput, optFns ...func(*BatchWriteItemOptions)) ([]*ddb.BatchWriteItemOutput, error) {
 	op := NewBatchWriteItemAll(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 

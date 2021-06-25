@@ -12,7 +12,7 @@ import (
 )
 
 // UpdateItem executes a scan api call with a UpdateItemInput
-func (c *DefaultClient) UpdateItem(ctx context.Context, input *ddb.UpdateItemInput, optFns ...func(*UpdateItemOptions)) (*ddb.UpdateItemOutput, error) {
+func (c *Client) UpdateItem(ctx context.Context, input *ddb.UpdateItemInput, optFns ...func(*UpdateItemOptions)) (*ddb.UpdateItemOutput, error) {
 	opt := NewUpdateItem(input, optFns...)
 	opt.DynoInvoke(ctx, c.ddb)
 

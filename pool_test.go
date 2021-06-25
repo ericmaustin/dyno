@@ -17,7 +17,7 @@ type PoolTestSuite struct {
 	suite.Suite
 	pool                *Pool
 	table               *Table
-	db                  *DefaultClient
+	db                  *Client
 	testItems           []*TestItem
 	testMarshalledItems []*TestItemMarshaller
 }

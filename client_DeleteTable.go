@@ -6,7 +6,7 @@ import (
 )
 
 // DeleteTable executes a scan api call with a DeleteTableInput
-func (c *DefaultClient) DeleteTable(ctx context.Context, input *ddb.DeleteTableInput, optFns ...func(*DeleteTableOptions)) (*ddb.DeleteTableOutput, error) {
+func (c *Client) DeleteTable(ctx context.Context, input *ddb.DeleteTableInput, optFns ...func(*DeleteTableOptions)) (*ddb.DeleteTableOutput, error) {
 	op := NewDeleteTable(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 	

@@ -8,7 +8,7 @@ import (
 )
 
 //Promise represents a request promise
-// a Promise is returned from any DefaultClient Execution
+// a Promise is returned from any Client Execution
 // use <-Promise.Done() to wait for a promise to be done
 // use Promise.Await() to wait for and receive the output from a promise
 type Promise struct {

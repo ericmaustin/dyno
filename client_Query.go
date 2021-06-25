@@ -9,8 +9,8 @@ import (
 	"github.com/ericmaustin/dyno/encoding"
 )
 
-// Query executes a scan api call with a QueryInput with this DefaultClient
-func (c *DefaultClient) Query(ctx context.Context, input *ddb.QueryInput, optFns ...func(*QueryOptions)) (*ddb.QueryOutput, error) {
+// Query executes a scan api call with a QueryInput with this Client
+func (c *Client) Query(ctx context.Context, input *ddb.QueryInput, optFns ...func(*QueryOptions)) (*ddb.QueryOutput, error) {
 	op := NewQuery(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 
@@ -19,7 +19,7 @@ func (c *DefaultClient) Query(ctx context.Context, input *ddb.QueryInput, optFns
 
 // QueryAll executes an exhaustive api call with a QueryInput
 // that will keep running Query sequentially until LastEvaluatedKey is empty
-func (c *DefaultClient) QueryAll(ctx context.Context, input *ddb.QueryInput, optFns ...func(*QueryOptions)) ([]*ddb.QueryOutput, error) {
+func (c *Client) QueryAll(ctx context.Context, input *ddb.QueryInput, optFns ...func(*QueryOptions)) ([]*ddb.QueryOutput, error) {
 	scan := NewQueryAll(input, optFns...)
 	scan.DynoInvoke(ctx, c.ddb)
 

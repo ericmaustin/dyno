@@ -80,9 +80,11 @@ func TestLock(t *testing.T) {
 
 
 	cb := dyno.QueryOutputCallbackF(func(ctx context.Context, output *dynamodb.QueryOutput) error {
+
 		if len(output.Items) < 0 {
 			return nil
 		}
+
 		for _, item := range output.Items {
 			target := new(testItem)
 			if err := encoding.UnmarshalMap(item, target); err != nil {
@@ -90,6 +92,7 @@ func TestLock(t *testing.T) {
 			}
 			resultItems = append(resultItems, target)
 		}
+
 		return nil
 	})
 

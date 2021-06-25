@@ -6,7 +6,7 @@ import (
 )
 
 // CreateBackup executes a scan api call with a CreateBackupInput
-func (c *DefaultClient) CreateBackup(ctx context.Context, input *ddb.CreateBackupInput, optFns ...func(*CreateBackupOptions)) (*ddb.CreateBackupOutput, error) {
+func (c *Client) CreateBackup(ctx context.Context, input *ddb.CreateBackupInput, optFns ...func(*CreateBackupOptions)) (*ddb.CreateBackupOutput, error) {
 	op := NewCreateBackup(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 
@@ -75,7 +75,7 @@ func CreateBackupWithOutputCallback(cb CreateBackupOutputCallback) func(*CreateB
 // CreateBackup represents a CreateBackup operation
 type CreateBackup struct {
 	*Promise
-	//client  *ddb.DefaultClient
+	//client  *ddb.Client
 	input   *ddb.CreateBackupInput
 	options CreateBackupOptions
 }

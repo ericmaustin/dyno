@@ -10,7 +10,7 @@ import (
 )
 
 // DescribeTable executes a scan api call with a DescribeTableInput
-func (c *DefaultClient) DescribeTable(ctx context.Context, input *ddb.DescribeTableInput, optFns ...func(*DescribeTableOptions)) (*ddb.DescribeTableOutput, error) {
+func (c *Client) DescribeTable(ctx context.Context, input *ddb.DescribeTableInput, optFns ...func(*DescribeTableOptions)) (*ddb.DescribeTableOutput, error) {
 	op := NewDescribeTable(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 
@@ -18,7 +18,7 @@ func (c *DefaultClient) DescribeTable(ctx context.Context, input *ddb.DescribeTa
 }
 
 // WaitForTableExists waits for a table to exist
-func (c *DefaultClient) WaitForTableExists(ctx context.Context, input *ddb.DescribeTableInput, optFns ...func(*TableExistsWaiterOptions)) error {
+func (c *Client) WaitForTableExists(ctx context.Context, input *ddb.DescribeTableInput, optFns ...func(*TableExistsWaiterOptions)) error {
 	waiter := NewTableExistsWaiter(input, optFns...)
 	waiter.DynoInvoke(ctx, c.ddb)
 
@@ -26,7 +26,7 @@ func (c *DefaultClient) WaitForTableExists(ctx context.Context, input *ddb.Descr
 }
 
 // WaitForTableNotExists waits for a table to not exist
-func (c *DefaultClient) WaitForTableNotExists(ctx context.Context, input *ddb.DescribeTableInput, optFns ...func(*TableNotExistsWaiterOptions)) error {
+func (c *Client) WaitForTableNotExists(ctx context.Context, input *ddb.DescribeTableInput, optFns ...func(*TableNotExistsWaiterOptions)) error {
 	waiter := NewTableNotExistsWaiter(input, optFns...)
 	waiter.DynoInvoke(ctx, c.ddb)
 

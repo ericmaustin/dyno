@@ -9,7 +9,7 @@ import (
 )
 
 // GetItem executes a scan api call with a GetItemInput
-func (c *DefaultClient) GetItem(ctx context.Context, input *ddb.GetItemInput, optFns ...func(*GetItemOptions)) (*ddb.GetItemOutput, error) {
+func (c *Client) GetItem(ctx context.Context, input *ddb.GetItemInput, optFns ...func(*GetItemOptions)) (*ddb.GetItemOutput, error) {
 	op := NewGetItem(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 

@@ -6,7 +6,7 @@ import (
 )
 
 // ListBackups executes a scan api call with a ListBackupsInput
-func (c *DefaultClient) ListBackups(ctx context.Context, input *ddb.ListBackupsInput, optFns ...func(*ListBackupsOptions)) (*ddb.ListBackupsOutput, error) {
+func (c *Client) ListBackups(ctx context.Context, input *ddb.ListBackupsInput, optFns ...func(*ListBackupsOptions)) (*ddb.ListBackupsOutput, error) {
 	op := NewListBackups(input, optFns...)
 	op.DynoInvoke(ctx, c.ddb)
 

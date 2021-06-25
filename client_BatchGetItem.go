@@ -8,120 +8,53 @@ import (
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// BatchGetItem executes a scan api call with a BatchGetItemInput
-func (c *DefaultClient) BatchGetItem(ctx context.Context, input *ddb.BatchGetItemInput, optFns ...func(*BatchGetItemOptions)) (*ddb.BatchGetItemOutput, error) {
-	op := NewBatchGetItem(input, optFns...)
-	op.DynoInvoke(ctx, c.ddb)
-
-	return op.Await()
+// BatchGetItem executes BatchGetItem operation and returns a BatchGetItemPromise
+func (c *Client) BatchGetItem(ctx context.Context, input *ddb.BatchGetItemInput, mw ...BatchGetItemMiddleWare) *BatchGetItemPromise {
+	return NewBatchGetItem(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// BatchGetItem executes a BatchGetItem operation with a BatchGetItemInput in this pool and returns the BatchGetItem for processing
-func (p *Pool) BatchGetItem(input *ddb.BatchGetItemInput, optFns ...func(*BatchGetItemOptions)) *BatchGetItem {
-	op := NewBatchGetItem(input, optFns...)
+// BatchGetItem executes a BatchGetItem operation with a BatchGetItemInput in this pool and returns the BatchGetItemPromise
+func (p *Pool) BatchGetItem(input *ddb.BatchGetItemInput, mw ...BatchGetItemMiddleWare) *BatchGetItemPromise {
+	op := NewBatchGetItem(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.SetResponse(nil, err)
+		op.promise.SetResponse(nil, err)
 	}
 
-	return op
+	return op.promise
 }
 
-// BatchGetItemAll executes a scan api call with a BatchGetItemInput
-func (c *DefaultClient) BatchGetItemAll(ctx context.Context, input *ddb.BatchGetItemInput, optFns ...func(*BatchGetItemOptions)) ([]*ddb.BatchGetItemOutput, error) {
-	op := NewBatchGetItemAll(input, optFns...)
-	op.DynoInvoke(ctx, c.ddb)
-
-	return op.Await()
+// BatchGetItemAll executes BatchGetItemAll operation and returns a BatchGetItemAllPromise
+func (c *Client) BatchGetItemAll(ctx context.Context, input *ddb.BatchGetItemInput,  mw ...BatchGetItemAllMiddleWare) *BatchGetItemAllPromise {
+	return NewBatchGetItemAll(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// BatchGetItemAll executes a BatchGetItemAll operation with a BatchGetItemInput in this pool and returns the BatchGetItemAll for processing
-func (p *Pool) BatchGetItemAll(input *ddb.BatchGetItemInput, optFns ...func(*BatchGetItemOptions)) *BatchGetItemAll {
-	op := NewBatchGetItemAll(input, optFns...)
+// BatchGetItemAll executes a BatchGetItemAll operation with a BatchGetItemInput in this pool and returns the BatchGetItemAllPromise
+func (p *Pool) BatchGetItemAll(input *ddb.BatchGetItemInput, mw ...BatchGetItemAllMiddleWare) *BatchGetItemAllPromise {
+	op := NewBatchGetItemAll(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.SetResponse(nil, err)
+		op.promise.SetResponse(nil, err)
 	}
 
-	return op
+	return op.promise
 }
 
-// BatchGetItemInputCallback is a callback that is called on a given BatchGetItemInput before a BatchGetItem operation api call executes
-type BatchGetItemInputCallback interface {
-	BatchGetItemInputCallback(context.Context, *ddb.BatchGetItemInput) (*ddb.BatchGetItemOutput, error)
+// BatchGetItemContext represents an exhaustive BatchGetItem operation request context
+type BatchGetItemContext struct {
+	context.Context
+	input  *ddb.BatchGetItemInput
+	client *ddb.Client
 }
 
-// BatchGetItemOutputCallback is a callback that is called on a given BatchGetItemOutput after a BatchGetItem operation api call executes
-type BatchGetItemOutputCallback interface {
-	BatchGetItemOutputCallback(context.Context, *ddb.BatchGetItemOutput) error
-}
-
-// BatchGetItemInputCallbackFunc is BatchGetItemOutputCallback function
-type BatchGetItemInputCallbackFunc func(context.Context, *ddb.BatchGetItemInput) (*ddb.BatchGetItemOutput, error)
-
-// BatchGetItemInputCallback implements the BatchGetItemOutputCallback interface
-func (cb BatchGetItemInputCallbackFunc) BatchGetItemInputCallback(ctx context.Context, input *ddb.BatchGetItemInput) (*ddb.BatchGetItemOutput, error) {
-	return cb(ctx, input)
-}
-
-// BatchGetItemOutputCallbackFunc is BatchGetItemOutputCallback function
-type BatchGetItemOutputCallbackFunc func(context.Context, *ddb.BatchGetItemOutput) error
-
-// BatchGetItemOutputCallback implements the BatchGetItemOutputCallback interface
-func (cb BatchGetItemOutputCallbackFunc) BatchGetItemOutputCallback(ctx context.Context, input *ddb.BatchGetItemOutput) error {
-	return cb(ctx, input)
-}
-
-// BatchGetItemOptions represents options passed to the BatchGetItem operation
-type BatchGetItemOptions struct {
-
-	// InputCallbacks are called before the BatchGetItem dynamodb api operation with the dynamodb.BatchGetItemInput
-	InputCallbacks []BatchGetItemInputCallback
-
-	// OutputCallbacks are called after the BatchGetItem dynamodb api operation with the dynamodb.BatchGetItemOutput
-	OutputCallbacks []BatchGetItemOutputCallback
-}
-
-// BatchGetItemWithInputCallback adds a BatchGetItemInputCallbackFunc to the InputCallbacks
-func BatchGetItemWithInputCallback(cb BatchGetItemInputCallback) func(*BatchGetItemOptions) {
-	return func(opt *BatchGetItemOptions) {
-		opt.InputCallbacks = append(opt.InputCallbacks, cb)
-	}
-}
-
-// BatchGetItemWithOutputCallback adds a BatchGetItemOutputCallback to the OutputCallbacks
-func BatchGetItemWithOutputCallback(cb BatchGetItemOutputCallback) func(*BatchGetItemOptions) {
-	return func(opt *BatchGetItemOptions) {
-		opt.OutputCallbacks = append(opt.OutputCallbacks, cb)
-	}
-}
-
-// BatchGetItem represents a BatchGetItem operation
-type BatchGetItem struct {
+// BatchGetItemPromise represents a promise for the BatchGetItem
+type BatchGetItemPromise struct {
 	*Promise
-	input   *ddb.BatchGetItemInput
-	options BatchGetItemOptions
 }
 
-// NewBatchGetItem creates a new BatchGetItem operation on the given client with a given BatchGetItemInput and options
-func NewBatchGetItem(input *ddb.BatchGetItemInput, optFns ...func(*BatchGetItemOptions)) *BatchGetItem {
-	opts := BatchGetItemOptions{}
-
-	for _, opt := range optFns {
-		opt(&opts)
-	}
-
-	return &BatchGetItem{
-		Promise: NewPromise(),
-		input:   input,
-		options: opts,
-	}
-}
-
-// Await waits for the Operation to be complete and then returns a BatchGetItemOutput and error
-func (op *BatchGetItem) Await() (*ddb.BatchGetItemOutput, error) {
-	out, err := op.Promise.Await()
-
+// Await waits for the BatchGetItemPromise to be fulfilled and then returns a BatchGetItemOutput and error
+func (p *BatchGetItemPromise) Await() (*ddb.BatchGetItemOutput, error) {
+	out, err := p.Promise.Await()
 	if out == nil {
 		return nil, err
 	}
@@ -129,65 +62,95 @@ func (op *BatchGetItem) Await() (*ddb.BatchGetItemOutput, error) {
 	return out.(*ddb.BatchGetItemOutput), err
 }
 
-// Invoke invokes the BatchGetItem operation
-func (op *BatchGetItem) Invoke(ctx context.Context, client *ddb.Client) *BatchGetItem {
+// newBatchGetItemPromise returns a new BatchGetItemPromise
+func newBatchGetItemPromise() *BatchGetItemPromise {
+	return &BatchGetItemPromise{NewPromise()}
+}
+
+// BatchGetItemHandler represents a handler for BatchGetItem requests
+type BatchGetItemHandler interface {
+	HandleBatchGetItem(ctx *BatchGetItemContext, promise *BatchGetItemPromise)
+}
+
+// BatchGetItemHandlerFunc is a BatchGetItemHandler function
+type BatchGetItemHandlerFunc func(ctx *BatchGetItemContext, promise *BatchGetItemPromise)
+
+// HandleBatchGetItem implements BatchGetItemHandler
+func (h BatchGetItemHandlerFunc) HandleBatchGetItem(ctx *BatchGetItemContext, promise *BatchGetItemPromise) {
+	h(ctx, promise)
+}
+
+// BatchGetItemMiddleWare is a middleware function use for wrapping BatchGetItemHandler requests
+type BatchGetItemMiddleWare func(handler BatchGetItemHandler) BatchGetItemHandler
+
+// BatchGetItemFinalHandler returns the final BatchGetItemHandler that executes a dynamodb BatchGetItem operation
+func BatchGetItemFinalHandler() BatchGetItemHandler {
+	return BatchGetItemHandlerFunc(func(ctx *BatchGetItemContext, promise *BatchGetItemPromise) {
+		promise.SetResponse(ctx.client.BatchGetItem(ctx, ctx.input))
+	})
+}
+
+// BatchGetItem represents a BatchGetItem operation
+type BatchGetItem struct {
+	promise     *BatchGetItemPromise
+	input       *ddb.BatchGetItemInput
+	middleWares []BatchGetItemMiddleWare
+}
+
+// NewBatchGetItem creates a new BatchGetItem
+func NewBatchGetItem(input *ddb.BatchGetItemInput, mws ...BatchGetItemMiddleWare) *BatchGetItem {
+	return &BatchGetItem{
+		input:       input,
+		middleWares: mws,
+		promise:     newBatchGetItemPromise(),
+	}
+}
+
+// Invoke invokes the BatchGetItem operation and returns a BatchGetItemPromise
+func (op *BatchGetItem) Invoke(ctx context.Context, client *ddb.Client) *BatchGetItemPromise {
 	go op.DynoInvoke(ctx, client)
-	return op
+
+	return op.promise
 }
 
 // DynoInvoke implements the Operation interface
 func (op *BatchGetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		out *ddb.BatchGetItemOutput
-		err error
-	)
 
-	defer func() {
-		op.SetResponse(out, err)
-	}()
+	requestCtx := &BatchGetItemContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
 
-	for _, cb := range op.options.InputCallbacks {
-		if out, err = cb.BatchGetItemInputCallback(ctx, op.input); out != nil || err != nil {
-			return
+	h := BatchGetItemFinalHandler()
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i](h)
 		}
 	}
 
-	if out, err = client.BatchGetItem(ctx, op.input); err != nil {
-		return
-	}
-
-	for _, cb := range op.options.OutputCallbacks {
-		if err = cb.BatchGetItemOutputCallback(ctx, out); err != nil {
-			return
-		}
-	}
+	h.HandleBatchGetItem(requestCtx, op.promise)
 }
 
-// BatchGetItemAll represents an exhaustive BatchGetItem operation
-type BatchGetItemAll struct {
+
+// BatchGetItemAllContext represents an exhaustive BatchGetItemAll operation request context
+type BatchGetItemAllContext struct {
+	context.Context
+	input  *ddb.BatchGetItemInput
+	client *ddb.Client
+}
+
+// BatchGetItemAllPromise represents a promise for the BatchGetItemAll
+type BatchGetItemAllPromise struct {
 	*Promise
-	input   *ddb.BatchGetItemInput
-	options BatchGetItemOptions
 }
 
-// NewBatchGetItemAll creates a new BatchGetItemAll operation on the given client with a given BatchGetItemInput and options
-func NewBatchGetItemAll(input *ddb.BatchGetItemInput, optFns ...func(*BatchGetItemOptions)) *BatchGetItemAll {
-	options := BatchGetItemOptions{}
-
-	for _, opt := range optFns {
-		opt(&options)
-	}
-
-	return &BatchGetItemAll{
-		Promise: NewPromise(),
-		input:   input,
-		options: options,
-	}
-}
-
-// Await waits for the Operation to be complete and then returns a BatchGetItemOutput and error
-func (op *BatchGetItemAll) Await() ([]*ddb.BatchGetItemOutput, error) {
-	out, err := op.Promise.Await()
+// Await waits for the BatchGetItemAllPromise to be fulfilled and then returns a BatchGetItemAllOutput and error
+func (p *BatchGetItemAllPromise) Await() ([]*ddb.BatchGetItemOutput, error) {
+	out, err := p.Promise.Await()
 	if out == nil {
 		return nil, err
 	}
@@ -195,56 +158,100 @@ func (op *BatchGetItemAll) Await() ([]*ddb.BatchGetItemOutput, error) {
 	return out.([]*ddb.BatchGetItemOutput), err
 }
 
-// Invoke invokes the BatchGetItem operation
-func (op *BatchGetItemAll) Invoke(ctx context.Context, client *ddb.Client) *BatchGetItemAll {
+// newBatchGetItemAllPromise returns a new BatchGetItemAllPromise
+func newBatchGetItemAllPromise() *BatchGetItemAllPromise {
+	return &BatchGetItemAllPromise{NewPromise()}
+}
+
+// BatchGetItemAllHandler represents a handler for BatchGetItemAll requests
+type BatchGetItemAllHandler interface {
+	HandleBatchGetItemAll(ctx *BatchGetItemAllContext, promise *BatchGetItemAllPromise)
+}
+
+// BatchGetItemAllHandlerFunc is a BatchGetItemAllHandler function
+type BatchGetItemAllHandlerFunc func(ctx *BatchGetItemAllContext, promise *BatchGetItemAllPromise)
+
+// HandleBatchGetItemAll implements BatchGetItemAllHandler
+func (h BatchGetItemAllHandlerFunc) HandleBatchGetItemAll(ctx *BatchGetItemAllContext, promise *BatchGetItemAllPromise) {
+	h(ctx, promise)
+}
+
+// BatchGetItemAllMiddleWare is a middleware function use for wrapping BatchGetItemAllHandler requests
+type BatchGetItemAllMiddleWare func(handler BatchGetItemAllHandler) BatchGetItemAllHandler
+
+// BatchGetItemAllFinalHandler returns the final BatchGetItemAllHandler that executes a dynamodb BatchGetItemAll operation
+func BatchGetItemAllFinalHandler() BatchGetItemAllHandler {
+	return BatchGetItemAllHandlerFunc(func(ctx *BatchGetItemAllContext, promise *BatchGetItemAllPromise) {
+		var (
+			outs []*ddb.BatchGetItemOutput
+			out  *ddb.BatchGetItemOutput
+			err  error
+		)
+
+		defer func() {promise.SetResponse(outs, err)}()
+
+		// copy the scan so we're not mutating the original
+		input := CopyBatchGetItem(ctx.input)
+
+		for {
+			if out, err = ctx.client.BatchGetItem(ctx, input); err != nil {
+				return
+			}
+
+			outs = append(outs, out)
+
+			if out.UnprocessedKeys == nil {
+				// no more work
+				break
+			}
+
+			input.RequestItems = out.UnprocessedKeys
+		}
+	})
+}
+
+// BatchGetItemAll represents a BatchGetItemAll operation
+type BatchGetItemAll struct {
+	promise     *BatchGetItemAllPromise
+	input       *ddb.BatchGetItemInput
+	middleWares []BatchGetItemAllMiddleWare
+}
+
+// NewBatchGetItemAll creates a new BatchGetItemAll
+func NewBatchGetItemAll(input *ddb.BatchGetItemInput, mws ...BatchGetItemAllMiddleWare) *BatchGetItemAll {
+	return &BatchGetItemAll{
+		input:       input,
+		middleWares: mws,
+		promise:     newBatchGetItemAllPromise(),
+	}
+}
+
+// Invoke invokes the BatchGetItemAll operation and returns a BatchGetItemAllPromise
+func (op *BatchGetItemAll) Invoke(ctx context.Context, client *ddb.Client) *BatchGetItemAllPromise {
 	go op.DynoInvoke(ctx, client)
-	return op
+
+	return op.promise
 }
 
 // DynoInvoke the Operation interface
 func (op *BatchGetItemAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		outs []*ddb.BatchGetItemOutput
-		out  *ddb.BatchGetItemOutput
-		err  error
-	)
-
-	// copy the scan so we're not mutating the original
-	input := CopyBatchGetItem(op.input)
-
-	defer func() { op.SetResponse(outs, err) }()
-
-	for {
-		for _, cb := range op.options.InputCallbacks {
-			if out, err = cb.BatchGetItemInputCallback(ctx, input); out != nil || err != nil {
-				if out != nil {
-					outs = append(outs, out)
-				}
-
-				return
-			}
-		}
-
-		if out, err = client.BatchGetItem(ctx, input); err != nil {
-			return
-		}
-
-		for _, cb := range op.options.OutputCallbacks {
-			if err = cb.BatchGetItemOutputCallback(ctx, out); err != nil {
-				return
-			}
-		}
-
-		outs = append(outs, out)
-
-		if out.UnprocessedKeys == nil {
-			// no more work
-			break
-		}
-
-		input.RequestItems = out.UnprocessedKeys
+	requestCtx := &BatchGetItemAllContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
 	}
 
+	h := BatchGetItemAllFinalHandler()
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i](h)
+		}
+	}
+
+	h.HandleBatchGetItemAll(requestCtx, op.promise)
 }
 
 func NewBatchGetItemInput() *ddb.BatchGetItemInput {
