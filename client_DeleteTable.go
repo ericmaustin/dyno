@@ -5,99 +5,37 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
-// DeleteTable executes a scan api call with a DeleteTableInput
-func (c *Client) DeleteTable(ctx context.Context, input *ddb.DeleteTableInput, optFns ...func(*DeleteTableOptions)) (*ddb.DeleteTableOutput, error) {
-	op := NewDeleteTable(input, optFns...)
-	op.DynoInvoke(ctx, c.ddb)
-	
-	return op.Await()
+// DeleteTable executes DeleteTable operation and returns a DeleteTablePromise
+func (c *Client) DeleteTable(ctx context.Context, input *ddb.DeleteTableInput, mw ...DeleteTableMiddleWare) *DeleteTablePromise {
+	return NewDeleteTable(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// DeleteTable executes a DeleteTable operation with a DeleteTableInput in this pool and returns the DeleteTable for processing
-func (p *Pool) DeleteTable(input *ddb.DeleteTableInput, optFns ...func(*DeleteTableOptions)) *DeleteTable {
-	op := NewDeleteTable(input, optFns...)
+// DeleteTable executes a DeleteTable operation with a DeleteTableInput in this pool and returns the DeleteTablePromise
+func (p *Pool) DeleteTable(input *ddb.DeleteTableInput, mw ...DeleteTableMiddleWare) *DeleteTablePromise {
+	op := NewDeleteTable(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.SetResponse(nil, err)
+		op.promise.SetResponse(nil, err)
 	}
 
-	return op
+	return op.promise
 }
 
-// DeleteTableInputCallback is a callback that is called on a given DeleteTableInput before a DeleteTable operation api call executes
-type DeleteTableInputCallback interface {
-	DeleteTableInputCallback(context.Context, *ddb.DeleteTableInput) (*ddb.DeleteTableOutput, error)
+// DeleteTableContext represents an exhaustive DeleteTable operation request context
+type DeleteTableContext struct {
+	context.Context
+	input  *ddb.DeleteTableInput
+	client *ddb.Client
 }
 
-// DeleteTableOutputCallback is a callback that is called on a given DeleteTableOutput after a DeleteTable operation api call executes
-type DeleteTableOutputCallback interface {
-	DeleteTableOutputCallback(context.Context, *ddb.DeleteTableOutput) error
-}
-
-// DeleteTableInputCallbackFunc is DeleteTableOutputCallback function
-type DeleteTableInputCallbackFunc func(context.Context, *ddb.DeleteTableInput) (*ddb.DeleteTableOutput, error)
-
-// DeleteTableInputCallback implements the DeleteTableOutputCallback interface
-func (cb DeleteTableInputCallbackFunc) DeleteTableInputCallback(ctx context.Context, input *ddb.DeleteTableInput) (*ddb.DeleteTableOutput, error) {
-	return cb(ctx, input)
-}
-
-// DeleteTableOutputCallbackFunc is DeleteTableOutputCallback function
-type DeleteTableOutputCallbackFunc func(context.Context, *ddb.DeleteTableOutput) error
-
-// DeleteTableOutputCallback implements the DeleteTableOutputCallback interface
-func (cb DeleteTableOutputCallbackFunc) DeleteTableOutputCallback(ctx context.Context, input *ddb.DeleteTableOutput) error {
-	return cb(ctx, input)
-}
-
-// DeleteTableOptions represents options passed to the DeleteTable operation
-type DeleteTableOptions struct {
-	// InputCallbacks are called before the DeleteTable dynamodb api operation with the dynamodb.DeleteTableInput
-	InputCallbacks []DeleteTableInputCallback
-	// OutputCallbacks are called after the DeleteTable dynamodb api operation with the dynamodb.DeleteTableOutput
-	OutputCallbacks []DeleteTableOutputCallback
-}
-
-// DeleteTableWithInputCallback adds a DeleteTableInputCallbackFunc to the InputCallbacks
-func DeleteTableWithInputCallback(cb DeleteTableInputCallbackFunc) func(*DeleteTableOptions) {
-	return func(opt *DeleteTableOptions) {
-		opt.InputCallbacks = append(opt.InputCallbacks, cb)
-	}
-}
-
-// DeleteTableWithOutputCallback adds a DeleteTableOutputCallback to the OutputCallbacks
-func DeleteTableWithOutputCallback(cb DeleteTableOutputCallback) func(*DeleteTableOptions) {
-	return func(opt *DeleteTableOptions) {
-		opt.OutputCallbacks = append(opt.OutputCallbacks, cb)
-	}
-}
-
-// DeleteTable represents a DeleteTable operation
-type DeleteTable struct {
+// DeleteTablePromise represents a promise for the DeleteTable
+type DeleteTablePromise struct {
 	*Promise
-	input   *ddb.DeleteTableInput
-	options DeleteTableOptions
 }
 
-// NewDeleteTable creates a new DeleteTable operation on the given client with a given DeleteTableInput and options
-func NewDeleteTable(input *ddb.DeleteTableInput, optFns ...func(*DeleteTableOptions)) *DeleteTable {
-	opts := DeleteTableOptions{}
-
-	for _, opt := range optFns {
-		opt(&opts)
-	}
-
-	return &DeleteTable{
-		Promise: NewPromise(),
-		input:   input,
-		options: opts,
-	}
-}
-
-// Await waits for the Operation to be complete and then returns a DeleteTableOutput and error
-func (op *DeleteTable) Await() (*ddb.DeleteTableOutput, error) {
-	out, err := op.Promise.Await()
-
+// Await waits for the DeleteTablePromise to be fulfilled and then returns a DeleteTableOutput and error
+func (p *DeleteTablePromise) Await() (*ddb.DeleteTableOutput, error) {
+	out, err := p.Promise.Await()
 	if out == nil {
 		return nil, err
 	}
@@ -105,36 +43,77 @@ func (op *DeleteTable) Await() (*ddb.DeleteTableOutput, error) {
 	return out.(*ddb.DeleteTableOutput), err
 }
 
-// Invoke invokes the DeleteTable operation
-func (op *DeleteTable) Invoke(ctx context.Context, client *ddb.Client) *DeleteTable {
+// newDeleteTablePromise returns a new DeleteTablePromise
+func newDeleteTablePromise() *DeleteTablePromise {
+	return &DeleteTablePromise{NewPromise()}
+}
+
+// DeleteTableHandler represents a handler for DeleteTable requests
+type DeleteTableHandler interface {
+	HandleDeleteTable(ctx *DeleteTableContext, promise *DeleteTablePromise)
+}
+
+// DeleteTableHandlerFunc is a DeleteTableHandler function
+type DeleteTableHandlerFunc func(ctx *DeleteTableContext, promise *DeleteTablePromise)
+
+// HandleDeleteTable implements DeleteTableHandler
+func (h DeleteTableHandlerFunc) HandleDeleteTable(ctx *DeleteTableContext, promise *DeleteTablePromise) {
+	h(ctx, promise)
+}
+
+// DeleteTableMiddleWare is a middleware function use for wrapping DeleteTableHandler requests
+type DeleteTableMiddleWare func(handler DeleteTableHandler) DeleteTableHandler
+
+// DeleteTableFinalHandler returns the final DeleteTableHandler that executes a dynamodb DeleteTable operation
+func DeleteTableFinalHandler() DeleteTableHandler {
+	return DeleteTableHandlerFunc(func(ctx *DeleteTableContext, promise *DeleteTablePromise) {
+		promise.SetResponse(ctx.client.DeleteTable(ctx, ctx.input))
+	})
+}
+
+// DeleteTable represents a DeleteTable operation
+type DeleteTable struct {
+	promise     *DeleteTablePromise
+	input       *ddb.DeleteTableInput
+	middleWares []DeleteTableMiddleWare
+}
+
+// NewDeleteTable creates a new DeleteTable
+func NewDeleteTable(input *ddb.DeleteTableInput, mws ...DeleteTableMiddleWare) *DeleteTable {
+	return &DeleteTable{
+		input:       input,
+		middleWares: mws,
+		promise:     newDeleteTablePromise(),
+	}
+}
+
+// Invoke invokes the DeleteTable operation and returns a DeleteTablePromise
+func (op *DeleteTable) Invoke(ctx context.Context, client *ddb.Client) *DeleteTablePromise {
 	go op.DynoInvoke(ctx, client)
-	return op
+
+	return op.promise
 }
 
 // DynoInvoke implements the Operation interface
 func (op *DeleteTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		out *ddb.DeleteTableOutput
-		err error
-	)
 
-	defer func() { op.SetResponse(out, err) }()
+	requestCtx := &DeleteTableContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
 
-	for _, cb := range op.options.InputCallbacks {
-		if out, err = cb.DeleteTableInputCallback(ctx, op.input); out != nil || err != nil {
-			return
+	h := DeleteTableFinalHandler()
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i](h)
 		}
 	}
 
-	if out, err = client.DeleteTable(ctx, op.input); err != nil {
-		return
-	}
-
-	for _, cb := range op.options.OutputCallbacks {
-		if err = cb.DeleteTableOutputCallback(ctx, out); err != nil {
-			return
-		}
-	}
+	h.HandleDeleteTable(requestCtx, op.promise)
 }
 
 // NewDeleteTableInput creates a new DeleteTableInput
