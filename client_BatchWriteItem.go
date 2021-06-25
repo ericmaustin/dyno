@@ -263,6 +263,7 @@ func CopyDeleteRequest(input *ddbTypes.DeleteRequest) *ddbTypes.DeleteRequest {
 	if input == nil {
 		return nil
 	}
+
 	return &ddbTypes.DeleteRequest{Key: CopyAttributeValueMap(input.Key)}
 }
 
@@ -271,6 +272,7 @@ func CopyPutRequest(input *ddbTypes.PutRequest) *ddbTypes.PutRequest {
 	if input == nil {
 		return nil
 	}
+
 	return &ddbTypes.PutRequest{Item: CopyAttributeValueMap(input.Item)}
 }
 
@@ -309,7 +311,7 @@ type BatchWriteItemBuilder struct {
 	*ddb.BatchWriteItemInput
 }
 
-//NewBatchWriteItemBuilder creates a new BatchWriteItemBuilder
+// NewBatchWriteItemBuilder creates a new BatchWriteItemBuilder
 func NewBatchWriteItemBuilder() *BatchWriteItemBuilder {
 	return &BatchWriteItemBuilder{
 		BatchWriteItemInput: &ddb.BatchWriteItemInput{
@@ -345,9 +347,12 @@ func (bld *BatchWriteItemBuilder) AddWriteRequests(tableName string, requests ..
 		for i, req := range requests {
 			bld.RequestItems[tableName][i] = req
 		}
+
 		return bld
 	}
+
 	bld.RequestItems[tableName] = append(bld.RequestItems[tableName], requests...)
+
 	return bld
 }
 
@@ -360,6 +365,7 @@ func (bld *BatchWriteItemBuilder) AddPuts(tableName string, items ...map[string]
 			PutRequest: &ddbTypes.PutRequest{Item: item},
 		}
 	}
+
 	return bld.AddWriteRequests(tableName, w...)
 }
 

@@ -7,99 +7,37 @@ import (
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// CreateTable executes a scan api call with a CreateTableInput
-func (c *Client) CreateTable(ctx context.Context, input *ddb.CreateTableInput, optFns ...func(*CreateTableOptions)) (*ddb.CreateTableOutput, error) {
-	op := NewCreateTable(input, optFns...)
-	op.DynoInvoke(ctx, c.ddb)
-
-	return op.Await()
+// CreateTable executes CreateTable operation and returns a CreateTablePromise
+func (c *Client) CreateTable(ctx context.Context, input *ddb.CreateTableInput, mw ...CreateTableMiddleWare) *CreateTablePromise {
+	return NewCreateTable(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// CreateTable executes a CreateTable operation with a CreateTableInput in this pool and returns the CreateTable for processing
-func (p *Pool) CreateTable(input *ddb.CreateTableInput, optFns ...func(*CreateTableOptions)) *CreateTable {
-	op := NewCreateTable(input, optFns...)
+// CreateTable executes a CreateTable operation with a CreateTableInput in this pool and returns the CreateTablePromise
+func (p *Pool) CreateTable(input *ddb.CreateTableInput, mw ...CreateTableMiddleWare) *CreateTablePromise {
+	op := NewCreateTable(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.SetResponse(nil, err)
+		op.promise.SetResponse(nil, err)
 	}
 
-	return op
+	return op.promise
 }
 
-// CreateTableInputCallback is a callback that is called on a given CreateTableInput before a CreateTable operation api call executes
-type CreateTableInputCallback interface {
-	CreateTableInputCallback(context.Context, *ddb.CreateTableInput) (*ddb.CreateTableOutput, error)
+// CreateTableContext represents an exhaustive CreateTable operation request context
+type CreateTableContext struct {
+	context.Context
+	input  *ddb.CreateTableInput
+	client *ddb.Client
 }
 
-// CreateTableOutputCallback is a callback that is called on a given CreateTableOutput after a CreateTable operation api call executes
-type CreateTableOutputCallback interface {
-	CreateTableOutputCallback(context.Context, *ddb.CreateTableOutput) error
-}
-
-// CreateTableInputCallbackF is CreateTableOutputCallback function
-type CreateTableInputCallbackF func(context.Context, *ddb.CreateTableInput) (*ddb.CreateTableOutput, error)
-
-// CreateTableInputCallback implements the CreateTableOutputCallback interface
-func (cb CreateTableInputCallbackF) CreateTableInputCallback(ctx context.Context, input *ddb.CreateTableInput) (*ddb.CreateTableOutput, error) {
-	return cb(ctx, input)
-}
-
-// CreateTableOutputCallbackF is CreateTableOutputCallback function
-type CreateTableOutputCallbackF func(context.Context, *ddb.CreateTableOutput) error
-
-// CreateTableOutputCallback implements the CreateTableOutputCallback interface
-func (cb CreateTableOutputCallbackF) CreateTableOutputCallback(ctx context.Context, input *ddb.CreateTableOutput) error {
-	return cb(ctx, input)
-}
-
-// CreateTableOptions represents options passed to the CreateTable operation
-type CreateTableOptions struct {
-	// InputCallbacks are called before the CreateTable dynamodb api operation with the dynamodb.CreateTableInput
-	InputCallbacks []CreateTableInputCallback
-	// OutputCallbacks are called after the CreateTable dynamodb api operation with the dynamodb.CreateTableOutput
-	OutputCallbacks []CreateTableOutputCallback
-}
-
-// CreateTableWithInputCallback adds a CreateTableInputCallbackF to the InputCallbacks
-func CreateTableWithInputCallback(cb CreateTableInputCallbackF) func(*CreateTableOptions) {
-	return func(opt *CreateTableOptions) {
-		opt.InputCallbacks = append(opt.InputCallbacks, cb)
-	}
-}
-
-// CreateTableWithOutputCallback adds a CreateTableOutputCallback to the OutputCallbacks
-func CreateTableWithOutputCallback(cb CreateTableOutputCallback) func(*CreateTableOptions) {
-	return func(opt *CreateTableOptions) {
-		opt.OutputCallbacks = append(opt.OutputCallbacks, cb)
-	}
-}
-
-// CreateTable represents a CreateTable operation
-type CreateTable struct {
+// CreateTablePromise represents a promise for the CreateTable
+type CreateTablePromise struct {
 	*Promise
-	input   *ddb.CreateTableInput
-	options CreateTableOptions
 }
 
-// NewCreateTable creates a new CreateTable operation on the given client with a given CreateTableInput and options
-func NewCreateTable(input *ddb.CreateTableInput, optFns ...func(*CreateTableOptions)) *CreateTable {
-	opts := CreateTableOptions{}
-
-	for _, opt := range optFns {
-		opt(&opts)
-	}
-
-	return &CreateTable{
-		Promise: NewPromise(),
-		input:   input,
-		options: opts,
-	}
-}
-
-// Await waits for the Operation to be complete and then returns a CreateTableOutput and error
-func (op *CreateTable) Await() (*ddb.CreateTableOutput, error) {
-	out, err := op.Promise.Await()
-
+// Await waits for the CreateTablePromise to be fulfilled and then returns a CreateTableOutput and error
+func (p *CreateTablePromise) Await() (*ddb.CreateTableOutput, error) {
+	out, err := p.Promise.Await()
 	if out == nil {
 		return nil, err
 	}
@@ -107,36 +45,77 @@ func (op *CreateTable) Await() (*ddb.CreateTableOutput, error) {
 	return out.(*ddb.CreateTableOutput), err
 }
 
-// Invoke invokes the CreateTable operation
-func (op *CreateTable) Invoke(ctx context.Context, client *ddb.Client) *CreateTable {
+// newCreateTablePromise returns a new CreateTablePromise
+func newCreateTablePromise() *CreateTablePromise {
+	return &CreateTablePromise{NewPromise()}
+}
+
+// CreateTableHandler represents a handler for CreateTable requests
+type CreateTableHandler interface {
+	HandleCreateTable(ctx *CreateTableContext, promise *CreateTablePromise)
+}
+
+// CreateTableHandlerFunc is a CreateTableHandler function
+type CreateTableHandlerFunc func(ctx *CreateTableContext, promise *CreateTablePromise)
+
+// HandleCreateTable implements CreateTableHandler
+func (h CreateTableHandlerFunc) HandleCreateTable(ctx *CreateTableContext, promise *CreateTablePromise) {
+	h(ctx, promise)
+}
+
+// CreateTableMiddleWare is a middleware function use for wrapping CreateTableHandler requests
+type CreateTableMiddleWare func(handler CreateTableHandler) CreateTableHandler
+
+// CreateTableFinalHandler returns the final CreateTableHandler that executes a dynamodb CreateTable operation
+func CreateTableFinalHandler() CreateTableHandler {
+	return CreateTableHandlerFunc(func(ctx *CreateTableContext, promise *CreateTablePromise) {
+		promise.SetResponse(ctx.client.CreateTable(ctx, ctx.input))
+	})
+}
+
+// CreateTable represents a CreateTable operation
+type CreateTable struct {
+	promise     *CreateTablePromise
+	input       *ddb.CreateTableInput
+	middleWares []CreateTableMiddleWare
+}
+
+// NewCreateTable creates a new CreateTable
+func NewCreateTable(input *ddb.CreateTableInput, mws ...CreateTableMiddleWare) *CreateTable {
+	return &CreateTable{
+		input:       input,
+		middleWares: mws,
+		promise:     newCreateTablePromise(),
+	}
+}
+
+// Invoke invokes the CreateTable operation and returns a CreateTablePromise
+func (op *CreateTable) Invoke(ctx context.Context, client *ddb.Client) *CreateTablePromise {
 	go op.DynoInvoke(ctx, client)
-	return op
+
+	return op.promise
 }
 
 // DynoInvoke implements the Operation interface
 func (op *CreateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		out *ddb.CreateTableOutput
-		err error
-	)
 
-	defer func(){ op.SetResponse(out, err) }()
+	requestCtx := &CreateTableContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
 
-	for _, cb := range op.options.InputCallbacks {
-		if out, err = cb.CreateTableInputCallback(ctx, op.input); out != nil || err != nil {
-			return
+	h := CreateTableFinalHandler()
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i](h)
 		}
 	}
 
-	if out, err = client.CreateTable(ctx, op.input); err != nil {
-		return
-	}
-
-	for _, cb := range op.options.OutputCallbacks {
-		if err = cb.CreateTableOutputCallback(ctx, out); err != nil {
-			return
-		}
-	}
+	h.HandleCreateTable(requestCtx, op.promise)
 }
 
 // CreateTableBuilder is used to construct a CreateTableBuilder dynamically
