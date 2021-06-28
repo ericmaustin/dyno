@@ -3,6 +3,7 @@ package dyno
 import (
 	"context"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"sync"
 )
 
 // DeleteBackup executes DeleteBackup operation and returns a DeleteBackupPromise
@@ -28,6 +29,30 @@ type DeleteBackupContext struct {
 	client *ddb.Client
 }
 
+// DeleteBackupOutput represents the output for the DeleteBackup opration
+type DeleteBackupOutput struct {
+	out *ddb.DeleteBackupOutput
+	err error
+	mu sync.RWMutex
+}
+
+// Set sets the output
+func (o *DeleteBackupOutput) Set(out *ddb.DeleteBackupOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *DeleteBackupOutput) Get() (out *ddb.DeleteBackupOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
+}
+
 // DeleteBackupPromise represents a promise for the DeleteBackup
 type DeleteBackupPromise struct {
 	*Promise
@@ -50,25 +75,36 @@ func newDeleteBackupPromise() *DeleteBackupPromise {
 
 // DeleteBackupHandler represents a handler for DeleteBackup requests
 type DeleteBackupHandler interface {
-	HandleDeleteBackup(ctx *DeleteBackupContext, promise *DeleteBackupPromise)
+	HandleDeleteBackup(ctx *DeleteBackupContext, output *DeleteBackupOutput)
 }
 
 // DeleteBackupHandlerFunc is a DeleteBackupHandler function
-type DeleteBackupHandlerFunc func(ctx *DeleteBackupContext, promise *DeleteBackupPromise)
+type DeleteBackupHandlerFunc func(ctx *DeleteBackupContext, output *DeleteBackupOutput)
 
 // HandleDeleteBackup implements DeleteBackupHandler
-func (h DeleteBackupHandlerFunc) HandleDeleteBackup(ctx *DeleteBackupContext, promise *DeleteBackupPromise) {
-	h(ctx, promise)
+func (h DeleteBackupHandlerFunc) HandleDeleteBackup(ctx *DeleteBackupContext, output *DeleteBackupOutput) {
+	h(ctx, output)
+}
+
+// DeleteBackupFinalHandler is the final DeleteBackupHandler that executes a dynamodb DeleteBackup operation
+type DeleteBackupFinalHandler struct {}
+
+// HandleDeleteBackup implements the DeleteBackupHandler
+func (h *DeleteBackupFinalHandler) HandleDeleteBackup(ctx *DeleteBackupContext, output *DeleteBackupOutput) {
+	output.Set(ctx.client.DeleteBackup(ctx, ctx.input))
 }
 
 // DeleteBackupMiddleWare is a middleware function use for wrapping DeleteBackupHandler requests
-type DeleteBackupMiddleWare func(handler DeleteBackupHandler) DeleteBackupHandler
+type DeleteBackupMiddleWare interface {
+	DeleteBackupMiddleWare(next DeleteBackupHandler) DeleteBackupHandler
+}
 
-// DeleteBackupFinalHandler returns the final DeleteBackupHandler that executes a dynamodb DeleteBackup operation
-func DeleteBackupFinalHandler() DeleteBackupHandler {
-	return DeleteBackupHandlerFunc(func(ctx *DeleteBackupContext, promise *DeleteBackupPromise) {
-		promise.SetResponse(ctx.client.DeleteBackup(ctx, ctx.input))
-	})
+// DeleteBackupMiddleWareFunc is a functional DeleteBackupMiddleWare
+type DeleteBackupMiddleWareFunc func(next DeleteBackupHandler) DeleteBackupHandler
+
+// DeleteBackupMiddleWare implements the DeleteBackupMiddleWare interface
+func (mw DeleteBackupMiddleWareFunc) DeleteBackupMiddleWare(h DeleteBackupHandler) DeleteBackupHandler {
+	return mw(h)
 }
 
 // DeleteBackup represents a DeleteBackup operation
@@ -97,23 +133,29 @@ func (op *DeleteBackup) Invoke(ctx context.Context, client *ddb.Client) *DeleteB
 // DynoInvoke implements the Operation interface
 func (op *DeleteBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
+	output := new(DeleteBackupOutput)
+
+	defer func() { op.promise.SetResponse(output.Get()) }()
+
 	requestCtx := &DeleteBackupContext{
 		Context: ctx,
 		client:  client,
 		input:   op.input,
 	}
 
-	h := DeleteBackupFinalHandler()
+	var h DeleteBackupHandler
+
+	h = new(DeleteBackupFinalHandler)
 
 	// no middlewares
 	if len(op.middleWares) > 0 {
 		// loop in reverse to preserve middleware order
 		for i := len(op.middleWares) - 1; i >= 0; i-- {
-			h = op.middleWares[i](h)
+			h = op.middleWares[i].DeleteBackupMiddleWare(h)
 		}
 	}
 
-	h.HandleDeleteBackup(requestCtx, op.promise)
+	h.HandleDeleteBackup(requestCtx, output)
 }
 
 // NewDeleteBackupInput creates a DeleteBackupInput with a given table name and key

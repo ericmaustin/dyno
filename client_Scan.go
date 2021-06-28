@@ -93,6 +93,14 @@ func (h ScanHandlerFunc) HandleScan(ctx *ScanContext, promise *ScanPromise) {
 	h(ctx, promise)
 }
 
+// ScanFinalHandler is the final ScanHandler that executes a dynamodb Scan operation
+type ScanFinalHandler struct {}
+
+// HandleScan implements the ScanHandler
+func (h *ScanFinalHandler) HandleScan(ctx *ScanContext, promise *ScanPromise) {
+	promise.SetResponse(ctx.client.Scan(ctx, ctx.input))
+}
+
 // ScanMiddleWare is a middleware function use for wrapping ScanHandler requests
 type ScanMiddleWare interface {
 	ScanMiddleWare(h ScanHandler) ScanHandler
@@ -104,14 +112,6 @@ type ScanMiddleWareFunc func(handler ScanHandler) ScanHandler
 // ScanMiddleWare implements the ScanMiddleWare interface
 func (mw ScanMiddleWareFunc) ScanMiddleWare(h ScanHandler) ScanHandler {
 	return mw(h)
-}
-
-// ScanFinalHandler is the final ScanHandler that executes a dynamodb Scan operation
-type ScanFinalHandler struct {}
-
-// HandleScan implements the ScanHandler
-func (h *ScanFinalHandler) HandleScan(ctx *ScanContext, promise *ScanPromise) {
-	promise.SetResponse(ctx.client.Scan(ctx, ctx.input))
 }
 
 // Scan represents a Scan operation

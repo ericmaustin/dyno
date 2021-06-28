@@ -3,6 +3,7 @@ package dyno
 import (
 	"context"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"sync"
 )
 
 // DeleteTable executes DeleteTable operation and returns a DeleteTablePromise
@@ -28,6 +29,30 @@ type DeleteTableContext struct {
 	client *ddb.Client
 }
 
+// DeleteTableOutput represents the output for the DeleteTable opration
+type DeleteTableOutput struct {
+	out *ddb.DeleteTableOutput
+	err error
+	mu  sync.RWMutex
+}
+
+// Set sets the output
+func (o *DeleteTableOutput) Set(out *ddb.DeleteTableOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *DeleteTableOutput) Get() (out *ddb.DeleteTableOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
+}
+
 // DeleteTablePromise represents a promise for the DeleteTable
 type DeleteTablePromise struct {
 	*Promise
@@ -50,25 +75,36 @@ func newDeleteTablePromise() *DeleteTablePromise {
 
 // DeleteTableHandler represents a handler for DeleteTable requests
 type DeleteTableHandler interface {
-	HandleDeleteTable(ctx *DeleteTableContext, promise *DeleteTablePromise)
+	HandleDeleteTable(ctx *DeleteTableContext, output *DeleteTableOutput)
 }
 
 // DeleteTableHandlerFunc is a DeleteTableHandler function
-type DeleteTableHandlerFunc func(ctx *DeleteTableContext, promise *DeleteTablePromise)
+type DeleteTableHandlerFunc func(ctx *DeleteTableContext, output *DeleteTableOutput)
 
 // HandleDeleteTable implements DeleteTableHandler
-func (h DeleteTableHandlerFunc) HandleDeleteTable(ctx *DeleteTableContext, promise *DeleteTablePromise) {
-	h(ctx, promise)
+func (h DeleteTableHandlerFunc) HandleDeleteTable(ctx *DeleteTableContext, output *DeleteTableOutput) {
+	h(ctx, output)
+}
+
+// DeleteTableFinalHandler is the final DeleteTableHandler that executes a dynamodb DeleteTable operation
+type DeleteTableFinalHandler struct{}
+
+// HandleDeleteTable implements the DeleteTableHandler
+func (h *DeleteTableFinalHandler) HandleDeleteTable(ctx *DeleteTableContext, output *DeleteTableOutput) {
+	output.Set(ctx.client.DeleteTable(ctx, ctx.input))
 }
 
 // DeleteTableMiddleWare is a middleware function use for wrapping DeleteTableHandler requests
-type DeleteTableMiddleWare func(handler DeleteTableHandler) DeleteTableHandler
+type DeleteTableMiddleWare interface {
+	DeleteTableMiddleWare(h DeleteTableHandler) DeleteTableHandler
+}
 
-// DeleteTableFinalHandler returns the final DeleteTableHandler that executes a dynamodb DeleteTable operation
-func DeleteTableFinalHandler() DeleteTableHandler {
-	return DeleteTableHandlerFunc(func(ctx *DeleteTableContext, promise *DeleteTablePromise) {
-		promise.SetResponse(ctx.client.DeleteTable(ctx, ctx.input))
-	})
+// DeleteTableMiddleWareFunc is a functional DeleteTableMiddleWare
+type DeleteTableMiddleWareFunc func(handler DeleteTableHandler) DeleteTableHandler
+
+// DeleteTableMiddleWare implements the DeleteTableMiddleWare interface
+func (mw DeleteTableMiddleWareFunc) DeleteTableMiddleWare(h DeleteTableHandler) DeleteTableHandler {
+	return mw(h)
 }
 
 // DeleteTable represents a DeleteTable operation
@@ -97,23 +133,29 @@ func (op *DeleteTable) Invoke(ctx context.Context, client *ddb.Client) *DeleteTa
 // DynoInvoke implements the Operation interface
 func (op *DeleteTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
+	output := new(DeleteTableOutput)
+
+	defer func() { op.promise.SetResponse(output.Get()) }()
+
 	requestCtx := &DeleteTableContext{
 		Context: ctx,
 		client:  client,
 		input:   op.input,
 	}
 
-	h := DeleteTableFinalHandler()
+	var h DeleteTableHandler
+
+	h = new(DeleteTableFinalHandler)
 
 	// no middlewares
 	if len(op.middleWares) > 0 {
 		// loop in reverse to preserve middleware order
 		for i := len(op.middleWares) - 1; i >= 0; i-- {
-			h = op.middleWares[i](h)
+			h = op.middleWares[i].DeleteTableMiddleWare(h)
 		}
 	}
 
-	h.HandleDeleteTable(requestCtx, op.promise)
+	h.HandleDeleteTable(requestCtx, output)
 }
 
 // NewDeleteTableInput creates a new DeleteTableInput

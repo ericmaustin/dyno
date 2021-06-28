@@ -4,6 +4,7 @@ import (
 	"context"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"sync"
 )
 
 // BatchWriteItem executes BatchWriteItem operation and returns a BatchWriteItemPromise
@@ -45,6 +46,30 @@ type BatchWriteItemContext struct {
 	client *ddb.Client
 }
 
+// BatchWriteItemOutput represents the output for the BatchWriteItem operation
+type BatchWriteItemOutput struct {
+	out *ddb.BatchWriteItemOutput
+	err error
+	mu sync.RWMutex
+}
+
+// Set sets the output
+func (o *BatchWriteItemOutput) Set(out *ddb.BatchWriteItemOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *BatchWriteItemOutput) Get() (out *ddb.BatchWriteItemOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
+}
+
 // BatchWriteItemPromise represents a promise for the BatchWriteItem
 type BatchWriteItemPromise struct {
 	*Promise
@@ -78,36 +103,36 @@ func newBatchWriteItemPromise() *BatchWriteItemPromise {
 
 // BatchWriteItemHandler represents a handler for BatchWriteItem requests
 type BatchWriteItemHandler interface {
-	HandleBatchWriteItem(ctx *BatchWriteItemContext, promise *BatchWriteItemPromise)
+	HandleBatchWriteItem(ctx *BatchWriteItemContext, output *BatchWriteItemOutput)
 }
 
 // BatchWriteItemHandlerFunc is a BatchWriteItemHandler function
-type BatchWriteItemHandlerFunc func(ctx *BatchWriteItemContext, promise *BatchWriteItemPromise)
+type BatchWriteItemHandlerFunc func(ctx *BatchWriteItemContext, output *BatchWriteItemOutput)
 
 // HandleBatchWriteItem implements BatchWriteItemHandler
-func (h BatchWriteItemHandlerFunc) HandleBatchWriteItem(ctx *BatchWriteItemContext, promise *BatchWriteItemPromise) {
-	h(ctx, promise)
+func (h BatchWriteItemHandlerFunc) HandleBatchWriteItem(ctx *BatchWriteItemContext, output *BatchWriteItemOutput) {
+	h(ctx, output)
 }
 
 // BatchWriteItemMiddleWare is a middleware function use for wrapping BatchWriteItemHandler requests
 type BatchWriteItemMiddleWare interface {
-	BatchWriteItemMiddleWare(h BatchWriteItemHandler) BatchWriteItemHandler
+	BatchWriteItemMiddleWare(next BatchWriteItemHandler) BatchWriteItemHandler
 }
 
 // BatchWriteItemMiddleWareFunc is a functional BatchWriteItemMiddleWare
-type BatchWriteItemMiddleWareFunc func(handler BatchWriteItemHandler) BatchWriteItemHandler
+type BatchWriteItemMiddleWareFunc func(next BatchWriteItemHandler) BatchWriteItemHandler
 
 // BatchWriteItemMiddleWare implements the BatchWriteItemMiddleWare interface
-func (mw BatchWriteItemMiddleWareFunc) BatchWriteItemMiddleWare(h BatchWriteItemHandler) BatchWriteItemHandler {
-	return mw(h)
+func (mw BatchWriteItemMiddleWareFunc) BatchWriteItemMiddleWare(next BatchWriteItemHandler) BatchWriteItemHandler {
+	return mw(next)
 }
 
 // BatchWriteItemFinalHandler is the final handler for all batchWriteItem operations
 type BatchWriteItemFinalHandler struct {}
 
 // HandleBatchWriteItem implements BatchWriteItemHandler
-func (b *BatchWriteItemFinalHandler) HandleBatchWriteItem(ctx *BatchWriteItemContext, promise *BatchWriteItemPromise) {
-	promise.SetResponse(ctx.client.BatchWriteItem(ctx, ctx.input))
+func (b *BatchWriteItemFinalHandler) HandleBatchWriteItem(ctx *BatchWriteItemContext, output *BatchWriteItemOutput) {
+	output.Set(ctx.client.BatchWriteItem(ctx, ctx.input))
 }
 
 // BatchWriteItem represents a BatchWriteItem operation
@@ -135,7 +160,10 @@ func (op *BatchWriteItem) Invoke(ctx context.Context, client *ddb.Client) *Batch
 
 // DynoInvoke implements the Operation interface
 func (op *BatchWriteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	output := new(BatchWriteItemOutput)
 
+	defer func() { op.promise.SetResponse(output.Get()) }()
+	
 	requestCtx := &BatchWriteItemContext{
 		Context: ctx,
 		client:  client,
@@ -154,7 +182,7 @@ func (op *BatchWriteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		}
 	}
 
-	h.HandleBatchWriteItem(requestCtx, op.promise)
+	h.HandleBatchWriteItem(requestCtx, output)
 }
 
 // BatchWriteItemAllContext represents an exhaustive BatchWriteItemAll operation request context
@@ -162,6 +190,30 @@ type BatchWriteItemAllContext struct {
 	context.Context
 	input  *ddb.BatchWriteItemInput
 	client *ddb.Client
+}
+
+// BatchWriteItemAllOutput represents the output for the BatchWriteItemAll operation
+type BatchWriteItemAllOutput struct {
+	out []*ddb.BatchWriteItemOutput
+	err error
+	mu sync.RWMutex
+}
+
+// Set sets the output
+func (o *BatchWriteItemAllOutput) Set(out []*ddb.BatchWriteItemOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *BatchWriteItemAllOutput) Get() (out []*ddb.BatchWriteItemOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
 }
 
 // BatchWriteItemAllPromise represents a promise for the BatchWriteItemAll
@@ -197,42 +249,42 @@ func newBatchWriteItemAllPromise() *BatchWriteItemAllPromise {
 
 // BatchWriteItemAllHandler represents a handler for BatchWriteItemAll requests
 type BatchWriteItemAllHandler interface {
-	HandleBatchWriteItemAll(ctx *BatchWriteItemAllContext, promise *BatchWriteItemAllPromise)
+	HandleBatchWriteItemAll(ctx *BatchWriteItemAllContext, output *BatchWriteItemAllOutput)
 }
 
 // BatchWriteItemAllHandlerFunc is a BatchWriteItemAllHandler function
-type BatchWriteItemAllHandlerFunc func(ctx *BatchWriteItemAllContext, promise *BatchWriteItemAllPromise)
+type BatchWriteItemAllHandlerFunc func(ctx *BatchWriteItemAllContext, output *BatchWriteItemAllOutput)
 
 // HandleBatchWriteItemAll implements BatchWriteItemAllHandler
-func (h BatchWriteItemAllHandlerFunc) HandleBatchWriteItemAll(ctx *BatchWriteItemAllContext, promise *BatchWriteItemAllPromise) {
-	h(ctx, promise)
+func (h BatchWriteItemAllHandlerFunc) HandleBatchWriteItemAll(ctx *BatchWriteItemAllContext, output *BatchWriteItemAllOutput) {
+	h(ctx, output)
 }
 
 // BatchWriteItemAllMiddleWare is a middleware function use for wrapping BatchWriteItemAllHandler requests
 type BatchWriteItemAllMiddleWare interface {
-	BatchWriteItemAllMiddleWare(h BatchWriteItemAllHandler) BatchWriteItemAllHandler
+	BatchWriteItemAllMiddleWare(next BatchWriteItemAllHandler) BatchWriteItemAllHandler
 }
 
 // BatchWriteItemAllMiddleWareFunc is a functional BatchWriteItemAllMiddleWare
-type BatchWriteItemAllMiddleWareFunc func(handler BatchWriteItemAllHandler) BatchWriteItemAllHandler
+type BatchWriteItemAllMiddleWareFunc func(next BatchWriteItemAllHandler) BatchWriteItemAllHandler
 
 // BatchWriteItemAllMiddleWare implements the BatchWriteItemAllMiddleWare interface
-func (mw BatchWriteItemAllMiddleWareFunc) BatchWriteItemAllMiddleWare(h BatchWriteItemAllHandler) BatchWriteItemAllHandler {
-	return mw(h)
+func (mw BatchWriteItemAllMiddleWareFunc) BatchWriteItemAllMiddleWare(next BatchWriteItemAllHandler) BatchWriteItemAllHandler {
+	return mw(next)
 }
 
 // BatchWriteItemAllFinalHandler is the final handler for all batchWriteItemAll operations
 type BatchWriteItemAllFinalHandler struct {}
 
 // HandleBatchWriteItemAll implements the HandleBatchWriteItem interface
-func (b *BatchWriteItemAllFinalHandler) HandleBatchWriteItemAll(ctx *BatchWriteItemAllContext, promise *BatchWriteItemAllPromise) {
+func (b *BatchWriteItemAllFinalHandler) HandleBatchWriteItemAll(ctx *BatchWriteItemAllContext, output *BatchWriteItemAllOutput) {
 	var (
 		outs []*ddb.BatchWriteItemOutput
 		out  *ddb.BatchWriteItemOutput
 		err  error
 	)
 
-	defer func() { promise.SetResponse(outs, err) }()
+	defer func() { output.Set(outs, err) }()
 
 	// copy the scan so we're not mutating the original
 	input := CopyBatchWriteItemInput(ctx.input)
@@ -279,6 +331,10 @@ func (op *BatchWriteItemAll) Invoke(ctx context.Context, client *ddb.Client) *Ba
 
 // DynoInvoke the Operation interface
 func (op *BatchWriteItemAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	output := new(BatchWriteItemAllOutput)
+
+	defer func() { op.promise.SetResponse(output.Get()) }()
+
 	requestCtx := &BatchWriteItemAllContext{
 		Context: ctx,
 		client:  client,
@@ -297,7 +353,7 @@ func (op *BatchWriteItemAll) DynoInvoke(ctx context.Context, client *ddb.Client)
 		}
 	}
 
-	h.HandleBatchWriteItemAll(requestCtx, op.promise)
+	h.HandleBatchWriteItemAll(requestCtx, output)
 }
 
 func NewBatchWriteItemInput() *ddb.BatchWriteItemInput {

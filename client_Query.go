@@ -7,99 +7,81 @@ import (
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ericmaustin/dyno/condition"
 	"github.com/ericmaustin/dyno/encoding"
+	"sync"
 )
 
-// Query executes a scan api call with a QueryInput with this Client
-func (c *Client) Query(ctx context.Context, input *ddb.QueryInput, optFns ...func(*QueryOptions)) (*ddb.QueryOutput, error) {
-	op := NewQuery(input, optFns...)
-	op.DynoInvoke(ctx, c.ddb)
-
-	return op.Await()
+// Query executes Query operation and returns a QueryPromise
+func (c *Client) Query(ctx context.Context, input *ddb.QueryInput, mw ...QueryMiddleWare) *QueryPromise {
+	return NewQuery(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// QueryAll executes an exhaustive api call with a QueryInput
-// that will keep running Query sequentially until LastEvaluatedKey is empty
-func (c *Client) QueryAll(ctx context.Context, input *ddb.QueryInput, optFns ...func(*QueryOptions)) ([]*ddb.QueryOutput, error) {
-	scan := NewQueryAll(input, optFns...)
-	scan.DynoInvoke(ctx, c.ddb)
+// Query executes a Query operation with a QueryInput in this pool and returns the QueryPromise
+func (p *Pool) Query(input *ddb.QueryInput, mw ...QueryMiddleWare) *QueryPromise {
+	op := NewQuery(input, mw...)
 
-	return scan.Await()
-}
-
-// QueryInputCallback is a callback that is called on a given QueryInput before a Query operation api call executes
-type QueryInputCallback interface {
-	QueryInputCallback(context.Context, *ddb.QueryInput) (*ddb.QueryOutput, error)
-}
-
-// QueryOutputCallback is a callback that is called on a given QueryOutput after a Query operation api call executes
-type QueryOutputCallback interface {
-	QueryOutputCallback(context.Context, *ddb.QueryOutput) error
-}
-
-// QueryInputCallbackFunc is QueryOutputCallback function
-type QueryInputCallbackFunc func(context.Context, *ddb.QueryInput) (*ddb.QueryOutput, error)
-
-// QueryInputCallback implements the QueryOutputCallback interface
-func (cb QueryInputCallbackFunc) QueryInputCallback(ctx context.Context, input *ddb.QueryInput) (*ddb.QueryOutput, error) {
-	return cb(ctx, input)
-}
-
-// QueryOutputCallbackF is QueryOutputCallback function
-type QueryOutputCallbackF func(context.Context, *ddb.QueryOutput) error
-
-// QueryOutputCallback implements the QueryOutputCallback interface
-func (cb QueryOutputCallbackF) QueryOutputCallback(ctx context.Context, input *ddb.QueryOutput) error {
-	return cb(ctx, input)
-}
-
-// QueryOptions represents options passed to the Query operation
-type QueryOptions struct {
-	// InputCallbacks are called before the Query dynamodb api operation with the dynamodb.QueryInput
-	InputCallbacks []QueryInputCallback
-	// OutputCallbacks are called after the Query dynamodb api operation with the dynamodb.QueryOutput
-	OutputCallbacks []QueryOutputCallback
-}
-
-// QueryWithInputCallback adds a QueryInputCallbackFunc to the InputCallbacks
-func QueryWithInputCallback(cb QueryInputCallbackFunc) func(*QueryOptions) {
-	return func(opt *QueryOptions) {
-		opt.InputCallbacks = append(opt.InputCallbacks, cb)
+	if err := p.Do(op); err != nil {
+		op.promise.SetResponse(nil, err)
 	}
+
+	return op.promise
 }
 
-// QueryWithOutputCallback adds a QueryOutputCallback to the OutputCallbacks
-func QueryWithOutputCallback(cb QueryOutputCallback) func(*QueryOptions) {
-	return func(opt *QueryOptions) {
-		opt.OutputCallbacks = append(opt.OutputCallbacks, cb)
+// QueryAll executes QueryAll operation and returns a QueryAllPromise
+func (c *Client) QueryAll(ctx context.Context, input *ddb.QueryInput, mw ...QueryAllMiddleWare) *QueryAllPromise {
+	return NewQueryAll(input, mw...).Invoke(ctx, c.ddb)
+}
+
+// QueryAll executes a QueryAll operation with a QueryInput in this pool and returns the QueryAllPromise
+func (p *Pool) QueryAll(input *ddb.QueryInput, mw ...QueryAllMiddleWare) *QueryAllPromise {
+	op := NewQueryAll(input, mw...)
+
+	if err := p.Do(op); err != nil {
+		op.promise.SetResponse(nil, err)
 	}
+
+	return op.promise
 }
 
-// Query represents a Query operation
-type Query struct {
+// QueryContext represents an exhaustive Query operation request context
+type QueryContext struct {
+	context.Context
+	input  *ddb.QueryInput
+	client *ddb.Client
+}
+
+// QueryOutput represents the output for the Query opration
+type QueryOutput struct {
+	out *ddb.QueryOutput
+	err error
+	mu sync.RWMutex
+}
+
+// Set sets the output
+func (o *QueryOutput) Set(out *ddb.QueryOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *QueryOutput) Get() (out *ddb.QueryOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
+}
+
+// QueryPromise represents a promise for the Query
+type QueryPromise struct {
 	*Promise
-	input   *ddb.QueryInput
-	options QueryOptions
 }
 
-// NewQuery creates a new Query operation on the given client with a given QueryInput and options
-func NewQuery(input *ddb.QueryInput, optFns ...func(*QueryOptions)) *Query {
-	opts := QueryOptions{}
-
-	for _, opt := range optFns {
-		opt(&opts)
-	}
-
-	return &Query{
-		//client:  nil,
-		Promise: NewPromise(),
-		input:   input,
-		options: opts,
-	}
-}
-
-// Await waits for the Operation to be complete and then returns a QueryOutput and error
-func (op *Query) Await() (*ddb.QueryOutput, error) {
-	out, err := op.Promise.Await()
+// GetResponse returns the GetResponse output and error
+// if Output has not been set yet nil is returned
+func (p *QueryPromise) GetResponse() (*ddb.QueryOutput, error) {
+	out, err := p.Promise.GetResponse()
 	if out == nil {
 		return nil, err
 	}
@@ -107,118 +89,247 @@ func (op *Query) Await() (*ddb.QueryOutput, error) {
 	return out.(*ddb.QueryOutput), err
 }
 
-// Invoke invokes the Query operation
-func (op *Query) Invoke(ctx context.Context, client *ddb.Client) *Query {
+// Await waits for the QueryPromise to be fulfilled and then returns a QueryOutput and error
+func (p *QueryPromise) Await() (*ddb.QueryOutput, error) {
+	out, err := p.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.QueryOutput), err
+}
+
+// newQueryPromise returns a new QueryPromise
+func newQueryPromise() *QueryPromise {
+	return &QueryPromise{NewPromise()}
+}
+
+// QueryHandler represents a handler for Query requests
+type QueryHandler interface {
+	HandleQuery(ctx *QueryContext, output *QueryOutput)
+}
+
+// QueryHandlerFunc is a QueryHandler function
+type QueryHandlerFunc func(ctx *QueryContext, output *QueryOutput)
+
+// HandleQuery implements QueryHandler
+func (h QueryHandlerFunc) HandleQuery(ctx *QueryContext, output *QueryOutput) {
+	h(ctx, output)
+}
+
+// QueryFinalHandler is the final QueryHandler that executes a dynamodb Query operation
+type QueryFinalHandler struct {}
+
+// HandleQuery implements the QueryHandler
+func (h *QueryFinalHandler) HandleQuery(ctx *QueryContext, output *QueryOutput) {
+	output.Set(ctx.client.Query(ctx, ctx.input))
+}
+
+// QueryMiddleWare is a middleware function use for wrapping QueryHandler requests
+type QueryMiddleWare interface {
+	QueryMiddleWare(h QueryHandler) QueryHandler
+}
+
+// QueryMiddleWareFunc is a functional QueryMiddleWare
+type QueryMiddleWareFunc func(handler QueryHandler) QueryHandler
+
+// QueryMiddleWare implements the QueryMiddleWare interface
+func (mw QueryMiddleWareFunc) QueryMiddleWare(h QueryHandler) QueryHandler {
+	return mw(h)
+}
+
+// Query represents a Query operation
+type Query struct {
+	promise     *QueryPromise
+	input       *ddb.QueryInput
+	middleWares []QueryMiddleWare
+}
+
+// NewQuery creates a new Query
+func NewQuery(input *ddb.QueryInput, mws ...QueryMiddleWare) *Query {
+	return &Query{
+		input:       input,
+		middleWares: mws,
+		promise:     newQueryPromise(),
+	}
+}
+
+// Invoke invokes the Query operation and returns a QueryPromise
+func (op *Query) Invoke(ctx context.Context, client *ddb.Client) *QueryPromise {
 	go op.DynoInvoke(ctx, client)
 
-	return op
+	return op.promise
 }
 
 // DynoInvoke implements the Operation interface
 func (op *Query) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		out *ddb.QueryOutput
-		err error
-	)
 
-	defer func() { op.SetResponse(out, err) }()
+	output := new(QueryOutput)
 
-	for _, cb := range op.options.InputCallbacks {
-		if out, err = cb.QueryInputCallback(ctx, op.input); out != nil || err != nil {
-			return
+	defer func() {op.promise.SetResponse(output.Get())}()
+
+	requestCtx := &QueryContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
+
+	var h QueryHandler
+
+	h = new(QueryFinalHandler)
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i].QueryMiddleWare(h)
 		}
 	}
 
-	if out, err = client.Query(ctx, op.input); err != nil {
-		return
-	}
-
-	for _, cb := range op.options.OutputCallbacks {
-		if err = cb.QueryOutputCallback(ctx, out); err != nil {
-			return
-		}
-	}
+	h.HandleQuery(requestCtx, output)
 }
 
-// QueryAll represents an exhaustive Query operation
-type QueryAll struct {
+// QueryAllContext represents an exhaustive QueryAll operation request context
+type QueryAllContext struct {
+	context.Context
+	input  *ddb.QueryInput
+	client *ddb.Client
+}
+
+// QueryAllPromise represents a promise for the QueryAll
+type QueryAllPromise struct {
 	*Promise
-	input   *ddb.QueryInput
-	options QueryOptions
 }
 
-// NewQueryAll creates a new QueryAll operation on the given client with a given QueryInput and options
-func NewQueryAll(input *ddb.QueryInput, optFns ...func(*QueryOptions)) *QueryAll {
-	options := QueryOptions{}
-	for _, opt := range optFns {
-		opt(&options)
-	}
-
-	return &QueryAll{
-		//client:  nil,
-		Promise: NewPromise(),
-		input:   input,
-		options: options,
-	}
-}
-
-// Await waits for the Operation to be complete and then returns a QueryOutput and error
-func (op *QueryAll) Await() ([]*ddb.QueryOutput, error) {
-	out, err := op.Promise.Await()
+// GetResponse returns the GetResponse output and error
+// if Output has not been set yet nil is returned
+func (p *QueryAllPromise) GetResponse() ([]*ddb.QueryOutput, error) {
+	out, err := p.Promise.GetResponse()
 	if out == nil {
 		return nil, err
 	}
+
 	return out.([]*ddb.QueryOutput), err
 }
 
-// Invoke invokes the Query operation
-func (op *QueryAll) Invoke(ctx context.Context, client *ddb.Client) *QueryAll {
-	go op.DynoInvoke(ctx, client)
-	return op
+// Await waits for the QueryAllPromise to be fulfilled and then returns a QueryAllOutput and error
+func (p *QueryAllPromise) Await() ([]*ddb.QueryOutput, error) {
+	out, err := p.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.([]*ddb.QueryOutput), err
 }
 
-// DynoInvoke implements the Operation interface
-func (op *QueryAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
+// newQueryAllPromise returns a new QueryAllPromise
+func newQueryAllPromise() *QueryAllPromise {
+	return &QueryAllPromise{NewPromise()}
+}
+
+// QueryAllHandler represents a handler for QueryAll requests
+type QueryAllHandler interface {
+	HandleQueryAll(ctx *QueryAllContext, promise *QueryAllPromise)
+}
+
+// QueryAllHandlerFunc is a QueryAllHandler function
+type QueryAllHandlerFunc func(ctx *QueryAllContext, promise *QueryAllPromise)
+
+// HandleQueryAll implements QueryAllHandler
+func (h QueryAllHandlerFunc) HandleQueryAll(ctx *QueryAllContext, promise *QueryAllPromise) {
+	h(ctx, promise)
+}
+
+// QueryAllMiddleWare is a middleware function use for wrapping QueryAllHandler requests
+type QueryAllMiddleWare interface {
+	QueryAllMiddleWare(h QueryAllHandler) QueryAllHandler
+}
+
+// QueryAllMiddleWareFunc is a functional QueryAllMiddleWare
+type QueryAllMiddleWareFunc func(handler QueryAllHandler) QueryAllHandler
+
+// QueryAllMiddleWare implements the QueryAllMiddleWare interface
+func (mw QueryAllMiddleWareFunc) QueryAllMiddleWare(h QueryAllHandler) QueryAllHandler {
+	return mw(h)
+}
+
+// QueryAllFinalHandler is the final QueryAllHandler that executes a dynamodb QueryAll operation
+type QueryAllFinalHandler struct {}
+
+// HandleQueryAll implements the QueryAllHandler
+func (h *QueryAllFinalHandler) HandleQueryAll(ctx *QueryAllContext, promise *QueryAllPromise) {
 	var (
 		outs []*ddb.QueryOutput
 		out  *ddb.QueryOutput
 		err  error
 	)
 
-	defer func() { op.SetResponse(outs, err) }()
+	defer func() { promise.SetResponse(outs, err) }()
 
-	//copy the scan so we're not mutating the original
-	input := CopyQuery(op.input)
+	// copy the scan so we're not mutating the original
+	input := CopyQuery(ctx.input)
 
 	for {
-		for _, cb := range op.options.InputCallbacks {
-			if out, err = cb.QueryInputCallback(ctx, input); out != nil || err != nil {
-				if out != nil {
-					outs = append(outs, out)
-				}
-				return
-			}
-		}
 
-		if out, err = client.Query(ctx, input); err != nil {
+		if out, err = ctx.client.Query(ctx, input); err != nil {
 			return
-		}
-
-		for _, cb := range op.options.OutputCallbacks {
-			if err = cb.QueryOutputCallback(ctx, out); err != nil {
-				return
-			}
 		}
 
 		outs = append(outs, out)
 
-		if out.LastEvaluatedKey == nil {
+		if out.LastEvaluatedKey == nil || len(out.LastEvaluatedKey) == 0 {
 			// no more work
 			break
 		}
 
 		input.ExclusiveStartKey = out.LastEvaluatedKey
 	}
+}
+
+// QueryAll represents a QueryAll operation
+type QueryAll struct {
+	promise     *QueryAllPromise
+	input       *ddb.QueryInput
+	middleWares []QueryAllMiddleWare
+}
+
+// NewQueryAll creates a new QueryAll
+func NewQueryAll(input *ddb.QueryInput, mws ...QueryAllMiddleWare) *QueryAll {
+	return &QueryAll{
+		input:       input,
+		middleWares: mws,
+		promise:     newQueryAllPromise(),
+	}
+}
+
+// Invoke invokes the QueryAll operation and returns a QueryAllPromise
+func (op *QueryAll) Invoke(ctx context.Context, client *ddb.Client) *QueryAllPromise {
+	go op.DynoInvoke(ctx, client)
+
+	return op.promise
+}
+
+// DynoInvoke the Operation interface
+func (op *QueryAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	requestCtx := &QueryAllContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
+
+	var h QueryAllHandler
+
+	h = new(QueryAllFinalHandler)
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i].QueryAllMiddleWare(h)
+		}
+	}
+
+	h.HandleQueryAll(requestCtx, op.promise)
 }
 
 // NewQueryInput creates a new QueryInput with a table name

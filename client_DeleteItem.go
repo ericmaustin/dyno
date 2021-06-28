@@ -7,6 +7,7 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ericmaustin/dyno/condition"
+	"sync"
 )
 
 
@@ -33,6 +34,30 @@ type DeleteItemContext struct {
 	client *ddb.Client
 }
 
+// DeleteItemOutput represents the output for the DeleteItem opration
+type DeleteItemOutput struct {
+	out *ddb.DeleteItemOutput
+	err error
+	mu sync.RWMutex
+}
+
+// Set sets the output
+func (o *DeleteItemOutput) Set(out *ddb.DeleteItemOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *DeleteItemOutput) Get() (out *ddb.DeleteItemOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
+}
+
 // DeleteItemPromise represents a promise for the DeleteItem
 type DeleteItemPromise struct {
 	*Promise
@@ -55,25 +80,36 @@ func newDeleteItemPromise() *DeleteItemPromise {
 
 // DeleteItemHandler represents a handler for DeleteItem requests
 type DeleteItemHandler interface {
-	HandleDeleteItem(ctx *DeleteItemContext, promise *DeleteItemPromise)
+	HandleDeleteItem(ctx *DeleteItemContext, output *DeleteItemOutput)
 }
 
 // DeleteItemHandlerFunc is a DeleteItemHandler function
-type DeleteItemHandlerFunc func(ctx *DeleteItemContext, promise *DeleteItemPromise)
+type DeleteItemHandlerFunc func(ctx *DeleteItemContext, output *DeleteItemOutput)
 
 // HandleDeleteItem implements DeleteItemHandler
-func (h DeleteItemHandlerFunc) HandleDeleteItem(ctx *DeleteItemContext, promise *DeleteItemPromise) {
-	h(ctx, promise)
+func (h DeleteItemHandlerFunc) HandleDeleteItem(ctx *DeleteItemContext, output *DeleteItemOutput) {
+	h(ctx, output)
+}
+
+// DeleteItemFinalHandler is the final DeleteItemHandler that executes a dynamodb DeleteItem operation
+type DeleteItemFinalHandler struct {}
+
+// HandleDeleteItem implements the DeleteItemHandler
+func (h *DeleteItemFinalHandler) HandleDeleteItem(ctx *DeleteItemContext, output *DeleteItemOutput) {
+	output.Set(ctx.client.DeleteItem(ctx, ctx.input))
 }
 
 // DeleteItemMiddleWare is a middleware function use for wrapping DeleteItemHandler requests
-type DeleteItemMiddleWare func(handler DeleteItemHandler) DeleteItemHandler
+type DeleteItemMiddleWare interface {
+	DeleteItemMiddleWare(next DeleteItemHandler) DeleteItemHandler
+}
 
-// DeleteItemFinalHandler returns the final DeleteItemHandler that executes a dynamodb DeleteItem operation
-func DeleteItemFinalHandler() DeleteItemHandler {
-	return DeleteItemHandlerFunc(func(ctx *DeleteItemContext, promise *DeleteItemPromise) {
-		promise.SetResponse(ctx.client.DeleteItem(ctx, ctx.input))
-	})
+// DeleteItemMiddleWareFunc is a functional DeleteItemMiddleWare
+type DeleteItemMiddleWareFunc func(handler DeleteItemHandler) DeleteItemHandler
+
+// DeleteItemMiddleWare implements the DeleteItemMiddleWare interface
+func (mw DeleteItemMiddleWareFunc) DeleteItemMiddleWare(h DeleteItemHandler) DeleteItemHandler {
+	return mw(h)
 }
 
 // DeleteItem represents a DeleteItem operation
@@ -102,23 +138,29 @@ func (op *DeleteItem) Invoke(ctx context.Context, client *ddb.Client) *DeleteIte
 // DynoInvoke implements the Operation interface
 func (op *DeleteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
+	output := new(DeleteItemOutput)
+
+	defer func() { op.promise.SetResponse(output.Get()) }()
+
 	requestCtx := &DeleteItemContext{
 		Context: ctx,
 		client:  client,
 		input:   op.input,
 	}
 
-	h := DeleteItemFinalHandler()
+	var h DeleteItemHandler
+
+	h = new(DeleteItemFinalHandler)
 
 	// no middlewares
 	if len(op.middleWares) > 0 {
 		// loop in reverse to preserve middleware order
 		for i := len(op.middleWares) - 1; i >= 0; i-- {
-			h = op.middleWares[i](h)
+			h = op.middleWares[i].DeleteItemMiddleWare(h)
 		}
 	}
 
-	h.HandleDeleteItem(requestCtx, op.promise)
+	h.HandleDeleteItem(requestCtx, output)
 }
 
 // NewDeleteItemInput creates a DeleteItemInput with a given table name and key

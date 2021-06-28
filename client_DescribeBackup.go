@@ -3,6 +3,7 @@ package dyno
 import (
 	"context"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"sync"
 )
 
 // DescribeBackup executes DescribeBackup operation and returns a DescribeBackupPromise
@@ -28,6 +29,30 @@ type DescribeBackupContext struct {
 	client *ddb.Client
 }
 
+// DescribeBackupOutput represents the output for the DescribeBackup opration
+type DescribeBackupOutput struct {
+	out *ddb.DescribeBackupOutput
+	err error
+	mu sync.RWMutex
+}
+
+// Set sets the output
+func (o *DescribeBackupOutput) Set(out *ddb.DescribeBackupOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *DescribeBackupOutput) Get() (out *ddb.DescribeBackupOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
+}
+
 // DescribeBackupPromise represents a promise for the DescribeBackup
 type DescribeBackupPromise struct {
 	*Promise
@@ -50,25 +75,36 @@ func newDescribeBackupPromise() *DescribeBackupPromise {
 
 // DescribeBackupHandler represents a handler for DescribeBackup requests
 type DescribeBackupHandler interface {
-	HandleDescribeBackup(ctx *DescribeBackupContext, promise *DescribeBackupPromise)
+	HandleDescribeBackup(ctx *DescribeBackupContext, output *DescribeBackupOutput)
 }
 
 // DescribeBackupHandlerFunc is a DescribeBackupHandler function
-type DescribeBackupHandlerFunc func(ctx *DescribeBackupContext, promise *DescribeBackupPromise)
+type DescribeBackupHandlerFunc func(ctx *DescribeBackupContext, output *DescribeBackupOutput)
 
 // HandleDescribeBackup implements DescribeBackupHandler
-func (h DescribeBackupHandlerFunc) HandleDescribeBackup(ctx *DescribeBackupContext, promise *DescribeBackupPromise) {
-	h(ctx, promise)
+func (h DescribeBackupHandlerFunc) HandleDescribeBackup(ctx *DescribeBackupContext, output *DescribeBackupOutput) {
+	h(ctx, output)
+}
+
+// DescribeBackupFinalHandler is the final DescribeBackupHandler that executes a dynamodb DescribeBackup operation
+type DescribeBackupFinalHandler struct {}
+
+// HandleDescribeBackup implements the DescribeBackupHandler
+func (h *DescribeBackupFinalHandler) HandleDescribeBackup(ctx *DescribeBackupContext, output *DescribeBackupOutput) {
+	output.Set(ctx.client.DescribeBackup(ctx, ctx.input))
 }
 
 // DescribeBackupMiddleWare is a middleware function use for wrapping DescribeBackupHandler requests
-type DescribeBackupMiddleWare func(handler DescribeBackupHandler) DescribeBackupHandler
+type DescribeBackupMiddleWare interface {
+	DescribeBackupMiddleWare(h DescribeBackupHandler) DescribeBackupHandler
+}
 
-// DescribeBackupFinalHandler returns the final DescribeBackupHandler that executes a dynamodb DescribeBackup operation
-func DescribeBackupFinalHandler() DescribeBackupHandler {
-	return DescribeBackupHandlerFunc(func(ctx *DescribeBackupContext, promise *DescribeBackupPromise) {
-		promise.SetResponse(ctx.client.DescribeBackup(ctx, ctx.input))
-	})
+// DescribeBackupMiddleWareFunc is a functional DescribeBackupMiddleWare
+type DescribeBackupMiddleWareFunc func(handler DescribeBackupHandler) DescribeBackupHandler
+
+// DescribeBackupMiddleWare implements the DescribeBackupMiddleWare interface
+func (mw DescribeBackupMiddleWareFunc) DescribeBackupMiddleWare(h DescribeBackupHandler) DescribeBackupHandler {
+	return mw(h)
 }
 
 // DescribeBackup represents a DescribeBackup operation
@@ -96,23 +132,29 @@ func (op *DescribeBackup) Invoke(ctx context.Context, client *ddb.Client) *Descr
 
 // DynoInvoke implements the Operation interface
 func (op *DescribeBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	output := new(DescribeBackupOutput)
+
+	defer func() {op.promise.SetResponse(output.Get())}()
+
 	requestCtx := &DescribeBackupContext{
 		Context: ctx,
 		client:  client,
 		input:   op.input,
 	}
 
-	h := DescribeBackupFinalHandler()
+	var h DescribeBackupHandler
+
+	h = new(DescribeBackupFinalHandler)
 
 	// no middlewares
 	if len(op.middleWares) > 0 {
 		// loop in reverse to preserve middleware order
 		for i := len(op.middleWares) - 1; i >= 0; i-- {
-			h = op.middleWares[i](h)
+			h = op.middleWares[i].DescribeBackupMiddleWare(h)
 		}
 	}
 
-	h.HandleDescribeBackup(requestCtx, op.promise)
+	h.HandleDescribeBackup(requestCtx, output)
 }
 
 

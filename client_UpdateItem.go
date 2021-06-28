@@ -11,85 +11,39 @@ import (
 	"github.com/ericmaustin/dyno/encoding"
 )
 
-// UpdateItem executes a scan api call with a UpdateItemInput
-func (c *Client) UpdateItem(ctx context.Context, input *ddb.UpdateItemInput, optFns ...func(*UpdateItemOptions)) (*ddb.UpdateItemOutput, error) {
-	opt := NewUpdateItem(input, optFns...)
-	opt.DynoInvoke(ctx, c.ddb)
 
-	return opt.Await()
+// UpdateItem executes UpdateItem operation and returns a UpdateItemPromise
+func (c *Client) UpdateItem(ctx context.Context, input *ddb.UpdateItemInput, mw ...UpdateItemMiddleWare) *UpdateItemPromise {
+	return NewUpdateItem(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// UpdateItemInputCallback is a callback that is called on a given UpdateItemInput before a UpdateItem operation api call executes
-type UpdateItemInputCallback interface {
-	UpdateItemInputCallback(context.Context, *ddb.UpdateItemInput) (*ddb.UpdateItemOutput, error)
-}
+// UpdateItem executes a UpdateItem operation with a UpdateItemInput in this pool and returns the UpdateItemPromise
+func (p *Pool) UpdateItem(input *ddb.UpdateItemInput, mw ...UpdateItemMiddleWare) *UpdateItemPromise {
+	op := NewUpdateItem(input, mw...)
 
-// UpdateItemOutputCallback is a callback that is called on a given UpdateItemOutput after a UpdateItem operation api call executes
-type UpdateItemOutputCallback interface {
-	UpdateItemOutputCallback(context.Context, *ddb.UpdateItemOutput) error
-}
-
-// UpdateItemInputCallbackFunc is UpdateItemOutputCallback function
-type UpdateItemInputCallbackFunc func(context.Context, *ddb.UpdateItemInput) (*ddb.UpdateItemOutput, error)
-
-// UpdateItemInputCallback implements the UpdateItemOutputCallback interface
-func (cb UpdateItemInputCallbackFunc) UpdateItemInputCallback(ctx context.Context, input *ddb.UpdateItemInput) (*ddb.UpdateItemOutput, error) {
-	return cb(ctx, input)
-}
-
-// UpdateItemOutputCallbackFunc is UpdateItemOutputCallback function
-type UpdateItemOutputCallbackFunc func(context.Context, *ddb.UpdateItemOutput) error
-
-// UpdateItemOutputCallback implements the UpdateItemOutputCallback interface
-func (cb UpdateItemOutputCallbackFunc) UpdateItemOutputCallback(ctx context.Context, input *ddb.UpdateItemOutput) error {
-	return cb(ctx, input)
-}
-
-// UpdateItemOptions represents options passed to the UpdateItem operation
-type UpdateItemOptions struct {
-	InputCallbacks  []UpdateItemInputCallback
-	OutputCallbacks []UpdateItemOutputCallback
-}
-
-// UpdateItemWithInputCallback adds a UpdateItemInputCallbackFunc to the InputCallbacks
-func UpdateItemWithInputCallback(cb UpdateItemInputCallbackFunc) func(*UpdateItemOptions) {
-	return func(opt *UpdateItemOptions) {
-		opt.InputCallbacks = append(opt.InputCallbacks, cb)
+	if err := p.Do(op); err != nil {
+		op.promise.SetResponse(nil, err)
 	}
+
+	return op.promise
 }
 
-// UpdateItemWithOutputCallback adds a UpdateItemOutputCallback to the OutputCallbacks
-func UpdateItemWithOutputCallback(cb UpdateItemOutputCallback) func(*UpdateItemOptions) {
-	return func(opt *UpdateItemOptions) {
-		opt.OutputCallbacks = append(opt.OutputCallbacks, cb)
-	}
+// UpdateItemContext represents an exhaustive UpdateItem operation request context
+type UpdateItemContext struct {
+	context.Context
+	input  *ddb.UpdateItemInput
+	client *ddb.Client
 }
 
-// UpdateItem represents a UpdateItem operation
-type UpdateItem struct {
+// UpdateItemPromise represents a promise for the UpdateItem
+type UpdateItemPromise struct {
 	*Promise
-	input   *ddb.UpdateItemInput
-	options UpdateItemOptions
 }
 
-// NewUpdateItem creates a new UpdateItem operation on the given client with a given UpdateItemInput and options
-func NewUpdateItem(input *ddb.UpdateItemInput, optFns ...func(*UpdateItemOptions)) *UpdateItem {
-	opts := UpdateItemOptions{}
-
-	for _, opt := range optFns {
-		opt(&opts)
-	}
-
-	return &UpdateItem{
-		Promise: NewPromise(),
-		input:   input,
-		options: opts,
-	}
-}
-
-// Await waits for the Operation to be complete and then returns a UpdateItemOutput and error
-func (op *UpdateItem) Await() (*ddb.UpdateItemOutput, error) {
-	out, err := op.Promise.Await()
+// GetResponse returns the GetResponse output and error
+// if Output has not been set yet nil is returned
+func (p *UpdateItemPromise) GetResponse() (*ddb.UpdateItemOutput, error) {
+	out, err := p.Promise.GetResponse()
 	if out == nil {
 		return nil, err
 	}
@@ -97,38 +51,100 @@ func (op *UpdateItem) Await() (*ddb.UpdateItemOutput, error) {
 	return out.(*ddb.UpdateItemOutput), err
 }
 
-// Invoke invokes the UpdateItem operation
-func (op *UpdateItem) Invoke(ctx context.Context, client *ddb.Client) *UpdateItem {
+// Await waits for the UpdateItemPromise to be fulfilled and then returns a UpdateItemOutput and error
+func (p *UpdateItemPromise) Await() (*ddb.UpdateItemOutput, error) {
+	out, err := p.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.UpdateItemOutput), err
+}
+
+// newUpdateItemPromise returns a new UpdateItemPromise
+func newUpdateItemPromise() *UpdateItemPromise {
+	return &UpdateItemPromise{NewPromise()}
+}
+
+// UpdateItemHandler represents a handler for UpdateItem requests
+type UpdateItemHandler interface {
+	HandleUpdateItem(ctx *UpdateItemContext, promise *UpdateItemPromise)
+}
+
+// UpdateItemHandlerFunc is a UpdateItemHandler function
+type UpdateItemHandlerFunc func(ctx *UpdateItemContext, promise *UpdateItemPromise)
+
+// HandleUpdateItem implements UpdateItemHandler
+func (h UpdateItemHandlerFunc) HandleUpdateItem(ctx *UpdateItemContext, promise *UpdateItemPromise) {
+	h(ctx, promise)
+}
+
+// UpdateItemFinalHandler is the final UpdateItemHandler that executes a dynamodb UpdateItem operation
+type UpdateItemFinalHandler struct {}
+
+// HandleUpdateItem implements the UpdateItemHandler
+func (h *UpdateItemFinalHandler) HandleUpdateItem(ctx *UpdateItemContext, promise *UpdateItemPromise) {
+	promise.SetResponse(ctx.client.UpdateItem(ctx, ctx.input))
+}
+
+// UpdateItemMiddleWare is a middleware function use for wrapping UpdateItemHandler requests
+type UpdateItemMiddleWare interface {
+	UpdateItemMiddleWare(h UpdateItemHandler) UpdateItemHandler
+}
+
+// UpdateItemMiddleWareFunc is a functional UpdateItemMiddleWare
+type UpdateItemMiddleWareFunc func(handler UpdateItemHandler) UpdateItemHandler
+
+// UpdateItemMiddleWare implements the UpdateItemMiddleWare interface
+func (mw UpdateItemMiddleWareFunc) UpdateItemMiddleWare(h UpdateItemHandler) UpdateItemHandler {
+	return mw(h)
+}
+
+// UpdateItem represents a UpdateItem operation
+type UpdateItem struct {
+	promise     *UpdateItemPromise
+	input       *ddb.UpdateItemInput
+	middleWares []UpdateItemMiddleWare
+}
+
+// NewUpdateItem creates a new UpdateItem
+func NewUpdateItem(input *ddb.UpdateItemInput, mws ...UpdateItemMiddleWare) *UpdateItem {
+	return &UpdateItem{
+		input:       input,
+		middleWares: mws,
+		promise:     newUpdateItemPromise(),
+	}
+}
+
+// Invoke invokes the UpdateItem operation and returns a UpdateItemPromise
+func (op *UpdateItem) Invoke(ctx context.Context, client *ddb.Client) *UpdateItemPromise {
 	go op.DynoInvoke(ctx, client)
-	return op
+
+	return op.promise
 }
 
 // DynoInvoke implements the Operation interface
 func (op *UpdateItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		out *ddb.UpdateItemOutput
-		err error
-	)
 
-	defer func() { op.SetResponse(out, err) }()
+	requestCtx := &UpdateItemContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
 
-	for _, cb := range op.options.InputCallbacks {
-		if out, err = cb.UpdateItemInputCallback(ctx, op.input); out != nil || err != nil {
-			return
+	var h UpdateItemHandler
+
+	h = new(UpdateItemFinalHandler)
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i].UpdateItemMiddleWare(h)
 		}
 	}
 
-	if out, err = client.UpdateItem(ctx, op.input); err != nil {
-		return
-	}
-
-	for _, cb := range op.options.OutputCallbacks {
-		if err = cb.UpdateItemOutputCallback(ctx, out); err != nil {
-			return
-		}
-	}
-
-	return
+	h.HandleUpdateItem(requestCtx, op.promise)
 }
 
 func NewUpdateItemInput(tableName *string) *ddb.UpdateItemInput {

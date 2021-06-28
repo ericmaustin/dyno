@@ -504,12 +504,12 @@ func (t *Table) CreateTableMiddleWare() CreateTableMiddleWare {
 	}
 }
 
-// TableExistsWaiterMiddleWare returns a TableExistsWaiterMiddleWare that will update this table from the describe table
+// TableWaiterMiddleWare returns a TableWaiterMiddleWare that will update this table from the describe table
 // operation output
-func (t *Table) TableExistsWaiterMiddleWare() TableExistsWaiterMiddleWare {
-	return func(next TableExistsWaiterHandler) TableExistsWaiterHandler {
-		return TableExistsWaiterHandlerFunc(func(ctx *DescribeTableContext, promise *TableExistsWaiterPromise) {
-			next.HandleTableExistsWaiter(ctx, promise)
+func (t *Table) TableExistsWaiterMiddleWare() TableWaiterMiddleWare {
+	return func(next TableWaiterHandler) TableWaiterHandler {
+		return TableWaiterHandlerFunc(func(ctx *DescribeTableContext, promise *TableWaiterPromise) {
+			next.HandleTableWaiter(ctx, promise)
 			out, rErr := promise.GetResponse()
 			if rErr == nil {
 				t.UpdateWithTableDescription(out.Table)

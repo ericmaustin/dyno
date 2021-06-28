@@ -6,90 +6,64 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ericmaustin/dyno/condition"
+	"sync"
 )
 
-// PutItem executes a scan api call with a PutItemInput
-func (c *Client) PutItem(ctx context.Context, input *ddb.PutItemInput, optFns ...func(*PutItemOptions)) (*ddb.PutItemOutput, error) {
-	opt := NewPutItem(input, optFns...)
-	opt.DynoInvoke(ctx, c.ddb)
-
-	return opt.Await()
+// PutItem executes PutItem operation and returns a PutItemPromise
+func (c *Client) PutItem(ctx context.Context, input *ddb.PutItemInput, mw ...PutItemMiddleWare) *PutItemPromise {
+	return NewPutItem(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// PutItemInputCallback is a callback that is called on a given PutItemInput before a PutItem operation api call executes
-type PutItemInputCallback interface {
-	PutItemInputCallback(context.Context, *ddb.PutItemInput) (*ddb.PutItemOutput, error)
-}
+// PutItem executes a PutItem operation with a PutItemInput in this pool and returns the PutItemPromise
+func (p *Pool) PutItem(input *ddb.PutItemInput, mw ...PutItemMiddleWare) *PutItemPromise {
+	op := NewPutItem(input, mw...)
 
-// PutItemOutputCallback is a callback that is called on a given PutItemOutput after a PutItem operation api call executes
-type PutItemOutputCallback interface {
-	PutItemOutputCallback(context.Context, *ddb.PutItemOutput) error
-}
-
-// PutItemInputCallbackFunc is PutItemOutputCallback function
-type PutItemInputCallbackFunc func(context.Context, *ddb.PutItemInput) (*ddb.PutItemOutput, error)
-
-// PutItemInputCallback implements the PutItemOutputCallback interface
-func (cb PutItemInputCallbackFunc) PutItemInputCallback(ctx context.Context, input *ddb.PutItemInput) (*ddb.PutItemOutput, error) {
-	return cb(ctx, input)
-}
-
-// PutItemOutputCallbackFunc is PutItemOutputCallback function
-type PutItemOutputCallbackFunc func(context.Context, *ddb.PutItemOutput) error
-
-// PutItemOutputCallback implements the PutItemOutputCallback interface
-func (cb PutItemOutputCallbackFunc) PutItemOutputCallback(ctx context.Context, input *ddb.PutItemOutput) error {
-	return cb(ctx, input)
-}
-
-// PutItemOptions represents options passed to the PutItem operation
-type PutItemOptions struct {
-	//InputCallbacks are called before the PutItem dynamodb api operation with the dynamodb.PutItemInput
-	InputCallbacks []PutItemInputCallback
-	// OutputCallbacks are called after the PutItem dynamodb api operation with the dynamodb.PutItemOutput
-	OutputCallbacks []PutItemOutputCallback
-}
-
-// PutItemWithInputCallback adds a PutItemInputCallbackFunc to the InputCallbacks
-func PutItemWithInputCallback(cb PutItemInputCallbackFunc) func(*PutItemOptions) {
-	return func(opt *PutItemOptions) {
-		opt.InputCallbacks = append(opt.InputCallbacks, cb)
+	if err := p.Do(op); err != nil {
+		op.promise.SetResponse(nil, err)
 	}
+
+	return op.promise
 }
 
-// PutItemWithOutputCallback adds a PutItemOutputCallback to the OutputCallbacks
-func PutItemWithOutputCallback(cb PutItemOutputCallback) func(*PutItemOptions) {
-	return func(opt *PutItemOptions) {
-		opt.OutputCallbacks = append(opt.OutputCallbacks, cb)
-	}
+// PutItemContext represents an exhaustive PutItem operation request context
+type PutItemContext struct {
+	context.Context
+	input  *ddb.PutItemInput
+	client *ddb.Client
 }
 
-// PutItem represents a PutItem operation
-type PutItem struct {
+// PutItemOutput represents the output for the PutItem opration
+type PutItemOutput struct {
+	out *ddb.PutItemOutput
+	err error
+	mu sync.RWMutex
+}
+
+// Set sets the output
+func (o *PutItemOutput) Set(out *ddb.PutItemOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *PutItemOutput) Get() (out *ddb.PutItemOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
+}
+
+// PutItemPromise represents a promise for the PutItem
+type PutItemPromise struct {
 	*Promise
-	input   *ddb.PutItemInput
-	options PutItemOptions
 }
 
-// NewPutItem creates a new PutItem operation on the given client with a given PutItemInput and options
-func NewPutItem(input *ddb.PutItemInput, optFns ...func(*PutItemOptions)) *PutItem {
-	opts := PutItemOptions{}
-
-	for _, opt := range optFns {
-		opt(&opts)
-	}
-
-	return &PutItem{
-		Promise: NewPromise(),
-		input:   input,
-		options: opts,
-	}
-}
-
-// Await waits for the Operation to be complete and then returns a PutItemOutput and error
-func (op *PutItem) Await() (*ddb.PutItemOutput, error) {
-	out, err := op.Promise.Await()
-
+// Await waits for the PutItemPromise to be fulfilled and then returns a PutItemOutput and error
+func (p *PutItemPromise) Await() (*ddb.PutItemOutput, error) {
+	out, err := p.Promise.Await()
 	if out == nil {
 		return nil, err
 	}
@@ -97,36 +71,94 @@ func (op *PutItem) Await() (*ddb.PutItemOutput, error) {
 	return out.(*ddb.PutItemOutput), err
 }
 
-// Invoke invokes the PutItem operation
-func (op *PutItem) Invoke(ctx context.Context, client *ddb.Client) *PutItem {
+// newPutItemPromise returns a new PutItemPromise
+func newPutItemPromise() *PutItemPromise {
+	return &PutItemPromise{NewPromise()}
+}
+
+// PutItemHandler represents a handler for PutItem requests
+type PutItemHandler interface {
+	HandlePutItem(ctx *PutItemContext, output *PutItemOutput)
+}
+
+// PutItemHandlerFunc is a PutItemHandler function
+type PutItemHandlerFunc func(ctx *PutItemContext, output *PutItemOutput)
+
+// HandlePutItem implements PutItemHandler
+func (h PutItemHandlerFunc) HandlePutItem(ctx *PutItemContext, output *PutItemOutput) {
+	h(ctx, output)
+}
+
+// PutItemFinalHandler is the final PutItemHandler that executes a dynamodb PutItem operation
+type PutItemFinalHandler struct {}
+
+// HandlePutItem implements the PutItemHandler
+func (h *PutItemFinalHandler) HandlePutItem(ctx *PutItemContext, output *PutItemOutput) {
+	output.Set(ctx.client.PutItem(ctx, ctx.input))
+}
+
+// PutItemMiddleWare is a middleware function use for wrapping PutItemHandler requests
+type PutItemMiddleWare interface {
+	PutItemMiddleWare(h PutItemHandler) PutItemHandler
+}
+
+// PutItemMiddleWareFunc is a functional PutItemMiddleWare
+type PutItemMiddleWareFunc func(handler PutItemHandler) PutItemHandler
+
+// PutItemMiddleWare implements the PutItemMiddleWare interface
+func (mw PutItemMiddleWareFunc) PutItemMiddleWare(h PutItemHandler) PutItemHandler {
+	return mw(h)
+}
+
+// PutItem represents a PutItem operation
+type PutItem struct {
+	promise     *PutItemPromise
+	input       *ddb.PutItemInput
+	middleWares []PutItemMiddleWare
+}
+
+// NewPutItem creates a new PutItem
+func NewPutItem(input *ddb.PutItemInput, mws ...PutItemMiddleWare) *PutItem {
+	return &PutItem{
+		input:       input,
+		middleWares: mws,
+		promise:     newPutItemPromise(),
+	}
+}
+
+// Invoke invokes the PutItem operation and returns a PutItemPromise
+func (op *PutItem) Invoke(ctx context.Context, client *ddb.Client) *PutItemPromise {
 	go op.DynoInvoke(ctx, client)
-	return op
+
+	return op.promise
 }
 
 // DynoInvoke implements the Operation interface
 func (op *PutItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		out *ddb.PutItemOutput
-		err error
-	)
 
-	defer func() { op.SetResponse(out, err) }()
+	output := new(PutItemOutput)
 
-	for _, cb := range op.options.InputCallbacks {
-		if out, err = cb.PutItemInputCallback(ctx, op.input); out != nil || err != nil {
-			return
+	defer func() { op.promise.SetResponse(output.Get()) }()
+
+	requestCtx := &PutItemContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
+
+	var h PutItemHandler
+
+	h = new(PutItemFinalHandler)
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i].PutItemMiddleWare(h)
 		}
 	}
 
-	if out, err = client.PutItem(ctx, op.input); err != nil {
-		return
-	}
-
-	for _, cb := range op.options.OutputCallbacks {
-		if err = cb.PutItemOutputCallback(ctx, out); err != nil {
-			return
-		}
-	}
+	h.HandlePutItem(requestCtx, output)
 }
 
 // PutItemBuilder allows for dynamic building of a PutItem input

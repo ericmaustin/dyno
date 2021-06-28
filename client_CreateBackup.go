@@ -3,6 +3,7 @@ package dyno
 import (
 	"context"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"sync"
 )
 
 // CreateBackup executes CreateBackup operation and returns a CreateBackupPromise
@@ -27,6 +28,31 @@ type CreateBackupContext struct {
 	input  *ddb.CreateBackupInput
 	client *ddb.Client
 }
+
+// CreateBackupOutput represents the output for the CreateBackup opration
+type CreateBackupOutput struct {
+	out *ddb.CreateBackupOutput
+	err error
+	mu sync.RWMutex
+}
+
+// Set sets the output
+func (o *CreateBackupOutput) Set(out *ddb.CreateBackupOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *CreateBackupOutput) Get() (out *ddb.CreateBackupOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
+}
+
 
 // CreateBackupPromise represents a promise for the CreateBackup
 type CreateBackupPromise struct {
@@ -61,36 +87,37 @@ func newCreateBackupPromise() *CreateBackupPromise {
 
 // CreateBackupHandler represents a handler for CreateBackup requests
 type CreateBackupHandler interface {
-	HandleCreateBackup(ctx *CreateBackupContext, promise *CreateBackupPromise)
+	HandleCreateBackup(ctx *CreateBackupContext, output *CreateBackupOutput)
 }
 
 // CreateBackupHandlerFunc is a CreateBackupHandler function
-type CreateBackupHandlerFunc func(ctx *CreateBackupContext, promise *CreateBackupPromise)
+type CreateBackupHandlerFunc func(ctx *CreateBackupContext, output *CreateBackupOutput)
+
+
+// HandleCreateBackup implements CreateBackupHandler
+func (h CreateBackupHandlerFunc) HandleCreateBackup(ctx *CreateBackupContext, output *CreateBackupOutput) {
+	h(ctx, output)
+}
 
 // CreateBackupFinalHandler is the final CreateBackupHandler that executes a dynamodb CreateBackup operation
 type CreateBackupFinalHandler struct {}
 
 // HandleCreateBackup implements the CreateBackupHandler
-func (h *CreateBackupFinalHandler) HandleCreateBackup(ctx *CreateBackupContext, promise *CreateBackupPromise) {
-	promise.SetResponse(ctx.client.CreateBackup(ctx, ctx.input))
-}
-
-// HandleCreateBackup implements CreateBackupHandler
-func (h CreateBackupHandlerFunc) HandleCreateBackup(ctx *CreateBackupContext, promise *CreateBackupPromise) {
-	h(ctx, promise)
+func (h *CreateBackupFinalHandler) HandleCreateBackup(ctx *CreateBackupContext, output *CreateBackupOutput) {
+	output.Set(ctx.client.CreateBackup(ctx, ctx.input))
 }
 
 // CreateBackupMiddleWare is a middleware function use for wrapping CreateBackupHandler requests
 type CreateBackupMiddleWare interface {
-	CreateBackupMiddleWare(h CreateBackupHandler) CreateBackupHandler
+	CreateBackupMiddleWare(next CreateBackupHandler) CreateBackupHandler
 }
 
 // CreateBackupMiddleWareFunc is a functional CreateBackupMiddleWare
-type CreateBackupMiddleWareFunc func(handler CreateBackupHandler) CreateBackupHandler
+type CreateBackupMiddleWareFunc func(next CreateBackupHandler) CreateBackupHandler
 
 // CreateBackupMiddleWare implements the CreateBackupMiddleWare interface
-func (mw CreateBackupMiddleWareFunc) CreateBackupMiddleWare(h CreateBackupHandler) CreateBackupHandler {
-	return mw(h)
+func (mw CreateBackupMiddleWareFunc) CreateBackupMiddleWare(next CreateBackupHandler) CreateBackupHandler {
+	return mw(next)
 }
 
 // CreateBackup represents a CreateBackup operation
@@ -118,6 +145,9 @@ func (op *CreateBackup) Invoke(ctx context.Context, client *ddb.Client) *CreateB
 
 // DynoInvoke implements the Operation interface
 func (op *CreateBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	output := new(CreateBackupOutput)
+
+	defer func() { op.promise.SetResponse(output.Get()) }()
 
 	requestCtx := &CreateBackupContext{
 		Context: ctx,
@@ -137,7 +167,7 @@ func (op *CreateBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		}
 	}
 
-	h.HandleCreateBackup(requestCtx, op.promise)
+	h.HandleCreateBackup(requestCtx, output)
 }
 
 // NewCreateBackupInput creates a CreateBackupInput with a given table name and key

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"sync"
 )
 
 // CreateTable executes CreateTable operation and returns a CreateTablePromise
@@ -28,6 +29,30 @@ type CreateTableContext struct {
 	context.Context
 	input  *ddb.CreateTableInput
 	client *ddb.Client
+}
+
+// CreateTableOutput represents the output for the CreateTable opration
+type CreateTableOutput struct {
+	out *ddb.CreateTableOutput
+	err error
+	mu sync.RWMutex
+}
+
+// Set sets the output
+func (o *CreateTableOutput) Set(out *ddb.CreateTableOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *CreateTableOutput) Get() (out *ddb.CreateTableOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
 }
 
 // CreateTablePromise represents a promise for the CreateTable
@@ -63,32 +88,32 @@ func newCreateTablePromise() *CreateTablePromise {
 
 // CreateTableHandler represents a handler for CreateTable requests
 type CreateTableHandler interface {
-	HandleCreateTable(ctx *CreateTableContext, promise *CreateTablePromise)
+	HandleCreateTable(ctx *CreateTableContext, output *CreateTableOutput)
 }
 
 // CreateTableHandlerFunc is a CreateTableHandler function
-type CreateTableHandlerFunc func(ctx *CreateTableContext, promise *CreateTablePromise)
+type CreateTableHandlerFunc func(ctx *CreateTableContext, output *CreateTableOutput)
 
 // HandleCreateTable implements CreateTableHandler
-func (h CreateTableHandlerFunc) HandleCreateTable(ctx *CreateTableContext, promise *CreateTablePromise) {
-	h(ctx, promise)
+func (h CreateTableHandlerFunc) HandleCreateTable(ctx *CreateTableContext, output *CreateTableOutput) {
+	h(ctx, output)
 }
 
 // CreateTableFinalHandler is the final CreateTableHandler that executes a dynamodb CreateTable operation
 type CreateTableFinalHandler struct {}
 
 // HandleCreateTable implements the CreateTableHandler
-func (h *CreateTableFinalHandler) HandleCreateTable(ctx *CreateTableContext, promise *CreateTablePromise) {
-	promise.SetResponse(ctx.client.CreateTable(ctx, ctx.input))
+func (h *CreateTableFinalHandler) HandleCreateTable(ctx *CreateTableContext, output *CreateTableOutput) {
+	output.Set(ctx.client.CreateTable(ctx, ctx.input))
 }
 
 // CreateTableMiddleWare is a middleware function use for wrapping CreateTableHandler requests
 type CreateTableMiddleWare interface {
-	CreateTableMiddleWare(h CreateTableHandler) CreateTableHandler
+	CreateTableMiddleWare(next CreateTableHandler) CreateTableHandler
 }
 
 // CreateTableMiddleWareFunc is a functional CreateTableMiddleWare
-type CreateTableMiddleWareFunc func(handler CreateTableHandler) CreateTableHandler
+type CreateTableMiddleWareFunc func(next CreateTableHandler) CreateTableHandler
 
 // CreateTableMiddleWare implements the CreateTableMiddleWare interface
 func (mw CreateTableMiddleWareFunc) CreateTableMiddleWare(h CreateTableHandler) CreateTableHandler {
@@ -120,6 +145,9 @@ func (op *CreateTable) Invoke(ctx context.Context, client *ddb.Client) *CreateTa
 
 // DynoInvoke implements the Operation interface
 func (op *CreateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	output := new(CreateTableOutput)
+
+	defer func() { op.promise.SetResponse(output.Get()) }()
 
 	requestCtx := &CreateTableContext{
 		Context: ctx,
@@ -138,7 +166,7 @@ func (op *CreateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		}
 	}
 
-	h.HandleCreateTable(requestCtx, op.promise)
+	h.HandleCreateTable(requestCtx, output)
 }
 
 // CreateTableBuilder is used to construct a CreateTableBuilder dynamically

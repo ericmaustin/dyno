@@ -3,90 +3,64 @@ package dyno
 import (
 	"context"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"sync"
 )
 
-// ListTables executes a scan api call with a ListTablesInput
-func (c *Client) ListTables(ctx context.Context, input *ddb.ListTablesInput, optFns ...func(*ListTablesOptions)) (*ddb.ListTablesOutput, error) {
-	op := NewListTables(input, optFns...)
-	op.DynoInvoke(ctx, c.ddb)
-
-	return op.Await()
+// ListTables executes ListTables operation and returns a ListTablesPromise
+func (c *Client) ListTables(ctx context.Context, input *ddb.ListTablesInput, mw ...ListTablesMiddleWare) *ListTablesPromise {
+	return NewListTables(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// ListTablesInputCallback is a callback that is called on a given ListTablesInput before a ListTables operation api call executes
-type ListTablesInputCallback interface {
-	ListTablesInputCallback(context.Context, *ddb.ListTablesInput) (*ddb.ListTablesOutput, error)
-}
+// ListTables executes a ListTables operation with a ListTablesInput in this pool and returns the ListTablesPromise
+func (p *Pool) ListTables(input *ddb.ListTablesInput, mw ...ListTablesMiddleWare) *ListTablesPromise {
+	op := NewListTables(input, mw...)
 
-// ListTablesOutputCallback is a callback that is called on a given ListTablesOutput after a ListTables operation api call executes
-type ListTablesOutputCallback interface {
-	ListTablesOutputCallback(context.Context, *ddb.ListTablesOutput) error
-}
-
-// ListTablesInputCallbackFunc is ListTablesOutputCallback function
-type ListTablesInputCallbackFunc func(context.Context, *ddb.ListTablesInput) (*ddb.ListTablesOutput, error)
-
-// ListTablesInputCallback implements the ListTablesOutputCallback interface
-func (cb ListTablesInputCallbackFunc) ListTablesInputCallback(ctx context.Context, input *ddb.ListTablesInput) (*ddb.ListTablesOutput, error) {
-	return cb(ctx, input)
-}
-
-// ListTablesOutputCallbackFunc is ListTablesOutputCallback function
-type ListTablesOutputCallbackFunc func(context.Context, *ddb.ListTablesOutput) error
-
-// ListTablesOutputCallback implements the ListTablesOutputCallback interface
-func (cb ListTablesOutputCallbackFunc) ListTablesOutputCallback(ctx context.Context, input *ddb.ListTablesOutput) error {
-	return cb(ctx, input)
-}
-
-// ListTablesOptions represents options passed to the ListTables operation
-type ListTablesOptions struct {
-	// InputCallbacks are called before the ListTables dynamodb api operation with the dynamodb.ListTablesInput
-	InputCallbacks []ListTablesInputCallback
-	// OutputCallbacks are called after the ListTables dynamodb api operation with the dynamodb.ListTablesOutput
-	OutputCallbacks []ListTablesOutputCallback
-}
-
-// ListTablesWithInputCallback adds a ListTablesInputCallbackFunc to the InputCallbacks
-func ListTablesWithInputCallback(cb ListTablesInputCallbackFunc) func(*ListTablesOptions) {
-	return func(opt *ListTablesOptions) {
-		opt.InputCallbacks = append(opt.InputCallbacks, cb)
+	if err := p.Do(op); err != nil {
+		op.promise.SetResponse(nil, err)
 	}
+
+	return op.promise
 }
 
-// ListTablesWithOutputCallback adds a ListTablesOutputCallback to the OutputCallbacks
-func ListTablesWithOutputCallback(cb ListTablesOutputCallback) func(*ListTablesOptions) {
-	return func(opt *ListTablesOptions) {
-		opt.OutputCallbacks = append(opt.OutputCallbacks, cb)
-	}
+// ListTablesContext represents an exhaustive ListTables operation request context
+type ListTablesContext struct {
+	context.Context
+	input  *ddb.ListTablesInput
+	client *ddb.Client
 }
 
-// ListTables represents a ListTables operation
-type ListTables struct {
+// ListTablesOutput represents the output for the ListTables opration
+type ListTablesOutput struct {
+	out *ddb.ListTablesOutput
+	err error
+	mu  sync.RWMutex
+}
+
+// Set sets the output
+func (o *ListTablesOutput) Set(out *ddb.ListTablesOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *ListTablesOutput) Get() (out *ddb.ListTablesOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
+}
+
+// ListTablesPromise represents a promise for the ListTables
+type ListTablesPromise struct {
 	*Promise
-	input   *ddb.ListTablesInput
-	options ListTablesOptions
 }
 
-// NewListTables creates a new ListTables operation on the given client with a given ListTablesInput and options
-func NewListTables(input *ddb.ListTablesInput, optFns ...func(*ListTablesOptions)) *ListTables {
-	opts := ListTablesOptions{}
-
-	for _, opt := range optFns {
-		opt(&opts)
-	}
-
-	return &ListTables{
-		Promise: NewPromise(),
-		input:   input,
-		options: opts,
-	}
-}
-
-// Await waits for the Operation to be complete and then returns a ListTablesOutput and error
-func (op *ListTables) Await() (*ddb.ListTablesOutput, error) {
-	out, err := op.Promise.Await()
-
+// Await waits for the ListTablesPromise to be fulfilled and then returns a ListTablesOutput and error
+func (p *ListTablesPromise) Await() (*ddb.ListTablesOutput, error) {
+	out, err := p.Promise.Await()
 	if out == nil {
 		return nil, err
 	}
@@ -94,37 +68,94 @@ func (op *ListTables) Await() (*ddb.ListTablesOutput, error) {
 	return out.(*ddb.ListTablesOutput), err
 }
 
-// Invoke invokes the ListTables operation
-func (op *ListTables) Invoke(ctx context.Context, client *ddb.Client) *ListTables {
+// newListTablesPromise returns a new ListTablesPromise
+func newListTablesPromise() *ListTablesPromise {
+	return &ListTablesPromise{NewPromise()}
+}
+
+// ListTablesHandler represents a handler for ListTables requests
+type ListTablesHandler interface {
+	HandleListTables(ctx *ListTablesContext, output *ListTablesOutput)
+}
+
+// ListTablesHandlerFunc is a ListTablesHandler function
+type ListTablesHandlerFunc func(ctx *ListTablesContext, output *ListTablesOutput)
+
+// HandleListTables implements ListTablesHandler
+func (h ListTablesHandlerFunc) HandleListTables(ctx *ListTablesContext, output *ListTablesOutput) {
+	h(ctx, output)
+}
+
+// ListTablesFinalHandler is the final ListTablesHandler that executes a dynamodb ListTables operation
+type ListTablesFinalHandler struct{}
+
+// HandleListTables implements the ListTablesHandler
+func (h *ListTablesFinalHandler) HandleListTables(ctx *ListTablesContext, output *ListTablesOutput) {
+	output.Set(ctx.client.ListTables(ctx, ctx.input))
+}
+
+// ListTablesMiddleWare is a middleware function use for wrapping ListTablesHandler requests
+type ListTablesMiddleWare interface {
+	ListTablesMiddleWare(h ListTablesHandler) ListTablesHandler
+}
+
+// ListTablesMiddleWareFunc is a functional ListTablesMiddleWare
+type ListTablesMiddleWareFunc func(handler ListTablesHandler) ListTablesHandler
+
+// ListTablesMiddleWare implements the ListTablesMiddleWare interface
+func (mw ListTablesMiddleWareFunc) ListTablesMiddleWare(h ListTablesHandler) ListTablesHandler {
+	return mw(h)
+}
+
+// ListTables represents a ListTables operation
+type ListTables struct {
+	promise     *ListTablesPromise
+	input       *ddb.ListTablesInput
+	middleWares []ListTablesMiddleWare
+}
+
+// NewListTables creates a new ListTables
+func NewListTables(input *ddb.ListTablesInput, mws ...ListTablesMiddleWare) *ListTables {
+	return &ListTables{
+		input:       input,
+		middleWares: mws,
+		promise:     newListTablesPromise(),
+	}
+}
+
+// Invoke invokes the ListTables operation and returns a ListTablesPromise
+func (op *ListTables) Invoke(ctx context.Context, client *ddb.Client) *ListTablesPromise {
 	go op.DynoInvoke(ctx, client)
 
-	return op
+	return op.promise
 }
 
 // DynoInvoke implements the Operation interface
 func (op *ListTables) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		out *ddb.ListTablesOutput
-		err error
-	)
 
-	defer func() { op.SetResponse(out, err) }()
+	output := new(ListTablesOutput)
 
-	for _, cb := range op.options.InputCallbacks {
-		if out, err = cb.ListTablesInputCallback(ctx, op.input); out != nil || err != nil {
-			return
+	defer func() { op.promise.SetResponse(output.Get()) }()
+
+	requestCtx := &ListTablesContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
+
+	var h ListTablesHandler
+
+	h = new(ListTablesFinalHandler)
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i].ListTablesMiddleWare(h)
 		}
 	}
 
-	if out, err = client.ListTables(ctx, op.input); err != nil {
-		return
-	}
-
-	for _, cb := range op.options.OutputCallbacks {
-		if err = cb.ListTablesOutputCallback(ctx, out); err != nil {
-			return
-		}
-	}
+	h.HandleListTables(requestCtx, output)
 }
 
 // NewListTablesInput creates a new ListTablesInput

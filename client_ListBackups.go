@@ -3,126 +3,159 @@ package dyno
 import (
 	"context"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"sync"
 )
 
-// ListBackups executes a scan api call with a ListBackupsInput
-func (c *Client) ListBackups(ctx context.Context, input *ddb.ListBackupsInput, optFns ...func(*ListBackupsOptions)) (*ddb.ListBackupsOutput, error) {
-	op := NewListBackups(input, optFns...)
-	op.DynoInvoke(ctx, c.ddb)
-
-	return op.Await()
+// ListBackups executes ListBackups operation and returns a ListBackupsPromise
+func (c *Client) ListBackups(ctx context.Context, input *ddb.ListBackupsInput, mw ...ListBackupsMiddleWare) *ListBackupsPromise {
+	return NewListBackups(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// ListBackupsInputCallback is a callback that is called on a given ListBackupsInput before a ListBackups operation api call executes
-type ListBackupsInputCallback interface {
-	ListBackupsInputCallback(context.Context, *ddb.ListBackupsInput) (*ddb.ListBackupsOutput, error)
-}
+// ListBackups executes a ListBackups operation with a ListBackupsInput in this pool and returns the ListBackupsPromise
+func (p *Pool) ListBackups(input *ddb.ListBackupsInput, mw ...ListBackupsMiddleWare) *ListBackupsPromise {
+	op := NewListBackups(input, mw...)
 
-// ListBackupsOutputCallback is a callback that is called on a given ListBackupsOutput after a ListBackups operation api call executes
-type ListBackupsOutputCallback interface {
-	ListBackupsOutputCallback(context.Context, *ddb.ListBackupsOutput) error
-}
-
-// ListBackupsInputCallbackFunc is ListBackupsOutputCallback function
-type ListBackupsInputCallbackFunc func(context.Context, *ddb.ListBackupsInput) (*ddb.ListBackupsOutput, error)
-
-// ListBackupsInputCallback implements the ListBackupsOutputCallback interface
-func (cb ListBackupsInputCallbackFunc) ListBackupsInputCallback(ctx context.Context, input *ddb.ListBackupsInput) (*ddb.ListBackupsOutput, error) {
-	return cb(ctx, input)
-}
-
-// ListBackupsOutputCallbackFunc is ListBackupsOutputCallback function
-type ListBackupsOutputCallbackFunc func(context.Context, *ddb.ListBackupsOutput) error
-
-// ListBackupsOutputCallback implements the ListBackupsOutputCallback interface
-func (cb ListBackupsOutputCallbackFunc) ListBackupsOutputCallback(ctx context.Context, input *ddb.ListBackupsOutput) error {
-	return cb(ctx, input)
-}
-
-// ListBackupsOptions represents options passed to the ListBackups operation
-type ListBackupsOptions struct {
-	// InputCallbacks are called before the ListBackups dynamodb api operation with the dynamodb.ListBackupsInput
-	InputCallbacks []ListBackupsInputCallback
-	// OutputCallbacks are called after the ListBackups dynamodb api operation with the dynamodb.ListBackupsOutput
-	OutputCallbacks []ListBackupsOutputCallback
-}
-
-// ListBackupsWithInputCallback adds a ListBackupsInputCallbackFunc to the InputCallbacks
-func ListBackupsWithInputCallback(cb ListBackupsInputCallbackFunc) func(*ListBackupsOptions) {
-	return func(opt *ListBackupsOptions) {
-		opt.InputCallbacks = append(opt.InputCallbacks, cb)
+	if err := p.Do(op); err != nil {
+		op.promise.SetResponse(nil, err)
 	}
+
+	return op.promise
 }
 
-// ListBackupsWithOutputCallback adds a ListBackupsOutputCallback to the OutputCallbacks
-func ListBackupsWithOutputCallback(cb ListBackupsOutputCallback) func(*ListBackupsOptions) {
-	return func(opt *ListBackupsOptions) {
-		opt.OutputCallbacks = append(opt.OutputCallbacks, cb)
+// ListBackupsContext represents an exhaustive ListBackups operation request context
+type ListBackupsContext struct {
+	context.Context
+	input  *ddb.ListBackupsInput
+	client *ddb.Client
+}
+
+// ListBackupsOutput represents the output for the ListBackups opration
+type ListBackupsOutput struct {
+	out *ddb.ListBackupsOutput
+	err error
+	mu sync.RWMutex
+}
+
+// Set sets the output
+func (o *ListBackupsOutput) Set(out *ddb.ListBackupsOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *ListBackupsOutput) Get() (out *ddb.ListBackupsOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
+}
+
+// ListBackupsPromise represents a promise for the ListBackups
+type ListBackupsPromise struct {
+	*Promise
+}
+
+// Await waits for the ListBackupsPromise to be fulfilled and then returns a ListBackupsOutput and error
+func (p *ListBackupsPromise) Await() (*ddb.ListBackupsOutput, error) {
+	out, err := p.Promise.Await()
+	if out == nil {
+		return nil, err
 	}
+
+	return out.(*ddb.ListBackupsOutput), err
+}
+
+// newListBackupsPromise returns a new ListBackupsPromise
+func newListBackupsPromise() *ListBackupsPromise {
+	return &ListBackupsPromise{NewPromise()}
+}
+
+// ListBackupsHandler represents a handler for ListBackups requests
+type ListBackupsHandler interface {
+	HandleListBackups(ctx *ListBackupsContext, output *ListBackupsOutput)
+}
+
+// ListBackupsHandlerFunc is a ListBackupsHandler function
+type ListBackupsHandlerFunc func(ctx *ListBackupsContext, output *ListBackupsOutput)
+
+// HandleListBackups implements ListBackupsHandler
+func (h ListBackupsHandlerFunc) HandleListBackups(ctx *ListBackupsContext, output *ListBackupsOutput) {
+	h(ctx, output)
+}
+
+// ListBackupsFinalHandler is the final ListBackupsHandler that executes a dynamodb ListBackups operation
+type ListBackupsFinalHandler struct {}
+
+// HandleListBackups implements the ListBackupsHandler
+func (h *ListBackupsFinalHandler) HandleListBackups(ctx *ListBackupsContext, output *ListBackupsOutput) {
+	output.Set(ctx.client.ListBackups(ctx, ctx.input))
+}
+
+// ListBackupsMiddleWare is a middleware function use for wrapping ListBackupsHandler requests
+type ListBackupsMiddleWare interface {
+	ListBackupsMiddleWare(h ListBackupsHandler) ListBackupsHandler
+}
+
+// ListBackupsMiddleWareFunc is a functional ListBackupsMiddleWare
+type ListBackupsMiddleWareFunc func(handler ListBackupsHandler) ListBackupsHandler
+
+// ListBackupsMiddleWare implements the ListBackupsMiddleWare interface
+func (mw ListBackupsMiddleWareFunc) ListBackupsMiddleWare(h ListBackupsHandler) ListBackupsHandler {
+	return mw(h)
 }
 
 // ListBackups represents a ListBackups operation
 type ListBackups struct {
-	*Promise
-	input   *ddb.ListBackupsInput
-	options ListBackupsOptions
+	promise     *ListBackupsPromise
+	input       *ddb.ListBackupsInput
+	middleWares []ListBackupsMiddleWare
 }
 
-// NewListBackups creates a new ListBackups operation on the given client with a given ListBackupsInput and options
-func NewListBackups(input *ddb.ListBackupsInput, optFns ...func(*ListBackupsOptions)) *ListBackups {
-	opts := ListBackupsOptions{}
-	for _, opt := range optFns {
-		opt(&opts)
-	}
-	
+// NewListBackups creates a new ListBackups
+func NewListBackups(input *ddb.ListBackupsInput, mws ...ListBackupsMiddleWare) *ListBackups {
 	return &ListBackups{
-		Promise: NewPromise(),
-		input:   input,
-		options: opts,
+		input:       input,
+		middleWares: mws,
+		promise:     newListBackupsPromise(),
 	}
 }
 
-// Await waits for the Operation to be complete and then returns a ListBackupsOutput and error
-func (op *ListBackups) Await() (*ddb.ListBackupsOutput, error) {
-	out, err := op.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-	
-	return out.(*ddb.ListBackupsOutput), err
-}
-
-// Invoke invokes the ListBackups operation
-func (op *ListBackups) Invoke(ctx context.Context, client *ddb.Client) *ListBackups {
+// Invoke invokes the ListBackups operation and returns a ListBackupsPromise
+func (op *ListBackups) Invoke(ctx context.Context, client *ddb.Client) *ListBackupsPromise {
 	go op.DynoInvoke(ctx, client)
 
-	return op
+	return op.promise
 }
 
 // DynoInvoke implements the Operation interface
 func (op *ListBackups) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	var (
-		out *ddb.ListBackupsOutput
-		err error
-	)
 
-	defer func() { op.SetResponse(out, err) }()
+	output := new(ListBackupsOutput)
 
-	for _, cb := range op.options.InputCallbacks {
-		if out, err = cb.ListBackupsInputCallback(ctx, op.input); out != nil || err != nil {
-			return
+	defer func() { op.promise.SetResponse(output.Get())}()
+
+	requestCtx := &ListBackupsContext{
+		Context: ctx,
+		client:  client,
+		input:   op.input,
+	}
+
+	var h ListBackupsHandler
+
+	h = new(ListBackupsFinalHandler)
+
+	// no middlewares
+	if len(op.middleWares) > 0 {
+		// loop in reverse to preserve middleware order
+		for i := len(op.middleWares) - 1; i >= 0; i-- {
+			h = op.middleWares[i].ListBackupsMiddleWare(h)
 		}
 	}
 
-	if out, err = client.ListBackups(ctx, op.input); err != nil {
-		return
-	}
-
-	for _, cb := range op.options.OutputCallbacks {
-		if err = cb.ListBackupsOutputCallback(ctx, out); err != nil {
-			return
-		}
-	}
+	h.HandleListBackups(requestCtx, output)
 }
 
 // NewListBackupsInput creates a new ListBackupsInput
