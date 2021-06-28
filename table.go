@@ -578,7 +578,6 @@ func (t *Table) BatchGet(items []map[string]ddbTypes.AttributeValue, mws ...Batc
 // BatchPut returns a new BatchWriteItem for this table with put requests provided items
 func (t *Table) BatchPut(items []map[string]ddbTypes.AttributeValue, mws ...BatchWriteItemAllMiddleWare) *BatchWriteItemAll {
 	input := NewBatchWriteItemBuilder(nil).AddPuts(t.Name(), items...).Build()
-
 	return NewBatchWriteItemAll(input, mws...)
 }
 

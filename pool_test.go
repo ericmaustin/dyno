@@ -132,50 +132,50 @@ func (suite *PoolTestSuite) TestPutItems() {
 		fmt.Println("successfully put marshalled item. output:\n", MustYamlString(out))
 	}
 }
-
-func (suite *PoolTestSuite) TestScan() {
-	scan := NewScanInput(suite.table.TableName)
-
-	fmt.Println("running scan:", MustYamlString(scan))
-
-	out, err := suite.pool.Scan(scan).Await()
-
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("scan result:\n", MustYamlString(out))
-
-	suite.Equal(len(out.Items), len(suite.testItems)+len(suite.testMarshalledItems))
-
-	// test scan with unmarshalling
-	scan = NewScanInput(suite.table.TableName)
-
-	var target []*TestItemMarshaller
-
-	cb := ScanOutputCallbackF(func(ctx context.Context, output *dynamodb.ScanOutput) error {
-		if len(output.Items) > 0 {
-			for _, item := range output.Items {
-				itemTarget := new(TestItemMarshaller)
-				if err := encoding.UnmarshalMap(item, itemTarget); err != nil {
-					return err
-				}
-				target = append(target, itemTarget)
-			}
-		}
-		return nil
-	})
-
-	fmt.Println("running scan with unmarshalling:", MustYamlString(scan))
-
-	if out, err = suite.pool.Scan(scan, ScanWithOutputCallback(cb)).Await(); err != nil {
-		panic(err)
-	}
-
-	fmt.Println("scan results:\n", MustYamlString(out))
-
-	suite.Equal(len(target), len(suite.testItems)+len(suite.testMarshalledItems))
-}
+//
+//func (suite *PoolTestSuite) TestScan() {
+//	scan := NewScanInput(suite.table.TableName)
+//
+//	fmt.Println("running scan:", MustYamlString(scan))
+//
+//	out, err := suite.pool.Scan(scan).Await()
+//
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	fmt.Println("scan result:\n", MustYamlString(out))
+//
+//	suite.Equal(len(out.Items), len(suite.testItems)+len(suite.testMarshalledItems))
+//
+//	// test scan with unmarshalling
+//	scan = NewScanInput(suite.table.TableName)
+//
+//	var target []*TestItemMarshaller
+//
+//	cb := ScanOutputCallbackF(func(ctx context.Context, output *dynamodb.ScanOutput) error {
+//		if len(output.Items) > 0 {
+//			for _, item := range output.Items {
+//				itemTarget := new(TestItemMarshaller)
+//				if err := encoding.UnmarshalMap(item, itemTarget); err != nil {
+//					return err
+//				}
+//				target = append(target, itemTarget)
+//			}
+//		}
+//		return nil
+//	})
+//
+//	fmt.Println("running scan with unmarshalling:", MustYamlString(scan))
+//
+//	if out, err = suite.pool.Scan(scan, ScanWithOutputCallback(cb)).Await(); err != nil {
+//		panic(err)
+//	}
+//
+//	fmt.Println("scan results:\n", MustYamlString(out))
+//
+//	suite.Equal(len(target), len(suite.testItems)+len(suite.testMarshalledItems))
+//}
 
 func TestPoolSuite(t *testing.T) {
 	// not using suite.Run() as we want to control the order
@@ -201,7 +201,7 @@ func TestPoolSuite(t *testing.T) {
 	s.Run("write ops", func() {
 		s.TestPutItems()
 	})
-	s.Run("read ops", func() {
-		s.TestScan()
-	})
+	//s.Run("read ops", func() {
+	//	s.TestScan()
+	//})
 }

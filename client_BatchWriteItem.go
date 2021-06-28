@@ -90,13 +90,24 @@ func (h BatchWriteItemHandlerFunc) HandleBatchWriteItem(ctx *BatchWriteItemConte
 }
 
 // BatchWriteItemMiddleWare is a middleware function use for wrapping BatchWriteItemHandler requests
-type BatchWriteItemMiddleWare func(next BatchWriteItemHandler) BatchWriteItemHandler
+type BatchWriteItemMiddleWare interface {
+	BatchWriteItemMiddleWare(h BatchWriteItemHandler) BatchWriteItemHandler
+}
 
-// BatchWriteItemFinalHandler returns the final BatchWriteItemHandler that executes a dynamodb BatchWriteItem operation
-func BatchWriteItemFinalHandler() BatchWriteItemHandler {
-	return BatchWriteItemHandlerFunc(func(ctx *BatchWriteItemContext, promise *BatchWriteItemPromise) {
-		promise.SetResponse(ctx.client.BatchWriteItem(ctx, ctx.input))
-	})
+// BatchWriteItemMiddleWareFunc is a functional BatchWriteItemMiddleWare
+type BatchWriteItemMiddleWareFunc func(handler BatchWriteItemHandler) BatchWriteItemHandler
+
+// BatchWriteItemMiddleWare implements the BatchWriteItemMiddleWare interface
+func (mw BatchWriteItemMiddleWareFunc) BatchWriteItemMiddleWare(h BatchWriteItemHandler) BatchWriteItemHandler {
+	return mw(h)
+}
+
+// BatchWriteItemFinalHandler is the final handler for all batchWriteItem operations
+type BatchWriteItemFinalHandler struct {}
+
+// HandleBatchWriteItem implements BatchWriteItemHandler
+func (b *BatchWriteItemFinalHandler) HandleBatchWriteItem(ctx *BatchWriteItemContext, promise *BatchWriteItemPromise) {
+	promise.SetResponse(ctx.client.BatchWriteItem(ctx, ctx.input))
 }
 
 // BatchWriteItem represents a BatchWriteItem operation
@@ -131,13 +142,15 @@ func (op *BatchWriteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		input:   op.input,
 	}
 
-	h := BatchWriteItemFinalHandler()
+	var h BatchWriteItemHandler
+
+	h = new(BatchWriteItemFinalHandler)
 
 	// no middlewares
 	if len(op.middleWares) > 0 {
 		// loop in reverse to preserve middleware order
 		for i := len(op.middleWares) - 1; i >= 0; i-- {
-			h = op.middleWares[i](h)
+			h = op.middleWares[i].BatchWriteItemMiddleWare(h)
 		}
 	}
 
@@ -158,13 +171,13 @@ type BatchWriteItemAllPromise struct {
 
 // GetResponse returns the GetResponse output and error
 // if Output has not been set yet nil is returned
-func (p *BatchWriteItemAllPromise) GetResponse() (*ddb.BatchWriteItemOutput, error) {
+func (p *BatchWriteItemAllPromise) GetResponse() ([]*ddb.BatchWriteItemOutput, error) {
 	out, err := p.Promise.GetResponse()
 	if out == nil {
 		return nil, err
 	}
 
-	return out.(*ddb.BatchWriteItemOutput), err
+	return out.([]*ddb.BatchWriteItemOutput), err
 }
 
 // Await waits for the BatchWriteItemAllPromise to be fulfilled and then returns a BatchWriteItemAllOutput and error
@@ -196,37 +209,49 @@ func (h BatchWriteItemAllHandlerFunc) HandleBatchWriteItemAll(ctx *BatchWriteIte
 }
 
 // BatchWriteItemAllMiddleWare is a middleware function use for wrapping BatchWriteItemAllHandler requests
-type BatchWriteItemAllMiddleWare func(handler BatchWriteItemAllHandler) BatchWriteItemAllHandler
+type BatchWriteItemAllMiddleWare interface {
+	BatchWriteItemAllMiddleWare(h BatchWriteItemAllHandler) BatchWriteItemAllHandler
+}
 
-// BatchWriteItemAllFinalHandler returns the final BatchWriteItemAllHandler that executes a dynamodb BatchWriteItemAll operation
-func BatchWriteItemAllFinalHandler() BatchWriteItemAllHandler {
-	return BatchWriteItemAllHandlerFunc(func(ctx *BatchWriteItemAllContext, promise *BatchWriteItemAllPromise) {
-		var (
-			outs []*ddb.BatchWriteItemOutput
-			out  *ddb.BatchWriteItemOutput
-			err  error
-		)
+// BatchWriteItemAllMiddleWareFunc is a functional BatchWriteItemAllMiddleWare
+type BatchWriteItemAllMiddleWareFunc func(handler BatchWriteItemAllHandler) BatchWriteItemAllHandler
 
-		defer func() { promise.SetResponse(outs, err) }()
+// BatchWriteItemAllMiddleWare implements the BatchWriteItemAllMiddleWare interface
+func (mw BatchWriteItemAllMiddleWareFunc) BatchWriteItemAllMiddleWare(h BatchWriteItemAllHandler) BatchWriteItemAllHandler {
+	return mw(h)
+}
 
-		// copy the scan so we're not mutating the original
-		input := CopyBatchWriteItemInput(ctx.input)
+// BatchWriteItemAllFinalHandler is the final handler for all batchWriteItemAll operations
+type BatchWriteItemAllFinalHandler struct {}
 
-		for {
-			if out, err = ctx.client.BatchWriteItem(ctx, input); err != nil {
-				return
-			}
+// HandleBatchWriteItemAll implements the HandleBatchWriteItem interface
+func (b *BatchWriteItemAllFinalHandler) HandleBatchWriteItemAll(ctx *BatchWriteItemAllContext, promise *BatchWriteItemAllPromise) {
+	var (
+		outs []*ddb.BatchWriteItemOutput
+		out  *ddb.BatchWriteItemOutput
+		err  error
+	)
 
-			outs = append(outs, out)
+	defer func() { promise.SetResponse(outs, err) }()
 
-			if out.UnprocessedItems == nil {
-				// no more work
-				return
-			}
+	// copy the scan so we're not mutating the original
+	input := CopyBatchWriteItemInput(ctx.input)
 
-			input.RequestItems = out.UnprocessedItems
+
+	for {
+		if out, err = ctx.client.BatchWriteItem(ctx, input); err != nil {
+			return
 		}
-	})
+
+		outs = append(outs, out)
+
+		if out.UnprocessedItems == nil || len(out.UnprocessedItems) == 0 {
+			// no more work
+			return
+		}
+
+		input.RequestItems = out.UnprocessedItems
+	}
 }
 
 // BatchWriteItemAll represents a BatchWriteItemAll operation
@@ -260,13 +285,15 @@ func (op *BatchWriteItemAll) DynoInvoke(ctx context.Context, client *ddb.Client)
 		input:   op.input,
 	}
 
-	h := BatchWriteItemAllFinalHandler()
+	var h BatchWriteItemAllHandler
+
+	h = new(BatchWriteItemAllFinalHandler)
 
 	// no middlewares
 	if len(op.middleWares) > 0 {
 		// loop in reverse to preserve middleware order
 		for i := len(op.middleWares) - 1; i >= 0; i-- {
-			h = op.middleWares[i](h)
+			h = op.middleWares[i].BatchWriteItemAllMiddleWare(h)
 		}
 	}
 
@@ -313,11 +340,11 @@ func CopyBatchWriteItemInput(input *ddb.BatchWriteItemInput) *ddb.BatchWriteItem
 		ReturnItemCollectionMetrics: input.ReturnItemCollectionMetrics,
 	}
 
-	if clone.RequestItems == nil {
+	if input.RequestItems == nil {
 		return clone
 	}
 
-	clone.RequestItems = make(map[string][]ddbTypes.WriteRequest, len(input.RequestItems))
+	clone.RequestItems = make(map[string][]ddbTypes.WriteRequest)
 
 	for k, v := range input.RequestItems {
 		clone.RequestItems[k] = make([]ddbTypes.WriteRequest, len(v))

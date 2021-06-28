@@ -66,10 +66,13 @@ func CopyAttributeValueMap(input map[string]types.AttributeValue) map[string]typ
 	if input == nil {
 		return nil
 	}
+
 	out := make(map[string]types.AttributeValue, len(input))
+
 	for k, v := range input {
 		out[k] = CopyAttributeValue(v)
 	}
+
 	return out
 }
 
@@ -79,19 +82,22 @@ func CopyCondition(cnd types.Condition) types.Condition {
 		ComparisonOperator: cnd.ComparisonOperator,
 		AttributeValueList: make([]types.AttributeValue, len(cnd.AttributeValueList)),
 	}
+
 	for i, av := range cnd.AttributeValueList {
 		newCnd.AttributeValueList[i] = CopyAttributeValue(av)
 	}
+
 	return newCnd
 }
 
-//addProjectionNames adds a string slice of projection values to a expression.ProjectionBuilder
+// addProjectionNames adds a string slice of projection values to a expression.ProjectionBuilder
 func addProjectionNames(projectionBuilder *expression.ProjectionBuilder, names []string) {
-	//nameBuilders := encoding.NameBuilders(names)
+	// nameBuilders := encoding.NameBuilders(names)
 	nameBuilders := make([]expression.NameBuilder, len(names))
 	for i, name := range names {
 		nameBuilders[i] = expression.Name(name)
 	}
+
 	if projectionBuilder != nil {
 		*projectionBuilder = projectionBuilder.AddNames(nameBuilders...)
 		return

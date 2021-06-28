@@ -94,7 +94,17 @@ func (h ScanHandlerFunc) HandleScan(ctx *ScanContext, promise *ScanPromise) {
 }
 
 // ScanMiddleWare is a middleware function use for wrapping ScanHandler requests
-type ScanMiddleWare func(handler ScanHandler) ScanHandler
+type ScanMiddleWare interface {
+	ScanMiddleWare(h ScanHandler) ScanHandler
+}
+
+// ScanMiddleWareFunc is a functional ScanMiddleWare
+type ScanMiddleWareFunc func(handler ScanHandler) ScanHandler
+
+// ScanMiddleWare implements the ScanMiddleWare interface
+func (mw ScanMiddleWareFunc) ScanMiddleWare(h ScanHandler) ScanHandler {
+	return mw(h)
+}
 
 // ScanFinalHandler returns the final ScanHandler that executes a dynamodb Scan operation
 func ScanFinalHandler() ScanHandler {
@@ -141,7 +151,7 @@ func (op *Scan) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	if len(op.middleWares) > 0 {
 		// loop in reverse to preserve middleware order
 		for i := len(op.middleWares) - 1; i >= 0; i-- {
-			h = op.middleWares[i](h)
+			h = op.middleWares[i].ScanMiddleWare(h)
 		}
 	}
 
@@ -200,7 +210,17 @@ func (h ScanAllHandlerFunc) HandleScanAll(ctx *ScanAllContext, promise *ScanAllP
 }
 
 // ScanAllMiddleWare is a middleware function use for wrapping ScanAllHandler requests
-type ScanAllMiddleWare func(handler ScanAllHandler) ScanAllHandler
+type ScanAllMiddleWare interface {
+	ScanAllMiddleWare(h ScanAllHandler) ScanAllHandler
+}
+
+// ScanAllMiddleWareFunc is a functional ScanAllMiddleWare
+type ScanAllMiddleWareFunc func(handler ScanAllHandler) ScanAllHandler
+
+// ScanAllMiddleWare implements the ScanAllMiddleWare interface
+func (mw ScanAllMiddleWareFunc) ScanAllMiddleWare(h ScanAllHandler) ScanAllHandler {
+	return mw(h)
+}
 
 // ScanAllFinalHandler returns the final ScanAllHandler that executes a dynamodb ScanAll operation
 func ScanAllFinalHandler() ScanAllHandler {
@@ -224,7 +244,7 @@ func ScanAllFinalHandler() ScanAllHandler {
 
 			outs = append(outs, out)
 
-			if out.LastEvaluatedKey == nil {
+			if out.LastEvaluatedKey == nil || len(out.LastEvaluatedKey) == 0 {
 				// no more work
 				break
 			}
@@ -271,7 +291,7 @@ func (op *ScanAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	if len(op.middleWares) > 0 {
 		// loop in reverse to preserve middleware order
 		for i := len(op.middleWares) - 1; i >= 0; i-- {
-			h = op.middleWares[i](h)
+			h = op.middleWares[i].ScanAllMiddleWare(h)
 		}
 	}
 
@@ -463,6 +483,7 @@ func (bld *ScanBuilder) Build() (*ddb.ScanInput, error) {
 		if err != nil {
 			return nil, fmt.Errorf("ScanBuilder Build() failed while attempting to build expression: %v", err)
 		}
+
 		bld.ExpressionAttributeNames = expr.Names()
 		bld.ExpressionAttributeValues = expr.Values()
 		bld.FilterExpression = expr.Filter()

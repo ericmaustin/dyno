@@ -92,7 +92,17 @@ func (h BatchGetItemHandlerFunc) HandleBatchGetItem(ctx *BatchGetItemContext, pr
 }
 
 // BatchGetItemMiddleWare is a middleware function use for wrapping BatchGetItemHandler requests
-type BatchGetItemMiddleWare func(handler BatchGetItemHandler) BatchGetItemHandler
+type BatchGetItemMiddleWare interface {
+	BatchGetItemMiddleWare(h BatchGetItemHandler) BatchGetItemHandler
+}
+
+// BatchGetItemMiddleWareFunc is a functional BatchGetItemMiddleWare
+type BatchGetItemMiddleWareFunc func(handler BatchGetItemHandler) BatchGetItemHandler
+
+// BatchGetItemMiddleWare implements the BatchGetItemMiddleWare interface
+func (mw BatchGetItemMiddleWareFunc) BatchGetItemMiddleWare(h BatchGetItemHandler) BatchGetItemHandler {
+	return mw(h)
+}
 
 // BatchGetItemFinalHandler returns the final BatchGetItemHandler that executes a dynamodb BatchGetItem operation
 func BatchGetItemFinalHandler() BatchGetItemHandler {
@@ -139,7 +149,7 @@ func (op *BatchGetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	if len(op.middleWares) > 0 {
 		// loop in reverse to preserve middleware order
 		for i := len(op.middleWares) - 1; i >= 0; i-- {
-			h = op.middleWares[i](h)
+			h = op.middleWares[i].BatchGetItemMiddleWare(h)
 		}
 	}
 
@@ -198,7 +208,17 @@ func (h BatchGetItemAllHandlerFunc) HandleBatchGetItemAll(ctx *BatchGetItemAllCo
 }
 
 // BatchGetItemAllMiddleWare is a middleware function use for wrapping BatchGetItemAllHandler requests
-type BatchGetItemAllMiddleWare func(handler BatchGetItemAllHandler) BatchGetItemAllHandler
+type BatchGetItemAllMiddleWare interface {
+	BatchGetItemAllMiddleWare(h BatchGetItemAllHandler) BatchGetItemAllHandler
+}
+
+// BatchGetItemAllMiddleWareFunc is a functional BatchGetItemAllMiddleWare
+type BatchGetItemAllMiddleWareFunc func(handler BatchGetItemAllHandler) BatchGetItemAllHandler
+
+// BatchGetItemAllMiddleWare implements the BatchGetItemAllMiddleWare interface
+func (mw BatchGetItemAllMiddleWareFunc) BatchGetItemAllMiddleWare(h BatchGetItemAllHandler) BatchGetItemAllHandler {
+	return mw(h)
+}
 
 // BatchGetItemAllFinalHandler returns the final BatchGetItemAllHandler that executes a dynamodb BatchGetItemAll operation
 func BatchGetItemAllFinalHandler() BatchGetItemAllHandler {
@@ -268,7 +288,7 @@ func (op *BatchGetItemAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	if len(op.middleWares) > 0 {
 		// loop in reverse to preserve middleware order
 		for i := len(op.middleWares) - 1; i >= 0; i-- {
-			h = op.middleWares[i](h)
+			h = op.middleWares[i].BatchGetItemAllMiddleWare(h)
 		}
 	}
 

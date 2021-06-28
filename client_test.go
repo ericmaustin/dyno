@@ -3,7 +3,6 @@ package dyno
 import (
 	"context"
 	"fmt"
-	//ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/ericmaustin/dyno/encoding"
 	"github.com/stretchr/testify/suite"
@@ -47,9 +46,9 @@ func (s *ClientTestSuite) TearDownSuite() {
 func (s *ClientTestSuite) TestBatchWriteItemWithMiddleWare() {
 	items := encoding.MustMarshalMaps(s.testItems)
 
-	var cached *dynamodb.BatchWriteItemOutput
+	var cached []*dynamodb.BatchWriteItemOutput
 
-	cacheMW := BatchWriteItemAllMiddleWare(func(next BatchWriteItemAllHandler) BatchWriteItemAllHandler {
+	cacheMW := BatchWriteItemAllMiddleWareFunc(func(next BatchWriteItemAllHandler) BatchWriteItemAllHandler {
 		return BatchWriteItemAllHandlerFunc(func(ctx *BatchWriteItemAllContext, promise *BatchWriteItemAllPromise) {
 			if cached != nil {
 				fmt.Println("cached!")
@@ -59,34 +58,38 @@ func (s *ClientTestSuite) TestBatchWriteItemWithMiddleWare() {
 			fmt.Println("not cached!")
 			next.HandleBatchWriteItemAll(ctx, promise)
 			out, err := promise.GetResponse()
-			if err == nil {
-				fmt.Println("saving to cache:\n", MustYamlString(out))
-				cached = out
+			if err != nil {
+				panic(err)
 			}
+			fmt.Println("saving batch write to cache")
+			cached = out
 		})
 	})
-	s.Nil(cached)
+
 	// first call, should not be cached
 	out, err := s.table.BatchPut(items, cacheMW).Invoke(context.Background(), s.client.DynamoDB()).Await()
 	if err != nil {
 		panic(err)
 	}
+
 	s.NotNil(out)
-	s.NotNil(cached)
+	s.Greater(len(cached), 0)
+	s.Equal(len(cached), len(out))
 	// second call, should be cached
 	out, err = s.table.BatchPut(items, cacheMW).Invoke(context.Background(), s.client.DynamoDB()).Await()
 	if err != nil {
 		panic(err)
 	}
+
 	s.NotNil(out)
-	s.NotNil(cached)
-	fmt.Println(MustYamlString(cached))
+	s.Greater(len(cached), 0)
+	s.Equal(len(cached), len(out))
 }
 
 func (s *ClientTestSuite) TestScanWithMiddleware() {
 	var cached []*dynamodb.ScanOutput
 
-	cacheMW := ScanAllMiddleWare(func(next ScanAllHandler) ScanAllHandler {
+	cacheMW := ScanAllMiddleWareFunc(func(next ScanAllHandler) ScanAllHandler {
 		return ScanAllHandlerFunc(func(ctx *ScanAllContext, promise *ScanAllPromise) {
 			if cached != nil {
 				fmt.Println("cached!")
@@ -96,13 +99,16 @@ func (s *ClientTestSuite) TestScanWithMiddleware() {
 			fmt.Println("not cached!")
 			next.HandleScanAll(ctx, promise)
 			out, err := promise.GetResponse()
-			if err == nil {
-				fmt.Println("saving to cache:\n", MustYamlString(out))
-				cached = out
+			if err != nil {
+				panic(err)
 			}
+			fmt.Println("saving scan output to cache")
+			cached = out
 		})
 	})
+
 	s.Nil(cached)
+
 	// first call, should not be cached
 	input, err := s.table.ScanBuilder().SetTableName(s.table.Name()).Build()
 	if err != nil {
@@ -113,16 +119,19 @@ func (s *ClientTestSuite) TestScanWithMiddleware() {
 	if err != nil {
 		panic(err)
 	}
+
 	s.NotNil(out)
 	s.NotNil(cached)
+
 	// second call, should be cached
 	out, err = NewScanAll(input, cacheMW).Invoke(context.Background(), s.client.DynamoDB()).Await()
 	if err != nil {
 		panic(err)
 	}
+
 	s.NotNil(out)
 	s.NotNil(cached)
-	fmt.Println(MustYamlString(cached))
+	fmt.Println("CACHE RESULT:", MustYamlString(cached))
 }
 
 func TestClientSuite(t *testing.T) {
