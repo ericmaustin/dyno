@@ -67,19 +67,30 @@ type CreateBackupHandler interface {
 // CreateBackupHandlerFunc is a CreateBackupHandler function
 type CreateBackupHandlerFunc func(ctx *CreateBackupContext, promise *CreateBackupPromise)
 
+// CreateBackupFinalHandler is the final CreateBackupHandler that executes a dynamodb CreateBackup operation
+type CreateBackupFinalHandler struct {}
+
+// HandleCreateBackup implements the CreateBackupHandler
+func (h *CreateBackupFinalHandler) HandleCreateBackup(ctx *CreateBackupContext, promise *CreateBackupPromise) {
+	promise.SetResponse(ctx.client.CreateBackup(ctx, ctx.input))
+}
+
 // HandleCreateBackup implements CreateBackupHandler
 func (h CreateBackupHandlerFunc) HandleCreateBackup(ctx *CreateBackupContext, promise *CreateBackupPromise) {
 	h(ctx, promise)
 }
 
 // CreateBackupMiddleWare is a middleware function use for wrapping CreateBackupHandler requests
-type CreateBackupMiddleWare func(handler CreateBackupHandler) CreateBackupHandler
+type CreateBackupMiddleWare interface {
+	CreateBackupMiddleWare(h CreateBackupHandler) CreateBackupHandler
+}
 
-// CreateBackupFinalHandler returns the final CreateBackupHandler that executes a dynamodb CreateBackup operation
-func CreateBackupFinalHandler() CreateBackupHandler {
-	return CreateBackupHandlerFunc(func(ctx *CreateBackupContext, promise *CreateBackupPromise) {
-		promise.SetResponse(ctx.client.CreateBackup(ctx, ctx.input))
-	})
+// CreateBackupMiddleWareFunc is a functional CreateBackupMiddleWare
+type CreateBackupMiddleWareFunc func(handler CreateBackupHandler) CreateBackupHandler
+
+// CreateBackupMiddleWare implements the CreateBackupMiddleWare interface
+func (mw CreateBackupMiddleWareFunc) CreateBackupMiddleWare(h CreateBackupHandler) CreateBackupHandler {
+	return mw(h)
 }
 
 // CreateBackup represents a CreateBackup operation
@@ -114,13 +125,15 @@ func (op *CreateBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		input:   op.input,
 	}
 
-	h := CreateBackupFinalHandler()
+	var h CreateBackupHandler
+
+	h = new(CreateBackupFinalHandler)
 
 	// no middlewares
 	if len(op.middleWares) > 0 {
 		// loop in reverse to preserve middleware order
 		for i := len(op.middleWares) - 1; i >= 0; i-- {
-			h = op.middleWares[i](h)
+			h = op.middleWares[i].CreateBackupMiddleWare(h)
 		}
 	}
 

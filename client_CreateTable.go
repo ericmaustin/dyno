@@ -74,14 +74,25 @@ func (h CreateTableHandlerFunc) HandleCreateTable(ctx *CreateTableContext, promi
 	h(ctx, promise)
 }
 
-// CreateTableMiddleWare is a middleware function use for wrapping CreateTableHandler requests
-type CreateTableMiddleWare func(next CreateTableHandler) CreateTableHandler
+// CreateTableFinalHandler is the final CreateTableHandler that executes a dynamodb CreateTable operation
+type CreateTableFinalHandler struct {}
 
-// CreateTableFinalHandler returns the final CreateTableHandler that executes a dynamodb CreateTable operation
-func CreateTableFinalHandler() CreateTableHandler {
-	return CreateTableHandlerFunc(func(ctx *CreateTableContext, promise *CreateTablePromise) {
-		promise.SetResponse(ctx.client.CreateTable(ctx, ctx.input))
-	})
+// HandleCreateTable implements the CreateTableHandler
+func (h *CreateTableFinalHandler) HandleCreateTable(ctx *CreateTableContext, promise *CreateTablePromise) {
+	promise.SetResponse(ctx.client.CreateTable(ctx, ctx.input))
+}
+
+// CreateTableMiddleWare is a middleware function use for wrapping CreateTableHandler requests
+type CreateTableMiddleWare interface {
+	CreateTableMiddleWare(h CreateTableHandler) CreateTableHandler
+}
+
+// CreateTableMiddleWareFunc is a functional CreateTableMiddleWare
+type CreateTableMiddleWareFunc func(handler CreateTableHandler) CreateTableHandler
+
+// CreateTableMiddleWare implements the CreateTableMiddleWare interface
+func (mw CreateTableMiddleWareFunc) CreateTableMiddleWare(h CreateTableHandler) CreateTableHandler {
+	return mw(h)
 }
 
 // CreateTable represents a CreateTable operation
@@ -116,13 +127,14 @@ func (op *CreateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		input:   op.input,
 	}
 
-	h := CreateTableFinalHandler()
+	var h CreateTableHandler
+	h = new(CreateTableFinalHandler)
 
 	// no middlewares
 	if len(op.middleWares) > 0 {
 		// loop in reverse to preserve middleware order
 		for i := len(op.middleWares) - 1; i >= 0; i-- {
-			h = op.middleWares[i](h)
+			h = op.middleWares[i].CreateTableMiddleWare(h)
 		}
 	}
 

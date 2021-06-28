@@ -106,11 +106,12 @@ func (mw ScanMiddleWareFunc) ScanMiddleWare(h ScanHandler) ScanHandler {
 	return mw(h)
 }
 
-// ScanFinalHandler returns the final ScanHandler that executes a dynamodb Scan operation
-func ScanFinalHandler() ScanHandler {
-	return ScanHandlerFunc(func(ctx *ScanContext, promise *ScanPromise) {
-		promise.SetResponse(ctx.client.Scan(ctx, ctx.input))
-	})
+// ScanFinalHandler is the final ScanHandler that executes a dynamodb Scan operation
+type ScanFinalHandler struct {}
+
+// HandleScan implements the ScanHandler
+func (h *ScanFinalHandler) HandleScan(ctx *ScanContext, promise *ScanPromise) {
+	promise.SetResponse(ctx.client.Scan(ctx, ctx.input))
 }
 
 // Scan represents a Scan operation
@@ -144,8 +145,10 @@ func (op *Scan) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		client:  client,
 		input:   op.input,
 	}
-
-	h := ScanFinalHandler()
+	
+	var h ScanHandler
+	
+	h = new(ScanFinalHandler)
 
 	// no middlewares
 	if len(op.middleWares) > 0 {
@@ -222,36 +225,37 @@ func (mw ScanAllMiddleWareFunc) ScanAllMiddleWare(h ScanAllHandler) ScanAllHandl
 	return mw(h)
 }
 
-// ScanAllFinalHandler returns the final ScanAllHandler that executes a dynamodb ScanAll operation
-func ScanAllFinalHandler() ScanAllHandler {
-	return ScanAllHandlerFunc(func(ctx *ScanAllContext, promise *ScanAllPromise) {
-		var (
-			outs []*ddb.ScanOutput
-			out  *ddb.ScanOutput
-			err  error
-		)
+// ScanAllFinalHandler is the final ScanAllHandler that executes a dynamodb ScanAll operation
+type ScanAllFinalHandler struct {}
 
-		defer func() { promise.SetResponse(outs, err) }()
+// HandleScanAll implements the ScanAllHandler
+func (h *ScanAllFinalHandler) HandleScanAll(ctx *ScanAllContext, promise *ScanAllPromise) {
+	var (
+		outs []*ddb.ScanOutput
+		out  *ddb.ScanOutput
+		err  error
+	)
 
-		// copy the scan so we're not mutating the original
-		input := CopyScan(ctx.input)
+	defer func() { promise.SetResponse(outs, err) }()
 
-		for {
+	// copy the scan so we're not mutating the original
+	input := CopyScan(ctx.input)
 
-			if out, err = ctx.client.Scan(ctx, input); err != nil {
-				return
-			}
+	for {
 
-			outs = append(outs, out)
-
-			if out.LastEvaluatedKey == nil || len(out.LastEvaluatedKey) == 0 {
-				// no more work
-				break
-			}
-
-			input.ExclusiveStartKey = out.LastEvaluatedKey
+		if out, err = ctx.client.Scan(ctx, input); err != nil {
+			return
 		}
-	})
+
+		outs = append(outs, out)
+
+		if out.LastEvaluatedKey == nil || len(out.LastEvaluatedKey) == 0 {
+			// no more work
+			break
+		}
+
+		input.ExclusiveStartKey = out.LastEvaluatedKey
+	}
 }
 
 // ScanAll represents a ScanAll operation
@@ -285,7 +289,9 @@ func (op *ScanAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		input:   op.input,
 	}
 
-	h := ScanAllFinalHandler()
+	var h ScanAllHandler
+
+	h = new(ScanAllFinalHandler)
 
 	// no middlewares
 	if len(op.middleWares) > 0 {
@@ -307,7 +313,7 @@ func NewScanInput(tableName *string) *ddb.ScanInput {
 	}
 }
 
-//ScanBuilder extends dynamodb.ScanInput to allow dynamic input building
+// ScanBuilder extends dynamodb.ScanInput to allow dynamic input building
 type ScanBuilder struct {
 	*ddb.ScanInput
 	filter     *expression.ConditionBuilder
