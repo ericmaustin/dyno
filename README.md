@@ -6,7 +6,7 @@ DYNO
 
 dyno is an AWS dynomodb API extension library
 
-##Features:
+## Features:
 
 ### Input Builders 
 
