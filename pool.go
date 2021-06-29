@@ -119,12 +119,3 @@ func (p *Pool) Wait() <-chan struct{} {
 
 	return out
 }
-
-
-//// ScanAll executes a scan api call with a ScanInput
-//func (p *Scan) ScanAll(input *ddb.ScanInput, optFns ...func(*ScanOptions)) ([]*ddb.ScanOutput, error) {
-//	opt := NewScanAll(input, optFns...)
-//	opt.DynoInvoke(ctx, c.ddb)
-//
-//	return opt.Await()
-//}

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/encoding"
@@ -55,18 +54,16 @@ func TestLock(t *testing.T) {
 		},
 	}
 
-	bld := dyno.NewBatchWriteItemBuilder()
+	bld := dyno.NewBatchWriteItemBuilder(nil)
 	for _, item := range items {
 		bld.AddPuts(tbl.Name(), encoding.MustMarshalMap(item))
 	}
 
 	input := bld.Build()
 
-	if _, err := client.BatchWriteItem(context.Background(), input); err != nil {
+	if _, err := client.BatchWriteItem(context.Background(), input).Await(); err != nil {
 		panic(err)
 	}
-
-	var resultItems []*testItem
 
 	queryBuilder := dyno.NewQueryBuilder(nil).
 		SetTableName(tbl.Name()).
@@ -77,24 +74,7 @@ func TestLock(t *testing.T) {
 		panic(err)
 	}
 
-	cb := dyno.QueryOutputCallbackF(func(ctx context.Context, output *dynamodb.QueryOutput) error {
-
-		if len(output.Items) < 0 {
-			return nil
-		}
-
-		for _, item := range output.Items {
-			target := new(testItem)
-			if err := encoding.UnmarshalMap(item, target); err != nil {
-				return err
-			}
-			resultItems = append(resultItems, target)
-		}
-
-		return nil
-	})
-
-	queryOutput, err := client.Query(context.Background(), queryInput, dyno.QueryWithOutputCallback(cb))
+	queryOutput, err := client.Query(context.Background(), queryInput).Await()
 	assert.NoError(t, err)
 	assert.NotZero(t, len(queryOutput.Items))
 

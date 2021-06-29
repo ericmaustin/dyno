@@ -6,7 +6,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno/condition"
 	"github.com/ericmaustin/dyno/encoding"
 	"sync"
@@ -224,7 +223,7 @@ func (bld *UpdateItemBuilder) Set(field string, value interface{}) *UpdateItemBu
 }
 
 // SetItem adds a set operation on this update with the given fields and values from an item
-func (bld *UpdateItemBuilder) SetItem(item map[string]dynamodb.AttributeValue) *UpdateItemBuilder {
+func (bld *UpdateItemBuilder) SetItem(item map[string]ddbTypes.AttributeValue) *UpdateItemBuilder {
 	for key, value := range item {
 		bld.updateBuilder = bld.updateBuilder.Set(expression.Name(key), expression.Value(value))
 	}

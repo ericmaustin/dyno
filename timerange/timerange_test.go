@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,16 +68,4 @@ func TestTimeRange(t *testing.T) {
 	tsUnmarshalled := &TimeSeries{}
 	err = json.Unmarshal(jTs, tsUnmarshalled)
 	assert.NoError(t, err)
-
-	// TEST DYNAMODB ATTRIBUTE
-	dTr, err := dynamodbattribute.Marshal(tr)
-	assert.NoError(t, err)
-	fmt.Printf("Marshalled DynamoDB AsTime Range:\n%v", dTr)
-
-	dTrUnmarshalled := &TimeRange{}
-	err = dynamodbattribute.Unmarshal(dTr, dTrUnmarshalled)
-	assert.NoError(t, err)
-
-	fmt.Printf("DYNAMODB Unmarshalled TR start = %v End = %v\n",
-		dTrUnmarshalled.Start, dTrUnmarshalled.End)
 }
