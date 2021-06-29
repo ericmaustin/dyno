@@ -135,6 +135,7 @@ func addValuesToRecord(item map[string]types.AttributeValue, rv reflect.Value) e
 			for _, key := range rv.MapKeys() {
 				item[key.Interface().(string)] = rv.MapIndex(key).Interface().(types.AttributeValue)
 			}
+
 			return nil
 		}
 
@@ -312,12 +313,15 @@ func Indirect(rv reflect.Value, decodingNil bool) reflect.Value {
 			if e.Kind() == reflect.Ptr && !e.IsNil() && (!decodingNil || e.Elem().Kind() == reflect.Ptr) {
 				haveAddr = false
 				rv = e
+
 				continue
 			}
 		}
+
 		if rv.Kind() != reflect.Ptr {
 			break
 		}
+
 		if decodingNil && rv.CanSet() {
 			break
 		}
@@ -328,6 +332,7 @@ func Indirect(rv reflect.Value, decodingNil bool) reflect.Value {
 			rv = rv.Elem()
 			break
 		}
+
 		if rv.IsNil() {
 			rv.Set(reflect.New(rv.Type().Elem()))
 		}
@@ -364,17 +369,21 @@ func IndirectType(rt reflect.Type) (reflect.Type, int) {
 				haveAddr = false
 				rt = e
 				steps++
+
 				continue
 			}
 		}
+
 		if rt.Kind() != reflect.Ptr {
 			break
 		}
+
 		if rt.Elem().Kind() == reflect.Interface && rt.Elem().Elem() == rt {
 			rt = rt.Elem()
 			steps++
 			break
 		}
+
 		if haveAddr {
 			rt = v0 // restore original value after round-trip Value.Addr().Elem()
 			haveAddr = false

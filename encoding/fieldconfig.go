@@ -57,6 +57,7 @@ func parseTag(tagStr string) (*fieldConfig, error) {
 	if !conf.Embed && (len(conf.Append) > 0 || len(conf.Prepend) > 0) {
 		return nil, errors.New("append and prepend cannot be used if field is not embedded")
 	}
+
 	return conf, nil
 }
 
@@ -69,8 +70,10 @@ func parseTagPart(part string, conf *fieldConfig) {
 		case "prepend":
 			conf.Prepend = subParts[1]
 		}
+
 		return
 	}
+
 	switch strings.ToLower(strings.TrimSpace(part)) {
 	case "*":
 		conf.Embed = true
