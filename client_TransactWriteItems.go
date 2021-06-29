@@ -198,6 +198,7 @@ func (bld *TransactWriteItemsBuilder) AddPut(put *ddbTypes.Put, cnd *ddbTypes.Co
 			ConditionCheck: cnd,
 			Put: put,
 		})
+
 	return bld
 }
 
@@ -208,6 +209,7 @@ func (bld *TransactWriteItemsBuilder) AddDelete(del *ddbTypes.Delete, cnd *ddbTy
 			ConditionCheck: cnd,
 			Delete: del,
 		})
+
 	return bld
 }
 
@@ -218,6 +220,7 @@ func (bld *TransactWriteItemsBuilder) AddUpdate(update *ddbTypes.Update, cnd *dd
 			ConditionCheck: cnd,
 			Update: update,
 		})
+
 	return bld
 }
 

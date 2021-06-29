@@ -318,13 +318,17 @@ func (bld *UpdateItemBuilder) Build() (*ddb.UpdateItemInput, error) {
 	if !bld.cnd.Empty() {
 		expr.WithCondition(bld.cnd.Builder())
 	}
+
 	b, err := expr.Build()
+
 	if err != nil {
 		return nil, fmt.Errorf("UpdateItemBuilder.Build() failed while attempting to build expression: %v", err)
 	}
+
 	bld.ConditionExpression = b.Condition()
 	bld.ExpressionAttributeNames = b.Names()
 	bld.ExpressionAttributeValues = b.Values()
 	bld.UpdateExpression = b.Update()
+
 	return bld.UpdateItemInput, nil
 }

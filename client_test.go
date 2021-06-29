@@ -160,3 +160,6 @@ func TestClientSuite(t *testing.T) {
 		s.TestScanWithMiddleware()
 	})
 }
+
+// todo: add more tests
+

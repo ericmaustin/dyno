@@ -50,6 +50,7 @@ func (o *UpdateTableOutput) Get() (out *ddb.UpdateTableOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
