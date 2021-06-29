@@ -361,6 +361,7 @@ func NewScanBuilder(input *ddb.ScanInput) *ScanBuilder {
 	if input != nil {
 		return &ScanBuilder{ScanInput: input}
 	}
+
 	return &ScanBuilder{ScanInput: NewScanInput(nil)}
 }
 
@@ -376,7 +377,7 @@ func (bld *ScanBuilder) SetInput(input *ddb.ScanInput) *ScanBuilder {
 	return bld
 }
 
-//AddProjection adds additional field names to the projection
+// AddProjection adds additional field names to the projection
 func (bld *ScanBuilder) AddProjection(names interface{}) *ScanBuilder {
 	nameBuilders := encoding.NameBuilders(names)
 
@@ -393,7 +394,6 @@ func (bld *ScanBuilder) AddProjection(names interface{}) *ScanBuilder {
 
 // AddProjectionNames adds additional field names to the projection with strings
 func (bld *ScanBuilder) AddProjectionNames(names ...string) *ScanBuilder {
-	//nameBuilders := encoding.NameBuilders(names)
 	nameBuilders := make([]expression.NameBuilder, len(names))
 
 	for i, name := range names {

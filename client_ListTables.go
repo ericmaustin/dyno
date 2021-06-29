@@ -152,3 +152,5 @@ func (op *ListTables) Await() (*ddb.ListTablesOutput, error) {
 func NewListTablesInput() *ddb.ListTablesInput {
 	return &ddb.ListTablesInput{}
 }
+
+// todo: ListAllTables operation

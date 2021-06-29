@@ -144,7 +144,9 @@ func (b *Builder) And(conditions ...expression.ConditionBuilder) *Builder {
 		b.ConditionBuilder = &builder
 		return b
 	}
+
 	builder = b.ConditionBuilder.And(builder)
+
 	return b
 }
 
@@ -166,7 +168,9 @@ func (b *Builder) Or(conditions ...expression.ConditionBuilder) *Builder {
 		b.ConditionBuilder = &builder
 		return b
 	}
+
 	builder = b.ConditionBuilder.Or(builder)
+
 	return b
 }
 
@@ -175,6 +179,7 @@ func (b *Builder) Builder() expression.ConditionBuilder {
 	if b.ConditionBuilder == nil {
 		return expression.ConditionBuilder{}
 	}
+
 	return *b.ConditionBuilder
 }
 
@@ -184,5 +189,6 @@ func (b *Builder) AddToExpression(exp expression.Builder) expression.Builder {
 	if b.Empty() {
 		return exp
 	}
+
 	return exp.WithCondition(b.Builder())
 }

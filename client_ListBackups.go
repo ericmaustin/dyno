@@ -152,3 +152,5 @@ func (op *ListBackups) Await() (*ddb.ListBackupsOutput, error) {
 func NewListBackupsInput() *ddb.ListBackupsInput {
 	return &ddb.ListBackupsInput{}
 }
+
+// todo: ListAllBackups operation
