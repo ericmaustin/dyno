@@ -1,8 +1,7 @@
-package middeware
+package dyno
 
 import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/ericmaustin/dyno"
 	"github.com/ericmaustin/dyno/encoding"
 	"sync"
 )
@@ -37,8 +36,8 @@ func (mw *Unmarshaler) unmarshalMaps(avs []map[string]types.AttributeValue) erro
 }
 
 // BatchGetItemAllMiddleWare implements the BatchGetItemAllMiddleWare interface
-func (mw *Unmarshaler) BatchGetItemAllMiddleWare(next dyno.BatchGetItemAllHandler) dyno.BatchGetItemAllHandler {
-	return dyno.BatchGetItemAllHandlerFunc(func(ctx *dyno.BatchGetItemAllContext, output *dyno.BatchGetItemAllOutput) {
+func (mw *Unmarshaler) BatchGetItemAllMiddleWare(next BatchGetItemAllHandler) BatchGetItemAllHandler {
+	return BatchGetItemAllHandlerFunc(func(ctx *BatchGetItemAllContext, output *BatchGetItemAllOutput) {
 		next.HandleBatchGetItemAll(ctx, output)
 		outs, err := output.Get()
 		if err != nil {
@@ -57,8 +56,8 @@ func (mw *Unmarshaler) BatchGetItemAllMiddleWare(next dyno.BatchGetItemAllHandle
 }
 
 // GetItemMiddleWare implements the GetItemMiddleWare interface
-func (mw *Unmarshaler) GetItemMiddleWare(next dyno.GetItemHandler) dyno.GetItemHandler {
-	return dyno.GetItemHandlerFunc(func(ctx *dyno.GetItemContext, output *dyno.GetItemOutput) {
+func (mw *Unmarshaler) GetItemMiddleWare(next GetItemHandler) GetItemHandler {
+	return GetItemHandlerFunc(func(ctx *GetItemContext, output *GetItemOutput) {
 		next.HandleGetItem(ctx, output)
 		out, err := output.Get()
 		if err != nil {
@@ -71,8 +70,8 @@ func (mw *Unmarshaler) GetItemMiddleWare(next dyno.GetItemHandler) dyno.GetItemH
 }
 
 // QueryMiddleWare implements the QueryMiddleWare interface
-func (mw *Unmarshaler) QueryMiddleWare(next dyno.QueryHandler) dyno.QueryHandler {
-	return dyno.QueryHandlerFunc(func(ctx *dyno.QueryContext, output *dyno.QueryOutput) {
+func (mw *Unmarshaler) QueryMiddleWare(next QueryHandler) QueryHandler {
+	return QueryHandlerFunc(func(ctx *QueryContext, output *QueryOutput) {
 		next.HandleQuery(ctx, output)
 		out, err := output.Get()
 		if err != nil {
@@ -87,8 +86,8 @@ func (mw *Unmarshaler) QueryMiddleWare(next dyno.QueryHandler) dyno.QueryHandler
 }
 
 // QueryAllMiddleWare implements the QueryAllMiddleWare interface
-func (mw *Unmarshaler) QueryAllMiddleWare(next dyno.QueryAllHandler) dyno.QueryAllHandler {
-	return dyno.QueryAllHandlerFunc(func(ctx *dyno.QueryAllContext, output *dyno.QueryAllOutput) {
+func (mw *Unmarshaler) QueryAllMiddleWare(next QueryAllHandler) QueryAllHandler {
+	return QueryAllHandlerFunc(func(ctx *QueryAllContext, output *QueryAllOutput) {
 		next.HandleQueryAll(ctx, output)
 		outs, err := output.Get()
 		if err != nil {
@@ -105,8 +104,8 @@ func (mw *Unmarshaler) QueryAllMiddleWare(next dyno.QueryAllHandler) dyno.QueryA
 }
 
 // ScanMiddleWare implements the ScanMiddleWare interface
-func (mw *Unmarshaler) ScanMiddleWare(next dyno.ScanHandler) dyno.ScanHandler {
-	return dyno.ScanHandlerFunc(func(ctx *dyno.ScanContext, output *dyno.ScanOutput) {
+func (mw *Unmarshaler) ScanMiddleWare(next ScanHandler) ScanHandler {
+	return ScanHandlerFunc(func(ctx *ScanContext, output *ScanOutput) {
 		next.HandleScan(ctx, output)
 		out, err := output.Get()
 		if err != nil {
@@ -121,8 +120,8 @@ func (mw *Unmarshaler) ScanMiddleWare(next dyno.ScanHandler) dyno.ScanHandler {
 }
 
 // ScanAllMiddleWare implements the ScanAllMiddleWare interface
-func (mw *Unmarshaler) ScanAllMiddleWare(next dyno.ScanAllHandler) dyno.ScanAllHandler {
-	return dyno.ScanAllHandlerFunc(func(ctx *dyno.ScanAllContext, output *dyno.ScanAllOutput) {
+func (mw *Unmarshaler) ScanAllMiddleWare(next ScanAllHandler) ScanAllHandler {
+	return ScanAllHandlerFunc(func(ctx *ScanAllContext, output *ScanAllOutput) {
 		next.HandleScanAll(ctx, output)
 		outs, err := output.Get()
 		if err != nil {
