@@ -6,20 +6,20 @@ import (
 	"sync"
 )
 
-// DeleteBackup executes DeleteBackup operation and returns a DeleteBackupPromise
-func (c *Client) DeleteBackup(ctx context.Context, input *ddb.DeleteBackupInput, mw ...DeleteBackupMiddleWare) *DeleteBackupPromise {
+// DeleteBackup creates a new DeleteBackup, invokes and returns it
+func (c *Client) DeleteBackup(ctx context.Context, input *ddb.DeleteBackupInput, mw ...DeleteBackupMiddleWare) *DeleteBackup {
 	return NewDeleteBackup(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// DeleteBackup executes a DeleteBackup operation with a DeleteBackupInput in this pool and returns the DeleteBackupPromise
-func (p *Pool) DeleteBackup(input *ddb.DeleteBackupInput, mw ...DeleteBackupMiddleWare) *DeleteBackupPromise {
+// DeleteBackup creates a new DeleteBackup, passes it to the Pool and then returns the DeleteBackup
+func (p *Pool) DeleteBackup(input *ddb.DeleteBackupInput, mw ...DeleteBackupMiddleWare) *DeleteBackup {
 	op := NewDeleteBackup(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // DeleteBackupContext represents an exhaustive DeleteBackup operation request context
@@ -29,7 +29,7 @@ type DeleteBackupContext struct {
 	client *ddb.Client
 }
 
-// DeleteBackupOutput represents the output for the DeleteBackup opration
+// DeleteBackupOutput represents the output for the DeleteBackup operation
 type DeleteBackupOutput struct {
 	out *ddb.DeleteBackupOutput
 	err error
@@ -109,7 +109,7 @@ func (mw DeleteBackupMiddleWareFunc) DeleteBackupMiddleWare(next DeleteBackupHan
 
 // DeleteBackup represents a DeleteBackup operation
 type DeleteBackup struct {
-	promise     *DeleteBackupPromise
+	*Promise
 	input       *ddb.DeleteBackupInput
 	middleWares []DeleteBackupMiddleWare
 }
@@ -117,17 +117,17 @@ type DeleteBackup struct {
 // NewDeleteBackup creates a new DeleteBackup
 func NewDeleteBackup(input *ddb.DeleteBackupInput, mws ...DeleteBackupMiddleWare) *DeleteBackup {
 	return &DeleteBackup{
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newDeleteBackupPromise(),
 	}
 }
 
 // Invoke invokes the DeleteBackup operation and returns a DeleteBackupPromise
-func (op *DeleteBackup) Invoke(ctx context.Context, client *ddb.Client) *DeleteBackupPromise {
+func (op *DeleteBackup) Invoke(ctx context.Context, client *ddb.Client) *DeleteBackup {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
@@ -135,7 +135,7 @@ func (op *DeleteBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(DeleteBackupOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &DeleteBackupContext{
 		Context: ctx,
@@ -156,6 +156,16 @@ func (op *DeleteBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleDeleteBackup(requestCtx, output)
+}
+
+// Await waits for the DeleteBackupPromise to be fulfilled and then returns a DeleteBackupOutput and error
+func (op *DeleteBackup) Await() (*ddb.DeleteBackupOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.DeleteBackupOutput), err
 }
 
 // NewDeleteBackupInput creates a DeleteBackupInput with a given table name and key

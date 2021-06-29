@@ -8,20 +8,20 @@ import (
 	"sync"
 )
 
-// CreateTable executes CreateTable operation and returns a CreateTablePromise
-func (c *Client) CreateTable(ctx context.Context, input *ddb.CreateTableInput, mw ...CreateTableMiddleWare) *CreateTablePromise {
+// CreateTable creates a new CreateTable, invokes and returns it
+func (c *Client) CreateTable(ctx context.Context, input *ddb.CreateTableInput, mw ...CreateTableMiddleWare) *CreateTable {
 	return NewCreateTable(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// CreateTable executes a CreateTable operation with a CreateTableInput in this pool and returns the CreateTablePromise
-func (p *Pool) CreateTable(input *ddb.CreateTableInput, mw ...CreateTableMiddleWare) *CreateTablePromise {
+// CreateTable creates a new CreateTable, passes it to the Pool and then returns the CreateTable
+func (p *Pool) CreateTable(input *ddb.CreateTableInput, mw ...CreateTableMiddleWare) *CreateTable {
 	op := NewCreateTable(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // CreateTableContext represents an exhaustive CreateTable operation request context
@@ -53,37 +53,6 @@ func (o *CreateTableOutput) Get() (out *ddb.CreateTableOutput, err error) {
 	err = o.err
 	o.mu.Unlock()
 	return
-}
-
-// CreateTablePromise represents a promise for the CreateTable
-type CreateTablePromise struct {
-	*Promise
-}
-
-// GetResponse returns the GetResponse output and error
-// if Output has not been set yet nil is returned
-func (p *CreateTablePromise) GetResponse() (*ddb.CreateTableOutput, error) {
-	out, err := p.Promise.GetResponse()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.CreateTableOutput), err
-}
-
-// Await waits for the CreateTablePromise to be fulfilled and then returns a CreateTableOutput and error
-func (p *CreateTablePromise) Await() (*ddb.CreateTableOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.CreateTableOutput), err
-}
-
-// newCreateTablePromise returns a new CreateTablePromise
-func newCreateTablePromise() *CreateTablePromise {
-	return &CreateTablePromise{NewPromise()}
 }
 
 // CreateTableHandler represents a handler for CreateTable requests
@@ -122,7 +91,7 @@ func (mw CreateTableMiddleWareFunc) CreateTableMiddleWare(h CreateTableHandler) 
 
 // CreateTable represents a CreateTable operation
 type CreateTable struct {
-	promise     *CreateTablePromise
+	*Promise
 	input       *ddb.CreateTableInput
 	middleWares []CreateTableMiddleWare
 }
@@ -130,24 +99,24 @@ type CreateTable struct {
 // NewCreateTable creates a new CreateTable
 func NewCreateTable(input *ddb.CreateTableInput, mws ...CreateTableMiddleWare) *CreateTable {
 	return &CreateTable{
+		Promise: NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newCreateTablePromise(),
 	}
 }
 
 // Invoke invokes the CreateTable operation and returns a CreateTablePromise
-func (op *CreateTable) Invoke(ctx context.Context, client *ddb.Client) *CreateTablePromise {
+func (op *CreateTable) Invoke(ctx context.Context, client *ddb.Client) *CreateTable {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *CreateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	output := new(CreateTableOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &CreateTableContext{
 		Context: ctx,
@@ -167,6 +136,16 @@ func (op *CreateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleCreateTable(requestCtx, output)
+}
+
+// Await waits for the CreateTablePromise to be fulfilled and then returns a CreateTableOutput and error
+func (op *CreateTable) Await() (*ddb.CreateTableOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.CreateTableOutput), err
 }
 
 // CreateTableBuilder is used to construct a CreateTableBuilder dynamically

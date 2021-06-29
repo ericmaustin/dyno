@@ -6,20 +6,20 @@ import (
 	"sync"
 )
 
-// CreateBackup executes CreateBackup operation and returns a CreateBackupPromise
-func (c *Client) CreateBackup(ctx context.Context, input *ddb.CreateBackupInput, mw ...CreateBackupMiddleWare) *CreateBackupPromise {
+// CreateBackup creates a new CreateBackup, invokes and returns it
+func (c *Client) CreateBackup(ctx context.Context, input *ddb.CreateBackupInput, mw ...CreateBackupMiddleWare) *CreateBackup {
 	return NewCreateBackup(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// CreateBackup executes a CreateBackup operation with a CreateBackupInput in this pool and returns the CreateBackupPromise
-func (p *Pool) CreateBackup(input *ddb.CreateBackupInput, mw ...CreateBackupMiddleWare) *CreateBackupPromise {
+// CreateBackup creates a new CreateBackup, passes it to the Pool and then returns the CreateBackup
+func (p *Pool) CreateBackup(input *ddb.CreateBackupInput, mw ...CreateBackupMiddleWare) *CreateBackup {
 	op := NewCreateBackup(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // CreateBackupContext represents an exhaustive CreateBackup operation request context
@@ -29,7 +29,7 @@ type CreateBackupContext struct {
 	client *ddb.Client
 }
 
-// CreateBackupOutput represents the output for the CreateBackup opration
+// CreateBackupOutput represents the output for the CreateBackup operation
 type CreateBackupOutput struct {
 	out *ddb.CreateBackupOutput
 	err error
@@ -51,37 +51,6 @@ func (o *CreateBackupOutput) Get() (out *ddb.CreateBackupOutput, err error) {
 	err = o.err
 	o.mu.Unlock()
 	return
-}
-
-// CreateBackupPromise represents a promise for the CreateBackup
-type CreateBackupPromise struct {
-	*Promise
-}
-
-// GetResponse returns the GetResponse output and error
-// if Output has not been set yet nil is returned
-func (p *CreateBackupPromise) GetResponse() (*ddb.CreateBackupOutput, error) {
-	out, err := p.Promise.GetResponse()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.CreateBackupOutput), err
-}
-
-// Await waits for the CreateBackupPromise to be fulfilled and then returns a CreateBackupOutput and error
-func (p *CreateBackupPromise) Await() (*ddb.CreateBackupOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.CreateBackupOutput), err
-}
-
-// newCreateBackupPromise returns a new CreateBackupPromise
-func newCreateBackupPromise() *CreateBackupPromise {
-	return &CreateBackupPromise{NewPromise()}
 }
 
 // CreateBackupHandler represents a handler for CreateBackup requests
@@ -120,7 +89,7 @@ func (mw CreateBackupMiddleWareFunc) CreateBackupMiddleWare(next CreateBackupHan
 
 // CreateBackup represents a CreateBackup operation
 type CreateBackup struct {
-	promise     *CreateBackupPromise
+	*Promise
 	input       *ddb.CreateBackupInput
 	middleWares []CreateBackupMiddleWare
 }
@@ -128,24 +97,24 @@ type CreateBackup struct {
 // NewCreateBackup creates a new CreateBackup
 func NewCreateBackup(input *ddb.CreateBackupInput, mws ...CreateBackupMiddleWare) *CreateBackup {
 	return &CreateBackup{
+		Promise: NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newCreateBackupPromise(),
 	}
 }
 
 // Invoke invokes the CreateBackup operation and returns a CreateBackupPromise
-func (op *CreateBackup) Invoke(ctx context.Context, client *ddb.Client) *CreateBackupPromise {
+func (op *CreateBackup) Invoke(ctx context.Context, client *ddb.Client) *CreateBackup {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *CreateBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	output := new(CreateBackupOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &CreateBackupContext{
 		Context: ctx,
@@ -166,6 +135,16 @@ func (op *CreateBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleCreateBackup(requestCtx, output)
+}
+
+// Await waits for the CreateBackupPromise to be fulfilled and then returns a CreateBackupOutput and error
+func (op *CreateBackup) Await() (*ddb.CreateBackupOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.CreateBackupOutput), err
 }
 
 // NewCreateBackupInput creates a CreateBackupInput with a given table name and key

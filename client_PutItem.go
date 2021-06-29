@@ -9,20 +9,20 @@ import (
 	"sync"
 )
 
-// PutItem executes PutItem operation and returns a PutItemPromise
-func (c *Client) PutItem(ctx context.Context, input *ddb.PutItemInput, mw ...PutItemMiddleWare) *PutItemPromise {
+// PutItem executes PutItem operation and returns it
+func (c *Client) PutItem(ctx context.Context, input *ddb.PutItemInput, mw ...PutItemMiddleWare) *PutItem {
 	return NewPutItem(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// PutItem executes a PutItem operation with a PutItemInput in this pool and returns the PutItemPromise
-func (p *Pool) PutItem(input *ddb.PutItemInput, mw ...PutItemMiddleWare) *PutItemPromise {
+// PutItem executes a PutItem operation with a PutItemInput in this pool and returns it
+func (p *Pool) PutItem(input *ddb.PutItemInput, mw ...PutItemMiddleWare) *PutItem {
 	op := NewPutItem(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // PutItemContext represents an exhaustive PutItem operation request context
@@ -56,25 +56,6 @@ func (o *PutItemOutput) Get() (out *ddb.PutItemOutput, err error) {
 	return
 }
 
-// PutItemPromise represents a promise for the PutItem
-type PutItemPromise struct {
-	*Promise
-}
-
-// Await waits for the PutItemPromise to be fulfilled and then returns a PutItemOutput and error
-func (p *PutItemPromise) Await() (*ddb.PutItemOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.PutItemOutput), err
-}
-
-// newPutItemPromise returns a new PutItemPromise
-func newPutItemPromise() *PutItemPromise {
-	return &PutItemPromise{NewPromise()}
-}
 
 // PutItemHandler represents a handler for PutItem requests
 type PutItemHandler interface {
@@ -112,7 +93,7 @@ func (mw PutItemMiddleWareFunc) PutItemMiddleWare(next PutItemHandler) PutItemHa
 
 // PutItem represents a PutItem operation
 type PutItem struct {
-	promise     *PutItemPromise
+	*Promise
 	input       *ddb.PutItemInput
 	middleWares []PutItemMiddleWare
 }
@@ -120,17 +101,17 @@ type PutItem struct {
 // NewPutItem creates a new PutItem
 func NewPutItem(input *ddb.PutItemInput, mws ...PutItemMiddleWare) *PutItem {
 	return &PutItem{
+		Promise:    NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newPutItemPromise(),
 	}
 }
 
 // Invoke invokes the PutItem operation and returns a PutItemPromise
-func (op *PutItem) Invoke(ctx context.Context, client *ddb.Client) *PutItemPromise {
+func (op *PutItem) Invoke(ctx context.Context, client *ddb.Client) *PutItem {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
@@ -138,7 +119,7 @@ func (op *PutItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(PutItemOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &PutItemContext{
 		Context: ctx,
@@ -159,6 +140,16 @@ func (op *PutItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandlePutItem(requestCtx, output)
+}
+
+// Await waits for the PutItemPromise to be fulfilled and then returns a PutItemOutput and error
+func (op *PutItem) Await() (*ddb.PutItemOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.PutItemOutput), err
 }
 
 // PutItemBuilder allows for dynamic building of a PutItem input

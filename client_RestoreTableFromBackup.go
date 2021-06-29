@@ -7,19 +7,19 @@ import (
 )
 
 // RestoreTableFromBackup executes RestoreTableFromBackup operation and returns a RestoreTableFromBackupPromise
-func (c *Client) RestoreTableFromBackup(ctx context.Context, input *ddb.RestoreTableFromBackupInput, mw ...RestoreTableFromBackupMiddleWare) *RestoreTableFromBackupPromise {
+func (c *Client) RestoreTableFromBackup(ctx context.Context, input *ddb.RestoreTableFromBackupInput, mw ...RestoreTableFromBackupMiddleWare) *RestoreTableFromBackup {
 	return NewRestoreTableFromBackup(input, mw...).Invoke(ctx, c.ddb)
 }
 
 // RestoreTableFromBackup executes a RestoreTableFromBackup operation with a RestoreTableFromBackupInput in this pool and returns the RestoreTableFromBackupPromise
-func (p *Pool) RestoreTableFromBackup(input *ddb.RestoreTableFromBackupInput, mw ...RestoreTableFromBackupMiddleWare) *RestoreTableFromBackupPromise {
+func (p *Pool) RestoreTableFromBackup(input *ddb.RestoreTableFromBackupInput, mw ...RestoreTableFromBackupMiddleWare) *RestoreTableFromBackup {
 	op := NewRestoreTableFromBackup(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // RestoreTableFromBackupContext represents an exhaustive RestoreTableFromBackup operation request context
@@ -51,37 +51,6 @@ func (o *RestoreTableFromBackupOutput) Get() (out *ddb.RestoreTableFromBackupOut
 	err = o.err
 	o.mu.Unlock()
 	return
-}
-
-// RestoreTableFromBackupPromise represents a promise for the RestoreTableFromBackup
-type RestoreTableFromBackupPromise struct {
-	*Promise
-}
-
-// GetResponse returns the GetResponse output and error
-// if Output has not been set yet nil is returned
-func (p *RestoreTableFromBackupPromise) GetResponse() (*ddb.RestoreTableFromBackupOutput, error) {
-	out, err := p.Promise.GetResponse()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.RestoreTableFromBackupOutput), err
-}
-
-// Await waits for the RestoreTableFromBackupPromise to be fulfilled and then returns a RestoreTableFromBackupOutput and error
-func (p *RestoreTableFromBackupPromise) Await() (*ddb.RestoreTableFromBackupOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.RestoreTableFromBackupOutput), err
-}
-
-// newRestoreTableFromBackupPromise returns a new RestoreTableFromBackupPromise
-func newRestoreTableFromBackupPromise() *RestoreTableFromBackupPromise {
-	return &RestoreTableFromBackupPromise{NewPromise()}
 }
 
 // RestoreTableFromBackupHandler represents a handler for RestoreTableFromBackup requests
@@ -120,7 +89,7 @@ func (mw RestoreTableFromBackupMiddleWareFunc) RestoreTableFromBackupMiddleWare(
 
 // RestoreTableFromBackup represents a RestoreTableFromBackup operation
 type RestoreTableFromBackup struct {
-	promise     *RestoreTableFromBackupPromise
+	*Promise
 	input       *ddb.RestoreTableFromBackupInput
 	middleWares []RestoreTableFromBackupMiddleWare
 }
@@ -128,24 +97,24 @@ type RestoreTableFromBackup struct {
 // NewRestoreTableFromBackup creates a new RestoreTableFromBackup
 func NewRestoreTableFromBackup(input *ddb.RestoreTableFromBackupInput, mws ...RestoreTableFromBackupMiddleWare) *RestoreTableFromBackup {
 	return &RestoreTableFromBackup{
+		Promise: NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newRestoreTableFromBackupPromise(),
 	}
 }
 
 // Invoke invokes the RestoreTableFromBackup operation and returns a RestoreTableFromBackupPromise
-func (op *RestoreTableFromBackup) Invoke(ctx context.Context, client *ddb.Client) *RestoreTableFromBackupPromise {
+func (op *RestoreTableFromBackup) Invoke(ctx context.Context, client *ddb.Client) *RestoreTableFromBackup {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *RestoreTableFromBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	output := new(RestoreTableFromBackupOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &RestoreTableFromBackupContext{
 		Context: ctx,
@@ -166,6 +135,16 @@ func (op *RestoreTableFromBackup) DynoInvoke(ctx context.Context, client *ddb.Cl
 	}
 
 	h.HandleRestoreTableFromBackup(requestCtx, output)
+}
+
+// Await waits for the RestoreTableFromBackupPromise to be fulfilled and then returns a RestoreTableFromBackupOutput and error
+func (op *RestoreTableFromBackup) Await() (*ddb.RestoreTableFromBackupOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.RestoreTableFromBackupOutput), err
 }
 
 // NewRestoreTableFromBackupInput creates a RestoreTableFromBackupInput with a given table name and key

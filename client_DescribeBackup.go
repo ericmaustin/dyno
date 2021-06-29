@@ -7,19 +7,19 @@ import (
 )
 
 // DescribeBackup executes DescribeBackup operation and returns a DescribeBackupPromise
-func (c *Client) DescribeBackup(ctx context.Context, input *ddb.DescribeBackupInput, mw ...DescribeBackupMiddleWare) *DescribeBackupPromise {
+func (c *Client) DescribeBackup(ctx context.Context, input *ddb.DescribeBackupInput, mw ...DescribeBackupMiddleWare) *DescribeBackup {
 	return NewDescribeBackup(input, mw...).Invoke(ctx, c.ddb)
 }
 
 // DescribeBackup executes a DescribeBackup operation with a DescribeBackupInput in this pool and returns the DescribeBackupPromise
-func (p *Pool) DescribeBackup(input *ddb.DescribeBackupInput, mw ...DescribeBackupMiddleWare) *DescribeBackupPromise {
+func (p *Pool) DescribeBackup(input *ddb.DescribeBackupInput, mw ...DescribeBackupMiddleWare) *DescribeBackup {
 	op := NewDescribeBackup(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // DescribeBackupContext represents an exhaustive DescribeBackup operation request context
@@ -51,26 +51,6 @@ func (o *DescribeBackupOutput) Get() (out *ddb.DescribeBackupOutput, err error) 
 	err = o.err
 	o.mu.Unlock()
 	return
-}
-
-// DescribeBackupPromise represents a promise for the DescribeBackup
-type DescribeBackupPromise struct {
-	*Promise
-}
-
-// Await waits for the DescribeBackupPromise to be fulfilled and then returns a DescribeBackupOutput and error
-func (p *DescribeBackupPromise) Await() (*ddb.DescribeBackupOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.DescribeBackupOutput), err
-}
-
-// newDescribeBackupPromise returns a new DescribeBackupPromise
-func newDescribeBackupPromise() *DescribeBackupPromise {
-	return &DescribeBackupPromise{NewPromise()}
 }
 
 // DescribeBackupHandler represents a handler for DescribeBackup requests
@@ -109,7 +89,7 @@ func (mw DescribeBackupMiddleWareFunc) DescribeBackupMiddleWare(next DescribeBac
 
 // DescribeBackup represents a DescribeBackup operation
 type DescribeBackup struct {
-	promise     *DescribeBackupPromise
+	*Promise
 	input       *ddb.DescribeBackupInput
 	middleWares []DescribeBackupMiddleWare
 }
@@ -117,24 +97,24 @@ type DescribeBackup struct {
 // NewDescribeBackup creates a new DescribeBackup
 func NewDescribeBackup(input *ddb.DescribeBackupInput, mws ...DescribeBackupMiddleWare) *DescribeBackup {
 	return &DescribeBackup{
+		Promise: NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newDescribeBackupPromise(),
 	}
 }
 
 // Invoke invokes the DescribeBackup operation and returns a DescribeBackupPromise
-func (op *DescribeBackup) Invoke(ctx context.Context, client *ddb.Client) *DescribeBackupPromise {
+func (op *DescribeBackup) Invoke(ctx context.Context, client *ddb.Client) *DescribeBackup {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *DescribeBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeBackupOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &DescribeBackupContext{
 		Context: ctx,
@@ -155,6 +135,16 @@ func (op *DescribeBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleDescribeBackup(requestCtx, output)
+}
+
+// Await waits for the DescribeBackupPromise to be fulfilled and then returns a DescribeBackupOutput and error
+func (op *DescribeBackup) Await() (*ddb.DescribeBackupOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.DescribeBackupOutput), err
 }
 
 // NewDescribeBackupInput creates a new DescribeBackupInput

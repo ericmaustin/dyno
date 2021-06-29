@@ -104,7 +104,7 @@ func (t *Table) TableNotExistsWaiter() *TableNotExistsWaiter {
 
 // UpdateWithRemote creates a new NewTableExistsWaiter with a callback that updates the table from the remote description
 func (t *Table) UpdateWithRemote() *TableExistsWaiter {
-	return NewTableExistsWaiter(NewDescribeTableInput(t.TableName), t.TableExistsWaiterMiddleWare())
+	return NewTableExistsWaiter(NewDescribeTableInput(t.TableName), t)
 }
 
 // setTableDescription sets the table description to the input value
@@ -487,35 +487,30 @@ func (t *Table) Create() (*CreateTable, error) {
 		return nil, err
 	}
 
-	return NewCreateTable(dynamodbInput, t.CreateTableMiddleWare()), nil
+	return NewCreateTable(dynamodbInput, t), nil
 }
 
 // CreateTableMiddleWare returns a CreateTableMiddleWare that will update this table from the create table
 // operation output
-func (t *Table) CreateTableMiddleWare() CreateTableMiddleWare {
-	return func(next CreateTableHandler) CreateTableHandler {
-		return CreateTableHandlerFunc(func(ctx *CreateTableContext, promise *CreateTablePromise) {
-			next.HandleCreateTable(ctx, promise)
-			out, rErr := promise.GetResponse()
-			if rErr == nil {
-				t.UpdateWithTableDescription(out.TableDescription)
-			}
-		})
-	}
+func (t *Table) CreateTableMiddleWare(next CreateTableHandler) CreateTableHandler {
+	return CreateTableHandlerFunc(func(ctx *CreateTableContext, output *CreateTableOutput) {
+		next.HandleCreateTable(ctx, output)
+		out, rErr := output.Get()
+		if rErr == nil {
+			t.UpdateWithTableDescription(out.TableDescription)
+		}
+	})
 }
 
-// TableWaiterMiddleWare returns a TableWaiterMiddleWare that will update this table from the describe table
-// operation output
-func (t *Table) TableExistsWaiterMiddleWare() TableWaiterMiddleWare {
-	return func(next TableWaiterHandler) TableWaiterHandler {
-		return TableWaiterHandlerFunc(func(ctx *DescribeTableContext, promise *TableWaiterPromise) {
-			next.HandleTableWaiter(ctx, promise)
-			out, rErr := promise.GetResponse()
-			if rErr == nil {
-				t.UpdateWithTableDescription(out.Table)
-			}
-		})
-	}
+// DescribeTableMiddleWare updates this table with the output of the describe table output
+func (t *Table) DescribeTableMiddleWare(next DescribeTableHandler) DescribeTableHandler {
+	return DescribeTableHandlerFunc(func(ctx *DescribeTableContext, output *DescribeTableOutput) {
+		next.HandleDescribeTable(ctx, output)
+		out, rErr := output.Get()
+		if rErr == nil {
+			t.UpdateWithTableDescription(out.Table)
+		}
+	})
 }
 
 // BackupInput creates a CreateBackupInput for this table with a given backup name

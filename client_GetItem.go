@@ -10,19 +10,19 @@ import (
 )
 
 // GetItem executes GetItem operation and returns a GetItemPromise
-func (c *Client) GetItem(ctx context.Context, input *ddb.GetItemInput, mw ...GetItemMiddleWare) *GetItemPromise {
+func (c *Client) GetItem(ctx context.Context, input *ddb.GetItemInput, mw ...GetItemMiddleWare) *GetItem {
 	return NewGetItem(input, mw...).Invoke(ctx, c.ddb)
 }
 
 // GetItem executes a GetItem operation with a GetItemInput in this pool and returns the GetItemPromise
-func (p *Pool) GetItem(input *ddb.GetItemInput, mw ...GetItemMiddleWare) *GetItemPromise {
+func (p *Pool) GetItem(input *ddb.GetItemInput, mw ...GetItemMiddleWare) *GetItem {
 	op := NewGetItem(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // GetItemContext represents an exhaustive GetItem operation request context
@@ -32,7 +32,7 @@ type GetItemContext struct {
 	client *ddb.Client
 }
 
-// GetItemOutput represents the output for the GetItem opration
+// GetItemOutput represents the output for the GetItem operation
 type GetItemOutput struct {
 	out *ddb.GetItemOutput
 	err error
@@ -54,26 +54,6 @@ func (o *GetItemOutput) Get() (out *ddb.GetItemOutput, err error) {
 	err = o.err
 	o.mu.Unlock()
 	return
-}
-
-// GetItemPromise represents a promise for the GetItem
-type GetItemPromise struct {
-	*Promise
-}
-
-// Await waits for the GetItemPromise to be fulfilled and then returns a GetItemOutput and error
-func (p *GetItemPromise) Await() (*ddb.GetItemOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.GetItemOutput), err
-}
-
-// newGetItemPromise returns a new GetItemPromise
-func newGetItemPromise() *GetItemPromise {
-	return &GetItemPromise{NewPromise()}
 }
 
 // GetItemHandler represents a handler for GetItem requests
@@ -112,7 +92,7 @@ func (mw GetItemMiddleWareFunc) GetItemMiddleWare(next GetItemHandler) GetItemHa
 
 // GetItem represents a GetItem operation
 type GetItem struct {
-	promise     *GetItemPromise
+	*Promise
 	input       *ddb.GetItemInput
 	middleWares []GetItemMiddleWare
 }
@@ -120,17 +100,17 @@ type GetItem struct {
 // NewGetItem creates a new GetItem
 func NewGetItem(input *ddb.GetItemInput, mws ...GetItemMiddleWare) *GetItem {
 	return &GetItem{
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newGetItemPromise(),
 	}
 }
 
 // Invoke invokes the GetItem operation and returns a GetItemPromise
-func (op *GetItem) Invoke(ctx context.Context, client *ddb.Client) *GetItemPromise {
+func (op *GetItem) Invoke(ctx context.Context, client *ddb.Client) *GetItem {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
@@ -138,7 +118,7 @@ func (op *GetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(GetItemOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &GetItemContext{
 		Context: ctx,
@@ -159,6 +139,16 @@ func (op *GetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleGetItem(requestCtx, output)
+}
+
+// Await waits for the GetItemPromise to be fulfilled and then returns a GetItemOutput and error
+func (op *GetItem) Await() (*ddb.GetItemOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.GetItemOutput), err
 }
 
 // GetItemBuilder is used to dynamically build a GetItemInput request

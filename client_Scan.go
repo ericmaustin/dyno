@@ -12,19 +12,19 @@ import (
 )
 
 // Scan executes Scan operation and returns a ScanPromise
-func (c *Client) Scan(ctx context.Context, input *ddb.ScanInput, mw ...ScanMiddleWare) *ScanPromise {
+func (c *Client) Scan(ctx context.Context, input *ddb.ScanInput, mw ...ScanMiddleWare) *Scan {
 	return NewScan(input, mw...).Invoke(ctx, c.ddb)
 }
 
 // Scan executes a Scan operation with a ScanInput in this pool and returns the ScanPromise
-func (p *Pool) Scan(input *ddb.ScanInput, mw ...ScanMiddleWare) *ScanPromise {
+func (p *Pool) Scan(input *ddb.ScanInput, mw ...ScanMiddleWare) *Scan {
 	op := NewScan(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // ScanAll executes ScanAll operation and returns a ScanAllPromise
@@ -74,37 +74,6 @@ func (o *ScanOutput) Get() (out *ddb.ScanOutput, err error) {
 	return
 }
 
-// ScanPromise represents a promise for the Scan
-type ScanPromise struct {
-	*Promise
-}
-
-// GetResponse returns the GetResponse output and error
-// if Output has not been set yet nil is returned
-func (p *ScanPromise) GetResponse() (*ddb.ScanOutput, error) {
-	out, err := p.Promise.GetResponse()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.ScanOutput), err
-}
-
-// Await waits for the ScanPromise to be fulfilled and then returns a ScanOutput and error
-func (p *ScanPromise) Await() (*ddb.ScanOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.ScanOutput), err
-}
-
-// newScanPromise returns a new ScanPromise
-func newScanPromise() *ScanPromise {
-	return &ScanPromise{NewPromise()}
-}
-
 // ScanHandler represents a handler for Scan requests
 type ScanHandler interface {
 	HandleScan(ctx *ScanContext, output *ScanOutput)
@@ -141,7 +110,7 @@ func (mw ScanMiddleWareFunc) ScanMiddleWare(next ScanHandler) ScanHandler {
 
 // Scan represents a Scan operation
 type Scan struct {
-	promise     *ScanPromise
+	*Promise
 	input       *ddb.ScanInput
 	middleWares []ScanMiddleWare
 }
@@ -149,17 +118,17 @@ type Scan struct {
 // NewScan creates a new Scan
 func NewScan(input *ddb.ScanInput, mws ...ScanMiddleWare) *Scan {
 	return &Scan{
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newScanPromise(),
 	}
 }
 
 // Invoke invokes the Scan operation and returns a ScanPromise
-func (op *Scan) Invoke(ctx context.Context, client *ddb.Client) *ScanPromise {
+func (op *Scan) Invoke(ctx context.Context, client *ddb.Client) *Scan {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
@@ -167,7 +136,7 @@ func (op *Scan) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(ScanOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &ScanContext{
 		Context: ctx,
@@ -188,6 +157,16 @@ func (op *Scan) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleScan(requestCtx, output)
+}
+
+// Await waits for the ScanPromise to be fulfilled and then returns a ScanOutput and error
+func (op *Scan) Await() (*ddb.ScanOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.ScanOutput), err
 }
 
 // ScanAllContext represents an exhaustive ScanAll operation request context

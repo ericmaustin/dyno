@@ -12,20 +12,20 @@ import (
 	"sync"
 )
 
-// UpdateItem executes UpdateItem operation and returns a UpdateItemPromise
-func (c *Client) UpdateItem(ctx context.Context, input *ddb.UpdateItemInput, mw ...UpdateItemMiddleWare) *UpdateItemPromise {
+// UpdateItem executes UpdateItem operation and returns it
+func (c *Client) UpdateItem(ctx context.Context, input *ddb.UpdateItemInput, mw ...UpdateItemMiddleWare) *UpdateItem {
 	return NewUpdateItem(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// UpdateItem executes a UpdateItem operation with a UpdateItemInput in this pool and returns the UpdateItemPromise
-func (p *Pool) UpdateItem(input *ddb.UpdateItemInput, mw ...UpdateItemMiddleWare) *UpdateItemPromise {
+// UpdateItem executes a UpdateItem operation with a UpdateItemInput in this pool and returns the UpdateItem
+func (p *Pool) UpdateItem(input *ddb.UpdateItemInput, mw ...UpdateItemMiddleWare) *UpdateItem {
 	op := NewUpdateItem(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // UpdateItemContext represents an exhaustive UpdateItem operation request context
@@ -57,37 +57,6 @@ func (o *UpdateItemOutput) Get() (out *ddb.UpdateItemOutput, err error) {
 	err = o.err
 	o.mu.Unlock()
 	return
-}
-
-// UpdateItemPromise represents a promise for the UpdateItem
-type UpdateItemPromise struct {
-	*Promise
-}
-
-// GetResponse returns the GetResponse output and error
-// if Output has not been set yet nil is returned
-func (p *UpdateItemPromise) GetResponse() (*ddb.UpdateItemOutput, error) {
-	out, err := p.Promise.GetResponse()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.UpdateItemOutput), err
-}
-
-// Await waits for the UpdateItemPromise to be fulfilled and then returns a UpdateItemOutput and error
-func (p *UpdateItemPromise) Await() (*ddb.UpdateItemOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.UpdateItemOutput), err
-}
-
-// newUpdateItemPromise returns a new UpdateItemPromise
-func newUpdateItemPromise() *UpdateItemPromise {
-	return &UpdateItemPromise{NewPromise()}
 }
 
 // UpdateItemHandler represents a handler for UpdateItem requests
@@ -126,7 +95,7 @@ func (mw UpdateItemMiddleWareFunc) UpdateItemMiddleWare(next UpdateItemHandler) 
 
 // UpdateItem represents a UpdateItem operation
 type UpdateItem struct {
-	promise     *UpdateItemPromise
+	*Promise
 	input       *ddb.UpdateItemInput
 	middleWares []UpdateItemMiddleWare
 }
@@ -134,24 +103,24 @@ type UpdateItem struct {
 // NewUpdateItem creates a new UpdateItem
 func NewUpdateItem(input *ddb.UpdateItemInput, mws ...UpdateItemMiddleWare) *UpdateItem {
 	return &UpdateItem{
+		Promise: NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newUpdateItemPromise(),
 	}
 }
 
 // Invoke invokes the UpdateItem operation and returns a UpdateItemPromise
-func (op *UpdateItem) Invoke(ctx context.Context, client *ddb.Client) *UpdateItemPromise {
+func (op *UpdateItem) Invoke(ctx context.Context, client *ddb.Client) *UpdateItem {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *UpdateItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateItemOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &UpdateItemContext{
 		Context: ctx,
@@ -172,6 +141,16 @@ func (op *UpdateItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleUpdateItem(requestCtx, output)
+}
+
+// Await waits for the UpdateItemPromise to be fulfilled and then returns a UpdateItemOutput and error
+func (op *UpdateItem) Await() (*ddb.UpdateItemOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.UpdateItemOutput), err
 }
 
 func NewUpdateItemInput(tableName *string) *ddb.UpdateItemInput {

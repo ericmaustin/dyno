@@ -11,35 +11,35 @@ import (
 )
 
 // Query executes Query operation and returns a QueryPromise
-func (c *Client) Query(ctx context.Context, input *ddb.QueryInput, mw ...QueryMiddleWare) *QueryPromise {
+func (c *Client) Query(ctx context.Context, input *ddb.QueryInput, mw ...QueryMiddleWare) *Query {
 	return NewQuery(input, mw...).Invoke(ctx, c.ddb)
 }
 
 // Query executes a Query operation with a QueryInput in this pool and returns the QueryPromise
-func (p *Pool) Query(input *ddb.QueryInput, mw ...QueryMiddleWare) *QueryPromise {
+func (p *Pool) Query(input *ddb.QueryInput, mw ...QueryMiddleWare) *Query {
 	op := NewQuery(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // QueryAll executes QueryAll operation and returns a QueryAllPromise
-func (c *Client) QueryAll(ctx context.Context, input *ddb.QueryInput, mw ...QueryAllMiddleWare) *QueryAllPromise {
+func (c *Client) QueryAll(ctx context.Context, input *ddb.QueryInput, mw ...QueryAllMiddleWare) *QueryAll {
 	return NewQueryAll(input, mw...).Invoke(ctx, c.ddb)
 }
 
 // QueryAll executes a QueryAll operation with a QueryInput in this pool and returns the QueryAllPromise
-func (p *Pool) QueryAll(input *ddb.QueryInput, mw ...QueryAllMiddleWare) *QueryAllPromise {
+func (p *Pool) QueryAll(input *ddb.QueryInput, mw ...QueryAllMiddleWare) *QueryAll {
 	op := NewQueryAll(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // QueryContext represents an exhaustive Query operation request context
@@ -71,37 +71,6 @@ func (o *QueryOutput) Get() (out *ddb.QueryOutput, err error) {
 	err = o.err
 	o.mu.Unlock()
 	return
-}
-
-// QueryPromise represents a promise for the Query
-type QueryPromise struct {
-	*Promise
-}
-
-// GetResponse returns the GetResponse output and error
-// if Output has not been set yet nil is returned
-func (p *QueryPromise) GetResponse() (*ddb.QueryOutput, error) {
-	out, err := p.Promise.GetResponse()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.QueryOutput), err
-}
-
-// Await waits for the QueryPromise to be fulfilled and then returns a QueryOutput and error
-func (p *QueryPromise) Await() (*ddb.QueryOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.QueryOutput), err
-}
-
-// newQueryPromise returns a new QueryPromise
-func newQueryPromise() *QueryPromise {
-	return &QueryPromise{NewPromise()}
 }
 
 // QueryHandler represents a handler for Query requests
@@ -140,7 +109,7 @@ func (mw QueryMiddleWareFunc) QueryMiddleWare(next QueryHandler) QueryHandler {
 
 // Query represents a Query operation
 type Query struct {
-	promise     *QueryPromise
+	*Promise
 	input       *ddb.QueryInput
 	middleWares []QueryMiddleWare
 }
@@ -148,17 +117,17 @@ type Query struct {
 // NewQuery creates a new Query
 func NewQuery(input *ddb.QueryInput, mws ...QueryMiddleWare) *Query {
 	return &Query{
+		Promise: NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newQueryPromise(),
 	}
 }
 
 // Invoke invokes the Query operation and returns a QueryPromise
-func (op *Query) Invoke(ctx context.Context, client *ddb.Client) *QueryPromise {
+func (op *Query) Invoke(ctx context.Context, client *ddb.Client) *Query {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
@@ -166,7 +135,7 @@ func (op *Query) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(QueryOutput)
 
-	defer func() {op.promise.SetResponse(output.Get())}()
+	defer func() {op.SetResponse(output.Get())}()
 
 	requestCtx := &QueryContext{
 		Context: ctx,
@@ -187,6 +156,16 @@ func (op *Query) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleQuery(requestCtx, output)
+}
+
+// Await waits for the QueryPromise to be fulfilled and then returns a QueryOutput and error
+func (op *Query) Await() (*ddb.QueryOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.QueryOutput), err
 }
 
 // QueryAllContext represents an exhaustive QueryAll operation request context
@@ -218,37 +197,6 @@ func (o *QueryAllOutput) Get() (out []*ddb.QueryOutput, err error) {
 	err = o.err
 	o.mu.Unlock()
 	return
-}
-
-// QueryAllPromise represents a promise for the QueryAll
-type QueryAllPromise struct {
-	*Promise
-}
-
-// GetResponse returns the GetResponse output and error
-// if Output has not been set yet nil is returned
-func (p *QueryAllPromise) GetResponse() ([]*ddb.QueryOutput, error) {
-	out, err := p.Promise.GetResponse()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.([]*ddb.QueryOutput), err
-}
-
-// Await waits for the QueryAllPromise to be fulfilled and then returns a QueryAllOutput and error
-func (p *QueryAllPromise) Await() ([]*ddb.QueryOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.([]*ddb.QueryOutput), err
-}
-
-// newQueryAllPromise returns a new QueryAllPromise
-func newQueryAllPromise() *QueryAllPromise {
-	return &QueryAllPromise{NewPromise()}
 }
 
 // QueryAllHandler represents a handler for QueryAll requests
@@ -312,7 +260,7 @@ func (h *QueryAllFinalHandler) HandleQueryAll(ctx *QueryAllContext, output *Quer
 
 // QueryAll represents a QueryAll operation
 type QueryAll struct {
-	promise     *QueryAllPromise
+	*Promise
 	input       *ddb.QueryInput
 	middleWares []QueryAllMiddleWare
 }
@@ -320,24 +268,24 @@ type QueryAll struct {
 // NewQueryAll creates a new QueryAll
 func NewQueryAll(input *ddb.QueryInput, mws ...QueryAllMiddleWare) *QueryAll {
 	return &QueryAll{
+		Promise: NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newQueryAllPromise(),
 	}
 }
 
 // Invoke invokes the QueryAll operation and returns a QueryAllPromise
-func (op *QueryAll) Invoke(ctx context.Context, client *ddb.Client) *QueryAllPromise {
+func (op *QueryAll) Invoke(ctx context.Context, client *ddb.Client) *QueryAll {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke the Operation interface
 func (op *QueryAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	output := new(QueryAllOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &QueryAllContext{
 		Context: ctx,
@@ -358,6 +306,16 @@ func (op *QueryAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleQueryAll(requestCtx, output)
+}
+
+// Await waits for the QueryAllPromise to be fulfilled and then returns a QueryAllOutput and error
+func (op *QueryAll) Await() ([]*ddb.QueryOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.([]*ddb.QueryOutput), err
 }
 
 // NewQueryInput creates a new QueryInput with a table name

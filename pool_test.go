@@ -52,7 +52,7 @@ func (suite *PoolTestSuite) TearDownSuite() {
 		panic(err)
 	}
 
-	if err := suite.db.TableNotExistsWaiter(context.Background(), suite.table.DescribeTableInput()).Await(); err != nil {
+	if _, err := suite.db.TableNotExistsWaiter(context.Background(), suite.table.DescribeTableInput()).Await(); err != nil {
 		panic(err)
 	}
 

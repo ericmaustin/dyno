@@ -6,20 +6,20 @@ import (
 	"sync"
 )
 
-// UpdateTable executes UpdateTable operation and returns a UpdateTablePromise
-func (c *Client) UpdateTable(ctx context.Context, input *ddb.UpdateTableInput, mw ...UpdateTableMiddleWare) *UpdateTablePromise {
+// UpdateTable creates a new UpdateTable, invokes and returns it
+func (c *Client) UpdateTable(ctx context.Context, input *ddb.UpdateTableInput, mw ...UpdateTableMiddleWare) *UpdateTable {
 	return NewUpdateTable(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// UpdateTable executes a UpdateTable operation with a UpdateTableInput in this pool and returns the UpdateTablePromise
-func (p *Pool) UpdateTable(input *ddb.UpdateTableInput, mw ...UpdateTableMiddleWare) *UpdateTablePromise {
+// UpdateTable creates a new UpdateTable, passes it to the Pool and then returns the UpdateTable
+func (p *Pool) UpdateTable(input *ddb.UpdateTableInput, mw ...UpdateTableMiddleWare) *UpdateTable {
 	op := NewUpdateTable(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // UpdateTableContext represents an exhaustive UpdateTable operation request context
@@ -51,37 +51,6 @@ func (o *UpdateTableOutput) Get() (out *ddb.UpdateTableOutput, err error) {
 	err = o.err
 	o.mu.Unlock()
 	return
-}
-
-// UpdateTablePromise represents a promise for the UpdateTable
-type UpdateTablePromise struct {
-	*Promise
-}
-
-// GetResponse returns the GetResponse output and error
-// if Output has not been set yet nil is returned
-func (p *UpdateTablePromise) GetResponse() (*ddb.UpdateTableOutput, error) {
-	out, err := p.Promise.GetResponse()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.UpdateTableOutput), err
-}
-
-// Await waits for the UpdateTablePromise to be fulfilled and then returns a UpdateTableOutput and error
-func (p *UpdateTablePromise) Await() (*ddb.UpdateTableOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.UpdateTableOutput), err
-}
-
-// newUpdateTablePromise returns a new UpdateTablePromise
-func newUpdateTablePromise() *UpdateTablePromise {
-	return &UpdateTablePromise{NewPromise()}
 }
 
 // UpdateTableHandler represents a handler for UpdateTable requests
@@ -120,7 +89,7 @@ func (mw UpdateTableMiddleWareFunc) UpdateTableMiddleWare(next UpdateTableHandle
 
 // UpdateTable represents a UpdateTable operation
 type UpdateTable struct {
-	promise     *UpdateTablePromise
+	*Promise
 	input       *ddb.UpdateTableInput
 	middleWares []UpdateTableMiddleWare
 }
@@ -128,24 +97,24 @@ type UpdateTable struct {
 // NewUpdateTable creates a new UpdateTable
 func NewUpdateTable(input *ddb.UpdateTableInput, mws ...UpdateTableMiddleWare) *UpdateTable {
 	return &UpdateTable{
+		Promise: NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newUpdateTablePromise(),
 	}
 }
 
 // Invoke invokes the UpdateTable operation and returns a UpdateTablePromise
-func (op *UpdateTable) Invoke(ctx context.Context, client *ddb.Client) *UpdateTablePromise {
+func (op *UpdateTable) Invoke(ctx context.Context, client *ddb.Client) *UpdateTable {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *UpdateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateTableOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &UpdateTableContext{
 		Context: ctx,
@@ -166,6 +135,16 @@ func (op *UpdateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleUpdateTable(requestCtx, output)
+}
+
+// Await waits for the UpdateTablePromise to be fulfilled and then returns a UpdateTableOutput and error
+func (op *UpdateTable) Await() (*ddb.UpdateTableOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.UpdateTableOutput), err
 }
 
 // NewUpdateTableInput creates a new UpdateTableInput

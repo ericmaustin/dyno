@@ -6,20 +6,20 @@ import (
 	"sync"
 )
 
-// ListBackups executes ListBackups operation and returns a ListBackupsPromise
-func (c *Client) ListBackups(ctx context.Context, input *ddb.ListBackupsInput, mw ...ListBackupsMiddleWare) *ListBackupsPromise {
+// ListBackups creates a new ListBackups operation, invokes and returns it
+func (c *Client) ListBackups(ctx context.Context, input *ddb.ListBackupsInput, mw ...ListBackupsMiddleWare) *ListBackups {
 	return NewListBackups(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// ListBackups executes a ListBackups operation with a ListBackupsInput in this pool and returns the ListBackupsPromise
-func (p *Pool) ListBackups(input *ddb.ListBackupsInput, mw ...ListBackupsMiddleWare) *ListBackupsPromise {
+// ListBackups creates a new ListBackups operation, passes it to the pool where it is evoked and returns it
+func (p *Pool) ListBackups(input *ddb.ListBackupsInput, mw ...ListBackupsMiddleWare) *ListBackups {
 	op := NewListBackups(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // ListBackupsContext represents an exhaustive ListBackups operation request context
@@ -51,26 +51,6 @@ func (o *ListBackupsOutput) Get() (out *ddb.ListBackupsOutput, err error) {
 	err = o.err
 	o.mu.Unlock()
 	return
-}
-
-// ListBackupsPromise represents a promise for the ListBackups
-type ListBackupsPromise struct {
-	*Promise
-}
-
-// Await waits for the ListBackupsPromise to be fulfilled and then returns a ListBackupsOutput and error
-func (p *ListBackupsPromise) Await() (*ddb.ListBackupsOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.ListBackupsOutput), err
-}
-
-// newListBackupsPromise returns a new ListBackupsPromise
-func newListBackupsPromise() *ListBackupsPromise {
-	return &ListBackupsPromise{NewPromise()}
 }
 
 // ListBackupsHandler represents a handler for ListBackups requests
@@ -109,7 +89,7 @@ func (mw ListBackupsMiddleWareFunc) ListBackupsMiddleWare(next ListBackupsHandle
 
 // ListBackups represents a ListBackups operation
 type ListBackups struct {
-	promise     *ListBackupsPromise
+	*Promise
 	input       *ddb.ListBackupsInput
 	middleWares []ListBackupsMiddleWare
 }
@@ -117,17 +97,17 @@ type ListBackups struct {
 // NewListBackups creates a new ListBackups
 func NewListBackups(input *ddb.ListBackupsInput, mws ...ListBackupsMiddleWare) *ListBackups {
 	return &ListBackups{
+		Promise: NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newListBackupsPromise(),
 	}
 }
 
 // Invoke invokes the ListBackups operation and returns a ListBackupsPromise
-func (op *ListBackups) Invoke(ctx context.Context, client *ddb.Client) *ListBackupsPromise {
+func (op *ListBackups) Invoke(ctx context.Context, client *ddb.Client) *ListBackups {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
@@ -135,7 +115,7 @@ func (op *ListBackups) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(ListBackupsOutput)
 
-	defer func() { op.promise.SetResponse(output.Get())}()
+	defer func() { op.SetResponse(output.Get())}()
 
 	requestCtx := &ListBackupsContext{
 		Context: ctx,
@@ -156,6 +136,16 @@ func (op *ListBackups) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleListBackups(requestCtx, output)
+}
+
+// Await waits for the ListBackupsPromise to be fulfilled and then returns a ListBackupsOutput and error
+func (op *ListBackups) Await() (*ddb.ListBackupsOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.ListBackupsOutput), err
 }
 
 // NewListBackupsInput creates a new ListBackupsInput

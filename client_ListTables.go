@@ -6,20 +6,20 @@ import (
 	"sync"
 )
 
-// ListTables executes ListTables operation and returns a ListTablesPromise
-func (c *Client) ListTables(ctx context.Context, input *ddb.ListTablesInput, mw ...ListTablesMiddleWare) *ListTablesPromise {
+// ListTables executes ListTables operation and returns a ListTables
+func (c *Client) ListTables(ctx context.Context, input *ddb.ListTablesInput, mw ...ListTablesMiddleWare) *ListTables {
 	return NewListTables(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// ListTables executes a ListTables operation with a ListTablesInput in this pool and returns the ListTablesPromise
-func (p *Pool) ListTables(input *ddb.ListTablesInput, mw ...ListTablesMiddleWare) *ListTablesPromise {
+// ListTables executes a ListTables operation with a ListTablesInput in this pool and returns it
+func (p *Pool) ListTables(input *ddb.ListTablesInput, mw ...ListTablesMiddleWare) *ListTables {
 	op := NewListTables(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // ListTablesContext represents an exhaustive ListTables operation request context
@@ -29,7 +29,7 @@ type ListTablesContext struct {
 	client *ddb.Client
 }
 
-// ListTablesOutput represents the output for the ListTables opration
+// ListTablesOutput represents the output for the ListTables operation
 type ListTablesOutput struct {
 	out *ddb.ListTablesOutput
 	err error
@@ -51,26 +51,6 @@ func (o *ListTablesOutput) Get() (out *ddb.ListTablesOutput, err error) {
 	err = o.err
 	o.mu.Unlock()
 	return
-}
-
-// ListTablesPromise represents a promise for the ListTables
-type ListTablesPromise struct {
-	*Promise
-}
-
-// Await waits for the ListTablesPromise to be fulfilled and then returns a ListTablesOutput and error
-func (p *ListTablesPromise) Await() (*ddb.ListTablesOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.ListTablesOutput), err
-}
-
-// newListTablesPromise returns a new ListTablesPromise
-func newListTablesPromise() *ListTablesPromise {
-	return &ListTablesPromise{NewPromise()}
 }
 
 // ListTablesHandler represents a handler for ListTables requests
@@ -109,7 +89,7 @@ func (mw ListTablesMiddleWareFunc) ListTablesMiddleWare(next ListTablesHandler) 
 
 // ListTables represents a ListTables operation
 type ListTables struct {
-	promise     *ListTablesPromise
+	*Promise
 	input       *ddb.ListTablesInput
 	middleWares []ListTablesMiddleWare
 }
@@ -117,17 +97,17 @@ type ListTables struct {
 // NewListTables creates a new ListTables
 func NewListTables(input *ddb.ListTablesInput, mws ...ListTablesMiddleWare) *ListTables {
 	return &ListTables{
+		Promise: NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newListTablesPromise(),
 	}
 }
 
-// Invoke invokes the ListTables operation and returns a ListTablesPromise
-func (op *ListTables) Invoke(ctx context.Context, client *ddb.Client) *ListTablesPromise {
+// Invoke invokes the ListTables operation and returns it
+func (op *ListTables) Invoke(ctx context.Context, client *ddb.Client) *ListTables {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
@@ -135,7 +115,7 @@ func (op *ListTables) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(ListTablesOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &ListTablesContext{
 		Context: ctx,
@@ -156,6 +136,16 @@ func (op *ListTables) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleListTables(requestCtx, output)
+}
+
+// Await waits for the ListTablesPromise to be fulfilled and then returns a ListTablesOutput and error
+func (op *ListTables) Await() (*ddb.ListTablesOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.ListTablesOutput), err
 }
 
 // NewListTablesInput creates a new ListTablesInput

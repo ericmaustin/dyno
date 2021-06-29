@@ -12,19 +12,19 @@ import (
 
 
 // DeleteItem executes DeleteItem operation and returns a DeleteItemPromise
-func (c *Client) DeleteItem(ctx context.Context, input *ddb.DeleteItemInput, mw ...DeleteItemMiddleWare) *DeleteItemPromise {
+func (c *Client) DeleteItem(ctx context.Context, input *ddb.DeleteItemInput, mw ...DeleteItemMiddleWare) *DeleteItem {
 	return NewDeleteItem(input, mw...).Invoke(ctx, c.ddb)
 }
 
 // DeleteItem executes a DeleteItem operation with a DeleteItemInput in this pool and returns the DeleteItemPromise
-func (p *Pool) DeleteItem(input *ddb.DeleteItemInput, mw ...DeleteItemMiddleWare) *DeleteItemPromise {
+func (p *Pool) DeleteItem(input *ddb.DeleteItemInput, mw ...DeleteItemMiddleWare) *DeleteItem {
 	op := NewDeleteItem(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // DeleteItemContext represents an exhaustive DeleteItem operation request context
@@ -56,26 +56,6 @@ func (o *DeleteItemOutput) Get() (out *ddb.DeleteItemOutput, err error) {
 	err = o.err
 	o.mu.Unlock()
 	return
-}
-
-// DeleteItemPromise represents a promise for the DeleteItem
-type DeleteItemPromise struct {
-	*Promise
-}
-
-// Await waits for the DeleteItemPromise to be fulfilled and then returns a DeleteItemOutput and error
-func (p *DeleteItemPromise) Await() (*ddb.DeleteItemOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.(*ddb.DeleteItemOutput), err
-}
-
-// newDeleteItemPromise returns a new DeleteItemPromise
-func newDeleteItemPromise() *DeleteItemPromise {
-	return &DeleteItemPromise{NewPromise()}
 }
 
 // DeleteItemHandler represents a handler for DeleteItem requests
@@ -114,7 +94,7 @@ func (mw DeleteItemMiddleWareFunc) DeleteItemMiddleWare(h DeleteItemHandler) Del
 
 // DeleteItem represents a DeleteItem operation
 type DeleteItem struct {
-	promise     *DeleteItemPromise
+	*Promise
 	input       *ddb.DeleteItemInput
 	middleWares []DeleteItemMiddleWare
 }
@@ -122,17 +102,17 @@ type DeleteItem struct {
 // NewDeleteItem creates a new DeleteItem
 func NewDeleteItem(input *ddb.DeleteItemInput, mws ...DeleteItemMiddleWare) *DeleteItem {
 	return &DeleteItem{
+		Promise: NewPromise(),
 		input:       input,
 		middleWares: mws,
-		promise:     newDeleteItemPromise(),
 	}
 }
 
 // Invoke invokes the DeleteItem operation and returns a DeleteItemPromise
-func (op *DeleteItem) Invoke(ctx context.Context, client *ddb.Client) *DeleteItemPromise {
+func (op *DeleteItem) Invoke(ctx context.Context, client *ddb.Client) *DeleteItem {
 	go op.DynoInvoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
 // DynoInvoke implements the Operation interface
@@ -140,7 +120,7 @@ func (op *DeleteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(DeleteItemOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &DeleteItemContext{
 		Context: ctx,
@@ -161,6 +141,16 @@ func (op *DeleteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleDeleteItem(requestCtx, output)
+}
+
+// Await waits for the DeleteItemPromise to be fulfilled and then returns a DeleteItemOutput and error
+func (op *DeleteItem) Await() (*ddb.DeleteItemOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.(*ddb.DeleteItemOutput), err
 }
 
 // NewDeleteItemInput creates a DeleteItemInput with a given table name and key
