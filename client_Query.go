@@ -127,15 +127,15 @@ func (h *QueryFinalHandler) HandleQuery(ctx *QueryContext, output *QueryOutput) 
 
 // QueryMiddleWare is a middleware function use for wrapping QueryHandler requests
 type QueryMiddleWare interface {
-	QueryMiddleWare(h QueryHandler) QueryHandler
+	QueryMiddleWare(next QueryHandler) QueryHandler
 }
 
 // QueryMiddleWareFunc is a functional QueryMiddleWare
-type QueryMiddleWareFunc func(handler QueryHandler) QueryHandler
+type QueryMiddleWareFunc func(next QueryHandler) QueryHandler
 
 // QueryMiddleWare implements the QueryMiddleWare interface
-func (mw QueryMiddleWareFunc) QueryMiddleWare(h QueryHandler) QueryHandler {
-	return mw(h)
+func (mw QueryMiddleWareFunc) QueryMiddleWare(next QueryHandler) QueryHandler {
+	return mw(next)
 }
 
 // Query represents a Query operation
@@ -196,6 +196,30 @@ type QueryAllContext struct {
 	client *ddb.Client
 }
 
+// QueryAllOutput represents the output for the QueryAll opration
+type QueryAllOutput struct {
+	out []*ddb.QueryOutput
+	err error
+	mu sync.RWMutex
+}
+
+// Set sets the output
+func (o *QueryAllOutput) Set(out []*ddb.QueryOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *QueryAllOutput) Get() (out []*ddb.QueryOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
+}
+
 // QueryAllPromise represents a promise for the QueryAll
 type QueryAllPromise struct {
 	*Promise
@@ -229,42 +253,42 @@ func newQueryAllPromise() *QueryAllPromise {
 
 // QueryAllHandler represents a handler for QueryAll requests
 type QueryAllHandler interface {
-	HandleQueryAll(ctx *QueryAllContext, promise *QueryAllPromise)
+	HandleQueryAll(ctx *QueryAllContext, output *QueryAllOutput)
 }
 
 // QueryAllHandlerFunc is a QueryAllHandler function
-type QueryAllHandlerFunc func(ctx *QueryAllContext, promise *QueryAllPromise)
+type QueryAllHandlerFunc func(ctx *QueryAllContext, output *QueryAllOutput)
 
 // HandleQueryAll implements QueryAllHandler
-func (h QueryAllHandlerFunc) HandleQueryAll(ctx *QueryAllContext, promise *QueryAllPromise) {
-	h(ctx, promise)
+func (h QueryAllHandlerFunc) HandleQueryAll(ctx *QueryAllContext, output *QueryAllOutput) {
+	h(ctx, output)
 }
 
 // QueryAllMiddleWare is a middleware function use for wrapping QueryAllHandler requests
 type QueryAllMiddleWare interface {
-	QueryAllMiddleWare(h QueryAllHandler) QueryAllHandler
+	QueryAllMiddleWare(next QueryAllHandler) QueryAllHandler
 }
 
 // QueryAllMiddleWareFunc is a functional QueryAllMiddleWare
-type QueryAllMiddleWareFunc func(handler QueryAllHandler) QueryAllHandler
+type QueryAllMiddleWareFunc func(next QueryAllHandler) QueryAllHandler
 
 // QueryAllMiddleWare implements the QueryAllMiddleWare interface
-func (mw QueryAllMiddleWareFunc) QueryAllMiddleWare(h QueryAllHandler) QueryAllHandler {
-	return mw(h)
+func (mw QueryAllMiddleWareFunc) QueryAllMiddleWare(next QueryAllHandler) QueryAllHandler {
+	return mw(next)
 }
 
 // QueryAllFinalHandler is the final QueryAllHandler that executes a dynamodb QueryAll operation
 type QueryAllFinalHandler struct {}
 
 // HandleQueryAll implements the QueryAllHandler
-func (h *QueryAllFinalHandler) HandleQueryAll(ctx *QueryAllContext, promise *QueryAllPromise) {
+func (h *QueryAllFinalHandler) HandleQueryAll(ctx *QueryAllContext, output *QueryAllOutput) {
 	var (
 		outs []*ddb.QueryOutput
 		out  *ddb.QueryOutput
 		err  error
 	)
 
-	defer func() { promise.SetResponse(outs, err) }()
+	defer func() { output.Set(outs, err) }()
 
 	// copy the scan so we're not mutating the original
 	input := CopyQuery(ctx.input)
@@ -311,6 +335,10 @@ func (op *QueryAll) Invoke(ctx context.Context, client *ddb.Client) *QueryAllPro
 
 // DynoInvoke the Operation interface
 func (op *QueryAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	output := new(QueryAllOutput)
+
+	defer func() { op.promise.SetResponse(output.Get()) }()
+
 	requestCtx := &QueryAllContext{
 		Context: ctx,
 		client:  client,
@@ -329,7 +357,7 @@ func (op *QueryAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		}
 	}
 
-	h.HandleQueryAll(requestCtx, op.promise)
+	h.HandleQueryAll(requestCtx, output)
 }
 
 // NewQueryInput creates a new QueryInput with a table name

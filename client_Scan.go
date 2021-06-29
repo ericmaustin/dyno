@@ -8,6 +8,7 @@ import (
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ericmaustin/dyno/condition"
 	"github.com/ericmaustin/dyno/encoding"
+	"sync"
 )
 
 // Scan executes Scan operation and returns a ScanPromise
@@ -49,6 +50,30 @@ type ScanContext struct {
 	client *ddb.Client
 }
 
+// ScanOutput represents the output for the Scan opration
+type ScanOutput struct {
+	out *ddb.ScanOutput
+	err error
+	mu  sync.RWMutex
+}
+
+// Set sets the output
+func (o *ScanOutput) Set(out *ddb.ScanOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *ScanOutput) Get() (out *ddb.ScanOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
+}
+
 // ScanPromise represents a promise for the Scan
 type ScanPromise struct {
 	*Promise
@@ -82,36 +107,36 @@ func newScanPromise() *ScanPromise {
 
 // ScanHandler represents a handler for Scan requests
 type ScanHandler interface {
-	HandleScan(ctx *ScanContext, promise *ScanPromise)
+	HandleScan(ctx *ScanContext, output *ScanOutput)
 }
 
 // ScanHandlerFunc is a ScanHandler function
-type ScanHandlerFunc func(ctx *ScanContext, promise *ScanPromise)
+type ScanHandlerFunc func(ctx *ScanContext, output *ScanOutput)
 
 // HandleScan implements ScanHandler
-func (h ScanHandlerFunc) HandleScan(ctx *ScanContext, promise *ScanPromise) {
-	h(ctx, promise)
+func (h ScanHandlerFunc) HandleScan(ctx *ScanContext, output *ScanOutput) {
+	h(ctx, output)
 }
 
 // ScanFinalHandler is the final ScanHandler that executes a dynamodb Scan operation
-type ScanFinalHandler struct {}
+type ScanFinalHandler struct{}
 
 // HandleScan implements the ScanHandler
-func (h *ScanFinalHandler) HandleScan(ctx *ScanContext, promise *ScanPromise) {
-	promise.SetResponse(ctx.client.Scan(ctx, ctx.input))
+func (h *ScanFinalHandler) HandleScan(ctx *ScanContext, output *ScanOutput) {
+	output.Set(ctx.client.Scan(ctx, ctx.input))
 }
 
 // ScanMiddleWare is a middleware function use for wrapping ScanHandler requests
 type ScanMiddleWare interface {
-	ScanMiddleWare(h ScanHandler) ScanHandler
+	ScanMiddleWare(next ScanHandler) ScanHandler
 }
 
 // ScanMiddleWareFunc is a functional ScanMiddleWare
-type ScanMiddleWareFunc func(handler ScanHandler) ScanHandler
+type ScanMiddleWareFunc func(next ScanHandler) ScanHandler
 
 // ScanMiddleWare implements the ScanMiddleWare interface
-func (mw ScanMiddleWareFunc) ScanMiddleWare(h ScanHandler) ScanHandler {
-	return mw(h)
+func (mw ScanMiddleWareFunc) ScanMiddleWare(next ScanHandler) ScanHandler {
+	return mw(next)
 }
 
 // Scan represents a Scan operation
@@ -140,14 +165,18 @@ func (op *Scan) Invoke(ctx context.Context, client *ddb.Client) *ScanPromise {
 // DynoInvoke implements the Operation interface
 func (op *Scan) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
+	output := new(ScanOutput)
+
+	defer func() { op.promise.SetResponse(output.Get()) }()
+
 	requestCtx := &ScanContext{
 		Context: ctx,
 		client:  client,
 		input:   op.input,
 	}
-	
+
 	var h ScanHandler
-	
+
 	h = new(ScanFinalHandler)
 
 	// no middlewares
@@ -158,7 +187,7 @@ func (op *Scan) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		}
 	}
 
-	h.HandleScan(requestCtx, op.promise)
+	h.HandleScan(requestCtx, output)
 }
 
 // ScanAllContext represents an exhaustive ScanAll operation request context
@@ -166,6 +195,30 @@ type ScanAllContext struct {
 	context.Context
 	input  *ddb.ScanInput
 	client *ddb.Client
+}
+
+// ScanAllOutput represents the output for the ScanAll opration
+type ScanAllOutput struct {
+	out []*ddb.ScanOutput
+	err error
+	mu  sync.RWMutex
+}
+
+// Set sets the output
+func (o *ScanAllOutput) Set(out []*ddb.ScanOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *ScanAllOutput) Get() (out []*ddb.ScanOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
 }
 
 // ScanAllPromise represents a promise for the ScanAll
@@ -201,42 +254,42 @@ func newScanAllPromise() *ScanAllPromise {
 
 // ScanAllHandler represents a handler for ScanAll requests
 type ScanAllHandler interface {
-	HandleScanAll(ctx *ScanAllContext, promise *ScanAllPromise)
+	HandleScanAll(ctx *ScanAllContext, output *ScanAllOutput)
 }
 
 // ScanAllHandlerFunc is a ScanAllHandler function
-type ScanAllHandlerFunc func(ctx *ScanAllContext, promise *ScanAllPromise)
+type ScanAllHandlerFunc func(ctx *ScanAllContext, output *ScanAllOutput)
 
 // HandleScanAll implements ScanAllHandler
-func (h ScanAllHandlerFunc) HandleScanAll(ctx *ScanAllContext, promise *ScanAllPromise) {
-	h(ctx, promise)
+func (h ScanAllHandlerFunc) HandleScanAll(ctx *ScanAllContext, output *ScanAllOutput) {
+	h(ctx, output)
 }
 
 // ScanAllMiddleWare is a middleware function use for wrapping ScanAllHandler requests
 type ScanAllMiddleWare interface {
-	ScanAllMiddleWare(h ScanAllHandler) ScanAllHandler
+	ScanAllMiddleWare(next ScanAllHandler) ScanAllHandler
 }
 
 // ScanAllMiddleWareFunc is a functional ScanAllMiddleWare
-type ScanAllMiddleWareFunc func(handler ScanAllHandler) ScanAllHandler
+type ScanAllMiddleWareFunc func(next ScanAllHandler) ScanAllHandler
 
 // ScanAllMiddleWare implements the ScanAllMiddleWare interface
-func (mw ScanAllMiddleWareFunc) ScanAllMiddleWare(h ScanAllHandler) ScanAllHandler {
-	return mw(h)
+func (mw ScanAllMiddleWareFunc) ScanAllMiddleWare(next ScanAllHandler) ScanAllHandler {
+	return mw(next)
 }
 
 // ScanAllFinalHandler is the final ScanAllHandler that executes a dynamodb ScanAll operation
-type ScanAllFinalHandler struct {}
+type ScanAllFinalHandler struct{}
 
 // HandleScanAll implements the ScanAllHandler
-func (h *ScanAllFinalHandler) HandleScanAll(ctx *ScanAllContext, promise *ScanAllPromise) {
+func (h *ScanAllFinalHandler) HandleScanAll(ctx *ScanAllContext, output *ScanAllOutput) {
 	var (
 		outs []*ddb.ScanOutput
 		out  *ddb.ScanOutput
 		err  error
 	)
 
-	defer func() { promise.SetResponse(outs, err) }()
+	defer func() { output.Set(outs, err) }()
 
 	// copy the scan so we're not mutating the original
 	input := CopyScan(ctx.input)
@@ -283,6 +336,10 @@ func (op *ScanAll) Invoke(ctx context.Context, client *ddb.Client) *ScanAllPromi
 
 // DynoInvoke the Operation interface
 func (op *ScanAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	output := new(ScanAllOutput)
+
+	defer func() { op.promise.SetResponse(output.Get()) }()
+
 	requestCtx := &ScanAllContext{
 		Context: ctx,
 		client:  client,
@@ -301,7 +358,7 @@ func (op *ScanAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		}
 	}
 
-	h.HandleScanAll(requestCtx, op.promise)
+	h.HandleScanAll(requestCtx, output)
 }
 
 // NewScanInput creates a new ScanInput with a table name

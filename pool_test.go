@@ -157,7 +157,7 @@ func (suite *PoolTestSuite) TestPutItems() {
 //		if len(output.Items) > 0 {
 //			for _, item := range output.Items {
 //				itemTarget := new(TestItemMarshaller)
-//				if err := encoding.UnmarshalMap(item, itemTarget); err != nil {
+//				if err := encoding.unmarshalMap(item, itemTarget); err != nil {
 //					return err
 //				}
 //				target = append(target, itemTarget)

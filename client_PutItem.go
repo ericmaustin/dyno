@@ -36,7 +36,7 @@ type PutItemContext struct {
 type PutItemOutput struct {
 	out *ddb.PutItemOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -90,7 +90,7 @@ func (h PutItemHandlerFunc) HandlePutItem(ctx *PutItemContext, output *PutItemOu
 }
 
 // PutItemFinalHandler is the final PutItemHandler that executes a dynamodb PutItem operation
-type PutItemFinalHandler struct {}
+type PutItemFinalHandler struct{}
 
 // HandlePutItem implements the PutItemHandler
 func (h *PutItemFinalHandler) HandlePutItem(ctx *PutItemContext, output *PutItemOutput) {
@@ -99,15 +99,15 @@ func (h *PutItemFinalHandler) HandlePutItem(ctx *PutItemContext, output *PutItem
 
 // PutItemMiddleWare is a middleware function use for wrapping PutItemHandler requests
 type PutItemMiddleWare interface {
-	PutItemMiddleWare(h PutItemHandler) PutItemHandler
+	PutItemMiddleWare(next PutItemHandler) PutItemHandler
 }
 
 // PutItemMiddleWareFunc is a functional PutItemMiddleWare
-type PutItemMiddleWareFunc func(handler PutItemHandler) PutItemHandler
+type PutItemMiddleWareFunc func(next PutItemHandler) PutItemHandler
 
 // PutItemMiddleWare implements the PutItemMiddleWare interface
-func (mw PutItemMiddleWareFunc) PutItemMiddleWare(h PutItemHandler) PutItemHandler {
-	return mw(h)
+func (mw PutItemMiddleWareFunc) PutItemMiddleWare(next PutItemHandler) PutItemHandler {
+	return mw(next)
 }
 
 // PutItem represents a PutItem operation

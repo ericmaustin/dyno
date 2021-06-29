@@ -36,7 +36,7 @@ func (s *ClientTestSuite) TearDownSuite() {
 		panic(err)
 	}
 
-	if err := s.client.TableNotExistsWaiter(context.Background(), s.table.DescribeTableInput()).Await(); err != nil {
+	if _, err := s.client.TableNotExistsWaiter(context.Background(), s.table.DescribeTableInput()).Await(); err != nil {
 		panic(err)
 	}
 
@@ -49,15 +49,15 @@ func (s *ClientTestSuite) TestBatchWriteItemWithMiddleWare() {
 	var cached []*dynamodb.BatchWriteItemOutput
 
 	cacheMW := BatchWriteItemAllMiddleWareFunc(func(next BatchWriteItemAllHandler) BatchWriteItemAllHandler {
-		return BatchWriteItemAllHandlerFunc(func(ctx *BatchWriteItemAllContext, promise *BatchWriteItemAllPromise) {
+		return BatchWriteItemAllHandlerFunc(func(ctx *BatchWriteItemAllContext, output *BatchWriteItemAllOutput) {
 			if cached != nil {
 				fmt.Println("cached!")
-				promise.SetResponse(cached, nil)
+				output.Set(cached, nil)
 				return
 			}
 			fmt.Println("not cached!")
-			next.HandleBatchWriteItemAll(ctx, promise)
-			out, err := promise.GetResponse()
+			next.HandleBatchWriteItemAll(ctx, output)
+			out, err := output.Get()
 			if err != nil {
 				panic(err)
 			}
@@ -90,15 +90,15 @@ func (s *ClientTestSuite) TestScanWithMiddleware() {
 	var cached []*dynamodb.ScanOutput
 
 	cacheMW := ScanAllMiddleWareFunc(func(next ScanAllHandler) ScanAllHandler {
-		return ScanAllHandlerFunc(func(ctx *ScanAllContext, promise *ScanAllPromise) {
+		return ScanAllHandlerFunc(func(ctx *ScanAllContext, output *ScanAllOutput) {
 			if cached != nil {
 				fmt.Println("cached!")
-				promise.SetResponse(cached, nil)
+				output.Set(cached, nil)
 				return
 			}
 			fmt.Println("not cached!")
-			next.HandleScanAll(ctx, promise)
-			out, err := promise.GetResponse()
+			next.HandleScanAll(ctx, output)
+			out, err := output.Get()
 			if err != nil {
 				panic(err)
 			}

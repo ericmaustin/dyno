@@ -9,8 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/ericmaustin/dyno/condition"
 	"github.com/ericmaustin/dyno/encoding"
+	"sync"
 )
-
 
 // UpdateItem executes UpdateItem operation and returns a UpdateItemPromise
 func (c *Client) UpdateItem(ctx context.Context, input *ddb.UpdateItemInput, mw ...UpdateItemMiddleWare) *UpdateItemPromise {
@@ -33,6 +33,30 @@ type UpdateItemContext struct {
 	context.Context
 	input  *ddb.UpdateItemInput
 	client *ddb.Client
+}
+
+// UpdateItemOutput represents the output for the UpdateItem opration
+type UpdateItemOutput struct {
+	out *ddb.UpdateItemOutput
+	err error
+	mu  sync.RWMutex
+}
+
+// Set sets the output
+func (o *UpdateItemOutput) Set(out *ddb.UpdateItemOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *UpdateItemOutput) Get() (out *ddb.UpdateItemOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
 }
 
 // UpdateItemPromise represents a promise for the UpdateItem
@@ -68,36 +92,36 @@ func newUpdateItemPromise() *UpdateItemPromise {
 
 // UpdateItemHandler represents a handler for UpdateItem requests
 type UpdateItemHandler interface {
-	HandleUpdateItem(ctx *UpdateItemContext, promise *UpdateItemPromise)
+	HandleUpdateItem(ctx *UpdateItemContext, output *UpdateItemOutput)
 }
 
 // UpdateItemHandlerFunc is a UpdateItemHandler function
-type UpdateItemHandlerFunc func(ctx *UpdateItemContext, promise *UpdateItemPromise)
+type UpdateItemHandlerFunc func(ctx *UpdateItemContext, output *UpdateItemOutput)
 
 // HandleUpdateItem implements UpdateItemHandler
-func (h UpdateItemHandlerFunc) HandleUpdateItem(ctx *UpdateItemContext, promise *UpdateItemPromise) {
-	h(ctx, promise)
+func (h UpdateItemHandlerFunc) HandleUpdateItem(ctx *UpdateItemContext, output *UpdateItemOutput) {
+	h(ctx, output)
 }
 
 // UpdateItemFinalHandler is the final UpdateItemHandler that executes a dynamodb UpdateItem operation
-type UpdateItemFinalHandler struct {}
+type UpdateItemFinalHandler struct{}
 
 // HandleUpdateItem implements the UpdateItemHandler
-func (h *UpdateItemFinalHandler) HandleUpdateItem(ctx *UpdateItemContext, promise *UpdateItemPromise) {
-	promise.SetResponse(ctx.client.UpdateItem(ctx, ctx.input))
+func (h *UpdateItemFinalHandler) HandleUpdateItem(ctx *UpdateItemContext, output *UpdateItemOutput) {
+	output.Set(ctx.client.UpdateItem(ctx, ctx.input))
 }
 
 // UpdateItemMiddleWare is a middleware function use for wrapping UpdateItemHandler requests
 type UpdateItemMiddleWare interface {
-	UpdateItemMiddleWare(h UpdateItemHandler) UpdateItemHandler
+	UpdateItemMiddleWare(next UpdateItemHandler) UpdateItemHandler
 }
 
 // UpdateItemMiddleWareFunc is a functional UpdateItemMiddleWare
-type UpdateItemMiddleWareFunc func(handler UpdateItemHandler) UpdateItemHandler
+type UpdateItemMiddleWareFunc func(next UpdateItemHandler) UpdateItemHandler
 
 // UpdateItemMiddleWare implements the UpdateItemMiddleWare interface
-func (mw UpdateItemMiddleWareFunc) UpdateItemMiddleWare(h UpdateItemHandler) UpdateItemHandler {
-	return mw(h)
+func (mw UpdateItemMiddleWareFunc) UpdateItemMiddleWare(next UpdateItemHandler) UpdateItemHandler {
+	return mw(next)
 }
 
 // UpdateItem represents a UpdateItem operation
@@ -125,6 +149,9 @@ func (op *UpdateItem) Invoke(ctx context.Context, client *ddb.Client) *UpdateIte
 
 // DynoInvoke implements the Operation interface
 func (op *UpdateItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	output := new(UpdateItemOutput)
+
+	defer func() { op.promise.SetResponse(output.Get()) }()
 
 	requestCtx := &UpdateItemContext{
 		Context: ctx,
@@ -144,7 +171,7 @@ func (op *UpdateItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		}
 	}
 
-	h.HandleUpdateItem(requestCtx, op.promise)
+	h.HandleUpdateItem(requestCtx, output)
 }
 
 func NewUpdateItemInput(tableName *string) *ddb.UpdateItemInput {

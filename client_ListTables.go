@@ -96,15 +96,15 @@ func (h *ListTablesFinalHandler) HandleListTables(ctx *ListTablesContext, output
 
 // ListTablesMiddleWare is a middleware function use for wrapping ListTablesHandler requests
 type ListTablesMiddleWare interface {
-	ListTablesMiddleWare(h ListTablesHandler) ListTablesHandler
+	ListTablesMiddleWare(next ListTablesHandler) ListTablesHandler
 }
 
 // ListTablesMiddleWareFunc is a functional ListTablesMiddleWare
-type ListTablesMiddleWareFunc func(handler ListTablesHandler) ListTablesHandler
+type ListTablesMiddleWareFunc func(next ListTablesHandler) ListTablesHandler
 
 // ListTablesMiddleWare implements the ListTablesMiddleWare interface
-func (mw ListTablesMiddleWareFunc) ListTablesMiddleWare(h ListTablesHandler) ListTablesHandler {
-	return mw(h)
+func (mw ListTablesMiddleWareFunc) ListTablesMiddleWare(next ListTablesHandler) ListTablesHandler {
+	return mw(next)
 }
 
 // ListTables represents a ListTables operation

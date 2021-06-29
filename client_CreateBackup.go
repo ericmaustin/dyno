@@ -33,7 +33,7 @@ type CreateBackupContext struct {
 type CreateBackupOutput struct {
 	out *ddb.CreateBackupOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -52,7 +52,6 @@ func (o *CreateBackupOutput) Get() (out *ddb.CreateBackupOutput, err error) {
 	o.mu.Unlock()
 	return
 }
-
 
 // CreateBackupPromise represents a promise for the CreateBackup
 type CreateBackupPromise struct {
@@ -93,14 +92,13 @@ type CreateBackupHandler interface {
 // CreateBackupHandlerFunc is a CreateBackupHandler function
 type CreateBackupHandlerFunc func(ctx *CreateBackupContext, output *CreateBackupOutput)
 
-
 // HandleCreateBackup implements CreateBackupHandler
 func (h CreateBackupHandlerFunc) HandleCreateBackup(ctx *CreateBackupContext, output *CreateBackupOutput) {
 	h(ctx, output)
 }
 
 // CreateBackupFinalHandler is the final CreateBackupHandler that executes a dynamodb CreateBackup operation
-type CreateBackupFinalHandler struct {}
+type CreateBackupFinalHandler struct{}
 
 // HandleCreateBackup implements the CreateBackupHandler
 func (h *CreateBackupFinalHandler) HandleCreateBackup(ctx *CreateBackupContext, output *CreateBackupOutput) {

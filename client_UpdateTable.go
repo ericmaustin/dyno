@@ -3,8 +3,8 @@ package dyno
 import (
 	"context"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"sync"
 )
-
 
 // UpdateTable executes UpdateTable operation and returns a UpdateTablePromise
 func (c *Client) UpdateTable(ctx context.Context, input *ddb.UpdateTableInput, mw ...UpdateTableMiddleWare) *UpdateTablePromise {
@@ -27,6 +27,30 @@ type UpdateTableContext struct {
 	context.Context
 	input  *ddb.UpdateTableInput
 	client *ddb.Client
+}
+
+// UpdateTableOutput represents the output for the UpdateTable opration
+type UpdateTableOutput struct {
+	out *ddb.UpdateTableOutput
+	err error
+	mu  sync.RWMutex
+}
+
+// Set sets the output
+func (o *UpdateTableOutput) Set(out *ddb.UpdateTableOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *UpdateTableOutput) Get() (out *ddb.UpdateTableOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
 }
 
 // UpdateTablePromise represents a promise for the UpdateTable
@@ -62,36 +86,36 @@ func newUpdateTablePromise() *UpdateTablePromise {
 
 // UpdateTableHandler represents a handler for UpdateTable requests
 type UpdateTableHandler interface {
-	HandleUpdateTable(ctx *UpdateTableContext, promise *UpdateTablePromise)
+	HandleUpdateTable(ctx *UpdateTableContext, output *UpdateTableOutput)
 }
 
 // UpdateTableHandlerFunc is a UpdateTableHandler function
-type UpdateTableHandlerFunc func(ctx *UpdateTableContext, promise *UpdateTablePromise)
+type UpdateTableHandlerFunc func(ctx *UpdateTableContext, output *UpdateTableOutput)
 
 // HandleUpdateTable implements UpdateTableHandler
-func (h UpdateTableHandlerFunc) HandleUpdateTable(ctx *UpdateTableContext, promise *UpdateTablePromise) {
-	h(ctx, promise)
+func (h UpdateTableHandlerFunc) HandleUpdateTable(ctx *UpdateTableContext, output *UpdateTableOutput) {
+	h(ctx, output)
 }
 
 // UpdateTableFinalHandler is the final UpdateTableHandler that executes a dynamodb UpdateTable operation
-type UpdateTableFinalHandler struct {}
+type UpdateTableFinalHandler struct{}
 
 // HandleUpdateTable implements the UpdateTableHandler
-func (h *UpdateTableFinalHandler) HandleUpdateTable(ctx *UpdateTableContext, promise *UpdateTablePromise) {
-	promise.SetResponse(ctx.client.UpdateTable(ctx, ctx.input))
+func (h *UpdateTableFinalHandler) HandleUpdateTable(ctx *UpdateTableContext, output *UpdateTableOutput) {
+	output.Set(ctx.client.UpdateTable(ctx, ctx.input))
 }
 
 // UpdateTableMiddleWare is a middleware function use for wrapping UpdateTableHandler requests
 type UpdateTableMiddleWare interface {
-	UpdateTableMiddleWare(h UpdateTableHandler) UpdateTableHandler
+	UpdateTableMiddleWare(next UpdateTableHandler) UpdateTableHandler
 }
 
 // UpdateTableMiddleWareFunc is a functional UpdateTableMiddleWare
-type UpdateTableMiddleWareFunc func(handler UpdateTableHandler) UpdateTableHandler
+type UpdateTableMiddleWareFunc func(next UpdateTableHandler) UpdateTableHandler
 
 // UpdateTableMiddleWare implements the UpdateTableMiddleWare interface
-func (mw UpdateTableMiddleWareFunc) UpdateTableMiddleWare(h UpdateTableHandler) UpdateTableHandler {
-	return mw(h)
+func (mw UpdateTableMiddleWareFunc) UpdateTableMiddleWare(next UpdateTableHandler) UpdateTableHandler {
+	return mw(next)
 }
 
 // UpdateTable represents a UpdateTable operation
@@ -119,6 +143,9 @@ func (op *UpdateTable) Invoke(ctx context.Context, client *ddb.Client) *UpdateTa
 
 // DynoInvoke implements the Operation interface
 func (op *UpdateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	output := new(UpdateTableOutput)
+
+	defer func() { op.promise.SetResponse(output.Get()) }()
 
 	requestCtx := &UpdateTableContext{
 		Context: ctx,
@@ -138,7 +165,7 @@ func (op *UpdateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 		}
 	}
 
-	h.HandleUpdateTable(requestCtx, op.promise)
+	h.HandleUpdateTable(requestCtx, output)
 }
 
 // NewUpdateTableInput creates a new UpdateTableInput

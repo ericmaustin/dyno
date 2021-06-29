@@ -52,7 +52,7 @@ type BatchGetItemContext struct {
 type BatchGetItemOutput struct {
 	out *ddb.BatchGetItemOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -119,7 +119,7 @@ func (mw BatchGetItemMiddleWareFunc) BatchGetItemMiddleWare(h BatchGetItemHandle
 }
 
 // BatchGetItemFinalHandler is the final handler for all BatchGetItem operations
-type BatchGetItemFinalHandler struct {}
+type BatchGetItemFinalHandler struct{}
 
 // HandleBatchGetItem returns the final BatchGetItemHandler that executes a dynamodb BatchGetItem operation
 func (b *BatchGetItemFinalHandler) HandleBatchGetItem(ctx *BatchGetItemContext, output *BatchGetItemOutput) {
@@ -151,17 +151,17 @@ func (op *BatchGetItem) Invoke(ctx context.Context, client *ddb.Client) *BatchGe
 
 // DynoInvoke implements the Operation interface
 func (op *BatchGetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
-	
+
 	output := new(BatchGetItemOutput)
-	
+
 	defer func() { op.promise.SetResponse(output.Get()) }()
-	
+
 	requestCtx := &BatchGetItemContext{
 		Context: ctx,
 		client:  client,
 		input:   op.input,
 	}
-	
+
 	var h BatchGetItemHandler
 
 	h = new(BatchGetItemFinalHandler)
@@ -188,7 +188,7 @@ type BatchGetItemAllContext struct {
 type BatchGetItemAllOutput struct {
 	out []*ddb.BatchGetItemOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -266,7 +266,7 @@ func (mw BatchGetItemAllMiddleWareFunc) BatchGetItemAllMiddleWare(h BatchGetItem
 }
 
 // BatchGetItemAllFinalHandler is the final handler for all BatchGetItemAll operations
-type BatchGetItemAllFinalHandler struct {}
+type BatchGetItemAllFinalHandler struct{}
 
 // HandleBatchGetItemAll returns the final BatchGetItemAllHandler that executes a dynamodb BatchGetItem operation
 func (b *BatchGetItemAllFinalHandler) HandleBatchGetItemAll(ctx *BatchGetItemAllContext, output *BatchGetItemAllOutput) {

@@ -33,7 +33,7 @@ type DescribeBackupContext struct {
 type DescribeBackupOutput struct {
 	out *ddb.DescribeBackupOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -87,7 +87,7 @@ func (h DescribeBackupHandlerFunc) HandleDescribeBackup(ctx *DescribeBackupConte
 }
 
 // DescribeBackupFinalHandler is the final DescribeBackupHandler that executes a dynamodb DescribeBackup operation
-type DescribeBackupFinalHandler struct {}
+type DescribeBackupFinalHandler struct{}
 
 // HandleDescribeBackup implements the DescribeBackupHandler
 func (h *DescribeBackupFinalHandler) HandleDescribeBackup(ctx *DescribeBackupContext, output *DescribeBackupOutput) {
@@ -96,15 +96,15 @@ func (h *DescribeBackupFinalHandler) HandleDescribeBackup(ctx *DescribeBackupCon
 
 // DescribeBackupMiddleWare is a middleware function use for wrapping DescribeBackupHandler requests
 type DescribeBackupMiddleWare interface {
-	DescribeBackupMiddleWare(h DescribeBackupHandler) DescribeBackupHandler
+	DescribeBackupMiddleWare(next DescribeBackupHandler) DescribeBackupHandler
 }
 
 // DescribeBackupMiddleWareFunc is a functional DescribeBackupMiddleWare
-type DescribeBackupMiddleWareFunc func(handler DescribeBackupHandler) DescribeBackupHandler
+type DescribeBackupMiddleWareFunc func(next DescribeBackupHandler) DescribeBackupHandler
 
 // DescribeBackupMiddleWare implements the DescribeBackupMiddleWare interface
-func (mw DescribeBackupMiddleWareFunc) DescribeBackupMiddleWare(h DescribeBackupHandler) DescribeBackupHandler {
-	return mw(h)
+func (mw DescribeBackupMiddleWareFunc) DescribeBackupMiddleWare(next DescribeBackupHandler) DescribeBackupHandler {
+	return mw(next)
 }
 
 // DescribeBackup represents a DescribeBackup operation
@@ -134,7 +134,7 @@ func (op *DescribeBackup) Invoke(ctx context.Context, client *ddb.Client) *Descr
 func (op *DescribeBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeBackupOutput)
 
-	defer func() {op.promise.SetResponse(output.Get())}()
+	defer func() { op.promise.SetResponse(output.Get()) }()
 
 	requestCtx := &DescribeBackupContext{
 		Context: ctx,
@@ -156,7 +156,6 @@ func (op *DescribeBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	h.HandleDescribeBackup(requestCtx, output)
 }
-
 
 // NewDescribeBackupInput creates a new DescribeBackupInput
 func NewDescribeBackupInput(backupArn *string) *ddb.DescribeBackupInput {

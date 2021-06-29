@@ -50,7 +50,7 @@ type BatchWriteItemContext struct {
 type BatchWriteItemOutput struct {
 	out *ddb.BatchWriteItemOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -128,7 +128,7 @@ func (mw BatchWriteItemMiddleWareFunc) BatchWriteItemMiddleWare(next BatchWriteI
 }
 
 // BatchWriteItemFinalHandler is the final handler for all batchWriteItem operations
-type BatchWriteItemFinalHandler struct {}
+type BatchWriteItemFinalHandler struct{}
 
 // HandleBatchWriteItem implements BatchWriteItemHandler
 func (b *BatchWriteItemFinalHandler) HandleBatchWriteItem(ctx *BatchWriteItemContext, output *BatchWriteItemOutput) {
@@ -163,7 +163,7 @@ func (op *BatchWriteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	output := new(BatchWriteItemOutput)
 
 	defer func() { op.promise.SetResponse(output.Get()) }()
-	
+
 	requestCtx := &BatchWriteItemContext{
 		Context: ctx,
 		client:  client,
@@ -196,7 +196,7 @@ type BatchWriteItemAllContext struct {
 type BatchWriteItemAllOutput struct {
 	out []*ddb.BatchWriteItemOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -274,7 +274,7 @@ func (mw BatchWriteItemAllMiddleWareFunc) BatchWriteItemAllMiddleWare(next Batch
 }
 
 // BatchWriteItemAllFinalHandler is the final handler for all batchWriteItemAll operations
-type BatchWriteItemAllFinalHandler struct {}
+type BatchWriteItemAllFinalHandler struct{}
 
 // HandleBatchWriteItemAll implements the HandleBatchWriteItem interface
 func (b *BatchWriteItemAllFinalHandler) HandleBatchWriteItemAll(ctx *BatchWriteItemAllContext, output *BatchWriteItemAllOutput) {
@@ -288,7 +288,6 @@ func (b *BatchWriteItemAllFinalHandler) HandleBatchWriteItemAll(ctx *BatchWriteI
 
 	// copy the scan so we're not mutating the original
 	input := CopyBatchWriteItemInput(ctx.input)
-
 
 	for {
 		if out, err = ctx.client.BatchWriteItem(ctx, input); err != nil {

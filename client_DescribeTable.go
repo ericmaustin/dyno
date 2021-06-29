@@ -69,7 +69,7 @@ type DescribeTableContext struct {
 type DescribeTableOutput struct {
 	out *ddb.DescribeTableOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -147,7 +147,7 @@ func (mw DescribeTableMiddleWareFunc) DescribeTableMiddleWare(next DescribeTable
 }
 
 // DescribeTableFinalHandler is the final DescribeTableHandler that executes a dynamodb DescribeTable operation
-type DescribeTableFinalHandler struct {}
+type DescribeTableFinalHandler struct{}
 
 // HandleDescribeTable implements the DescribeTableHandler
 func (h *DescribeTableFinalHandler) HandleDescribeTable(ctx *DescribeTableContext, output *DescribeTableOutput) {
@@ -183,7 +183,7 @@ func (op *DescribeTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 }
 
 // TableExistsWaiterFinalHandler is the final TableWaiterHandler that executes a dynamodb TableExistsWaiter operation
-type TableExistsWaiterFinalHandler struct {}
+type TableExistsWaiterFinalHandler struct{}
 
 // HandleDescribeTable implements the DescribeTableHandler
 func (h *TableExistsWaiterFinalHandler) HandleDescribeTable(ctx *DescribeTableContext, output *DescribeTableOutput) {
@@ -196,14 +196,13 @@ func (h *TableExistsWaiterFinalHandler) HandleDescribeTable(ctx *DescribeTableCo
 
 	defer func() { output.Set(out, err) }()
 
-
-	sleeper = timer.NewLinearSleeper(time.Millisecond * 100, 2).WithContext(ctx)
+	sleeper = timer.NewLinearSleeper(time.Millisecond*100, 2).WithContext(ctx)
 
 	for {
 		out, err = ctx.client.DescribeTable(ctx, ctx.input)
 		retry, err = tableExistsRetryState(out, err)
 
-		if !retry || err != nil  {
+		if !retry || err != nil {
 			return
 		}
 
@@ -232,7 +231,7 @@ func NewTableExistsWaiter(input *ddb.DescribeTableInput, mws ...DescribeTableMid
 // Invoke invokes the TableExistsWaiter operation
 func (op *TableExistsWaiter) Invoke(ctx context.Context, client *ddb.Client) *DescribeTablePromise {
 	go op.DynoInvoke(ctx, client)
-	
+
 	return op.promise
 }
 
@@ -242,7 +241,7 @@ func (op *TableExistsWaiter) DynoInvoke(ctx context.Context, client *ddb.Client)
 }
 
 // TableNotExistsWaiterFinalHandler is the final TableNotExistsWaiterHandler that executes a dynamodb TableNotExistsWaiter operation
-type TableNotExistsWaiterFinalHandler struct {}
+type TableNotExistsWaiterFinalHandler struct{}
 
 // HandleDescribeTable implements the DescribeTableHandler
 func (h *TableNotExistsWaiterFinalHandler) HandleDescribeTable(ctx *DescribeTableContext, output *DescribeTableOutput) {
@@ -255,7 +254,7 @@ func (h *TableNotExistsWaiterFinalHandler) HandleDescribeTable(ctx *DescribeTabl
 
 	defer func() { output.Set(out, err) }()
 
-	sleeper = timer.NewLinearSleeper(time.Millisecond * 100, 2).WithContext(ctx)
+	sleeper = timer.NewLinearSleeper(time.Millisecond*100, 2).WithContext(ctx)
 
 	for {
 		out, err = ctx.client.DescribeTable(ctx, ctx.input)
@@ -270,7 +269,6 @@ func (h *TableNotExistsWaiterFinalHandler) HandleDescribeTable(ctx *DescribeTabl
 		}
 	}
 }
-
 
 // TableNotExistsWaiter represents an operation that waits for a table to exist
 type TableNotExistsWaiter struct {
@@ -299,6 +297,7 @@ func (op *TableNotExistsWaiter) Invoke(ctx context.Context, client *ddb.Client) 
 func (op *TableNotExistsWaiter) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	invokeDescribeTableWithHandler(ctx, client, op.input, new(TableNotExistsWaiterFinalHandler), op.middleWares, op.promise)
 }
+
 // invokeDescribeTableWithHandler invokes a describe table operation with a specific handler
 func invokeDescribeTableWithHandler(ctx context.Context, client *ddb.Client, input *ddb.DescribeTableInput, handler DescribeTableHandler, mws []DescribeTableMiddleWare, promise *DescribeTablePromise) {
 	output := new(DescribeTableOutput)

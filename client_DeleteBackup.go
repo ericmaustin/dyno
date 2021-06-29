@@ -33,7 +33,7 @@ type DeleteBackupContext struct {
 type DeleteBackupOutput struct {
 	out *ddb.DeleteBackupOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -87,7 +87,7 @@ func (h DeleteBackupHandlerFunc) HandleDeleteBackup(ctx *DeleteBackupContext, ou
 }
 
 // DeleteBackupFinalHandler is the final DeleteBackupHandler that executes a dynamodb DeleteBackup operation
-type DeleteBackupFinalHandler struct {}
+type DeleteBackupFinalHandler struct{}
 
 // HandleDeleteBackup implements the DeleteBackupHandler
 func (h *DeleteBackupFinalHandler) HandleDeleteBackup(ctx *DeleteBackupContext, output *DeleteBackupOutput) {
@@ -103,8 +103,8 @@ type DeleteBackupMiddleWare interface {
 type DeleteBackupMiddleWareFunc func(next DeleteBackupHandler) DeleteBackupHandler
 
 // DeleteBackupMiddleWare implements the DeleteBackupMiddleWare interface
-func (mw DeleteBackupMiddleWareFunc) DeleteBackupMiddleWare(h DeleteBackupHandler) DeleteBackupHandler {
-	return mw(h)
+func (mw DeleteBackupMiddleWareFunc) DeleteBackupMiddleWare(next DeleteBackupHandler) DeleteBackupHandler {
+	return mw(next)
 }
 
 // DeleteBackup represents a DeleteBackup operation

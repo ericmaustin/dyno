@@ -96,15 +96,15 @@ func (h *DeleteTableFinalHandler) HandleDeleteTable(ctx *DeleteTableContext, out
 
 // DeleteTableMiddleWare is a middleware function use for wrapping DeleteTableHandler requests
 type DeleteTableMiddleWare interface {
-	DeleteTableMiddleWare(h DeleteTableHandler) DeleteTableHandler
+	DeleteTableMiddleWare(next DeleteTableHandler) DeleteTableHandler
 }
 
 // DeleteTableMiddleWareFunc is a functional DeleteTableMiddleWare
-type DeleteTableMiddleWareFunc func(handler DeleteTableHandler) DeleteTableHandler
+type DeleteTableMiddleWareFunc func(next DeleteTableHandler) DeleteTableHandler
 
 // DeleteTableMiddleWare implements the DeleteTableMiddleWare interface
-func (mw DeleteTableMiddleWareFunc) DeleteTableMiddleWare(h DeleteTableHandler) DeleteTableHandler {
-	return mw(h)
+func (mw DeleteTableMiddleWareFunc) DeleteTableMiddleWare(next DeleteTableHandler) DeleteTableHandler {
+	return mw(next)
 }
 
 // DeleteTable represents a DeleteTable operation

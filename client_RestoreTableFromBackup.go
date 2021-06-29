@@ -3,6 +3,7 @@ package dyno
 import (
 	"context"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"sync"
 )
 
 // RestoreTableFromBackup executes RestoreTableFromBackup operation and returns a RestoreTableFromBackupPromise
@@ -26,6 +27,30 @@ type RestoreTableFromBackupContext struct {
 	context.Context
 	input  *ddb.RestoreTableFromBackupInput
 	client *ddb.Client
+}
+
+// RestoreTableFromBackupOutput represents the output for the RestoreTableFromBackup opration
+type RestoreTableFromBackupOutput struct {
+	out *ddb.RestoreTableFromBackupOutput
+	err error
+	mu  sync.RWMutex
+}
+
+// Set sets the output
+func (o *RestoreTableFromBackupOutput) Set(out *ddb.RestoreTableFromBackupOutput, err error) {
+	o.mu.Lock()
+	o.out = out
+	o.err = err
+	o.mu.Unlock()
+}
+
+// Get gets the output
+func (o *RestoreTableFromBackupOutput) Get() (out *ddb.RestoreTableFromBackupOutput, err error) {
+	o.mu.Lock()
+	out = o.out
+	err = o.err
+	o.mu.Unlock()
+	return
 }
 
 // RestoreTableFromBackupPromise represents a promise for the RestoreTableFromBackup
@@ -61,36 +86,36 @@ func newRestoreTableFromBackupPromise() *RestoreTableFromBackupPromise {
 
 // RestoreTableFromBackupHandler represents a handler for RestoreTableFromBackup requests
 type RestoreTableFromBackupHandler interface {
-	HandleRestoreTableFromBackup(ctx *RestoreTableFromBackupContext, promise *RestoreTableFromBackupPromise)
+	HandleRestoreTableFromBackup(ctx *RestoreTableFromBackupContext, output *RestoreTableFromBackupOutput)
 }
 
 // RestoreTableFromBackupHandlerFunc is a RestoreTableFromBackupHandler function
-type RestoreTableFromBackupHandlerFunc func(ctx *RestoreTableFromBackupContext, promise *RestoreTableFromBackupPromise)
+type RestoreTableFromBackupHandlerFunc func(ctx *RestoreTableFromBackupContext, output *RestoreTableFromBackupOutput)
 
 // HandleRestoreTableFromBackup implements RestoreTableFromBackupHandler
-func (h RestoreTableFromBackupHandlerFunc) HandleRestoreTableFromBackup(ctx *RestoreTableFromBackupContext, promise *RestoreTableFromBackupPromise) {
-	h(ctx, promise)
+func (h RestoreTableFromBackupHandlerFunc) HandleRestoreTableFromBackup(ctx *RestoreTableFromBackupContext, output *RestoreTableFromBackupOutput) {
+	h(ctx, output)
 }
 
 // RestoreTableFromBackupFinalHandler is the final RestoreTableFromBackupHandler that executes a dynamodb RestoreTableFromBackup operation
-type RestoreTableFromBackupFinalHandler struct {}
+type RestoreTableFromBackupFinalHandler struct{}
 
 // HandleRestoreTableFromBackup implements the RestoreTableFromBackupHandler
-func (h *RestoreTableFromBackupFinalHandler) HandleRestoreTableFromBackup(ctx *RestoreTableFromBackupContext, promise *RestoreTableFromBackupPromise) {
-	promise.SetResponse(ctx.client.RestoreTableFromBackup(ctx, ctx.input))
+func (h *RestoreTableFromBackupFinalHandler) HandleRestoreTableFromBackup(ctx *RestoreTableFromBackupContext, output *RestoreTableFromBackupOutput) {
+	output.Set(ctx.client.RestoreTableFromBackup(ctx, ctx.input))
 }
 
 // RestoreTableFromBackupMiddleWare is a middleware function use for wrapping RestoreTableFromBackupHandler requests
 type RestoreTableFromBackupMiddleWare interface {
-	RestoreTableFromBackupMiddleWare(h RestoreTableFromBackupHandler) RestoreTableFromBackupHandler
+	RestoreTableFromBackupMiddleWare(next RestoreTableFromBackupHandler) RestoreTableFromBackupHandler
 }
 
 // RestoreTableFromBackupMiddleWareFunc is a functional RestoreTableFromBackupMiddleWare
-type RestoreTableFromBackupMiddleWareFunc func(handler RestoreTableFromBackupHandler) RestoreTableFromBackupHandler
+type RestoreTableFromBackupMiddleWareFunc func(next RestoreTableFromBackupHandler) RestoreTableFromBackupHandler
 
 // RestoreTableFromBackupMiddleWare implements the RestoreTableFromBackupMiddleWare interface
-func (mw RestoreTableFromBackupMiddleWareFunc) RestoreTableFromBackupMiddleWare(h RestoreTableFromBackupHandler) RestoreTableFromBackupHandler {
-	return mw(h)
+func (mw RestoreTableFromBackupMiddleWareFunc) RestoreTableFromBackupMiddleWare(next RestoreTableFromBackupHandler) RestoreTableFromBackupHandler {
+	return mw(next)
 }
 
 // RestoreTableFromBackup represents a RestoreTableFromBackup operation
@@ -118,6 +143,9 @@ func (op *RestoreTableFromBackup) Invoke(ctx context.Context, client *ddb.Client
 
 // DynoInvoke implements the Operation interface
 func (op *RestoreTableFromBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	output := new(RestoreTableFromBackupOutput)
+
+	defer func() { op.promise.SetResponse(output.Get()) }()
 
 	requestCtx := &RestoreTableFromBackupContext{
 		Context: ctx,
@@ -137,7 +165,7 @@ func (op *RestoreTableFromBackup) DynoInvoke(ctx context.Context, client *ddb.Cl
 		}
 	}
 
-	h.HandleRestoreTableFromBackup(requestCtx, op.promise)
+	h.HandleRestoreTableFromBackup(requestCtx, output)
 }
 
 // NewRestoreTableFromBackupInput creates a RestoreTableFromBackupInput with a given table name and key

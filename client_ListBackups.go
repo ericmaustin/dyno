@@ -96,15 +96,15 @@ func (h *ListBackupsFinalHandler) HandleListBackups(ctx *ListBackupsContext, out
 
 // ListBackupsMiddleWare is a middleware function use for wrapping ListBackupsHandler requests
 type ListBackupsMiddleWare interface {
-	ListBackupsMiddleWare(h ListBackupsHandler) ListBackupsHandler
+	ListBackupsMiddleWare(next ListBackupsHandler) ListBackupsHandler
 }
 
 // ListBackupsMiddleWareFunc is a functional ListBackupsMiddleWare
-type ListBackupsMiddleWareFunc func(handler ListBackupsHandler) ListBackupsHandler
+type ListBackupsMiddleWareFunc func(next ListBackupsHandler) ListBackupsHandler
 
 // ListBackupsMiddleWare implements the ListBackupsMiddleWare interface
-func (mw ListBackupsMiddleWareFunc) ListBackupsMiddleWare(h ListBackupsHandler) ListBackupsHandler {
-	return mw(h)
+func (mw ListBackupsMiddleWareFunc) ListBackupsMiddleWare(next ListBackupsHandler) ListBackupsHandler {
+	return mw(next)
 }
 
 // ListBackups represents a ListBackups operation

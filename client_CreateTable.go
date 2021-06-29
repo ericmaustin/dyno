@@ -35,7 +35,7 @@ type CreateTableContext struct {
 type CreateTableOutput struct {
 	out *ddb.CreateTableOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -100,7 +100,7 @@ func (h CreateTableHandlerFunc) HandleCreateTable(ctx *CreateTableContext, outpu
 }
 
 // CreateTableFinalHandler is the final CreateTableHandler that executes a dynamodb CreateTable operation
-type CreateTableFinalHandler struct {}
+type CreateTableFinalHandler struct{}
 
 // HandleCreateTable implements the CreateTableHandler
 func (h *CreateTableFinalHandler) HandleCreateTable(ctx *CreateTableContext, output *CreateTableOutput) {
