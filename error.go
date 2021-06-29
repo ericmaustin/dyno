@@ -1,6 +1,9 @@
 package dyno
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+)
 
 /*
 Error is the Master Error type for all Dyno related errors
@@ -89,34 +92,52 @@ const (
 	ErrBatchOutputContextCancelled
 
 	//
-	// Request Errors
+	// NewRequest Errors
 	//
-
-	// ErrRequestExecutionContextCancelled raised when context is cancelled before a request execution completes
-	ErrRequestExecutionContextCancelled
-
-	//
-	// Encoding errors
-	//
-
-	// ErrEncodingEmbeddedStructUnmarshalFailed raised when unmarshalling an embedded struct fails
-	ErrEncodingEmbeddedStructUnmarshalFailed
-
-	// ErrEncodingEmbeddedStructMarshalFailed raised when marshalling an embedded struct fails
-	ErrEncodingEmbeddedStructMarshalFailed
-
-	// ErrEncodingEmbeddedMapUnmarshalFailed raised when unmarshalling an embedded map fails
-	ErrEncodingEmbeddedMapUnmarshalFailed
-
-	// ErrEncodingEmbeddedMapMarshalFailed raised when marshalling an embedded map fails
-	ErrEncodingEmbeddedMapMarshalFailed
-
-	// ErrEncodingEmbeddedBadKind raised when unmarshalling a bad value kind
-	ErrEncodingEmbeddedBadKind
-
-	// ErrEncodingBadKind raised when an input is of an unexpected kind
-	ErrEncodingBadKind
-
-	// ErrEncodingBadValue raised when the value of an input is unexpected or incorrect
-	ErrEncodingBadValue
 )
+
+//ErrSet is a generic collection of errors
+type ErrSet struct {
+	Errors []error
+}
+
+func (e *ErrSet) AddErr(errs ...error) {
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+		e.Errors = append(e.Errors, err)
+	}
+}
+
+func (e *ErrSet) Error() string {
+	var buf bytes.Buffer
+	if len(e.Errors) < 1 {
+		return ""
+	}
+	fmt.Fprintf(&buf, "%d errors: ", len(e.Errors))
+	for _, err := range e.Errors {
+		buf.WriteString(err.Error() + "; ")
+	}
+	buf.Truncate(buf.Len() - 2)
+	return buf.String()
+}
+
+//Err returns itself only if the set contains any errors, otherwise it returns nil
+func (e *ErrSet) Err() error {
+	if len(e.Errors) == 0 {
+		return nil
+	}
+	return e
+}
+
+func NewErrSet(errs []error) *ErrSet {
+	e := new(ErrSet)
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+		e.Errors = append(e.Errors, err)
+	}
+	return e
+}

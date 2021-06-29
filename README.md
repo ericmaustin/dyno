@@ -4,22 +4,77 @@ DYNO
 [![Coverage Status](https://coveralls.io/repos/github/ericmaustin/dyno/badge.svg?branch=master)](https://coveralls.io/github/ericmaustin/dyno?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ericmaustin/dyno)](https://goreportcard.com/report/github.com/ericmaustin/dyno)
 
-dyno is an AWS dynomodb API extension library with built in retry-on-failure, session management, and extensive type
-encoding features
+dyno is an AWS dynomodb API extension library
 
-Features:
-- All operations will retry on failure with exponential backoff
-- ORM-like table modeling with the table module: 
-    - Create, modify, delete, backup, and restore tables all in code.
-- More control over struct encoding with "dyno" struct tags including:
-    - embedding (or flattening) other structs or maps
-    - prepending or appending strings to embedded structs or map attribute names
-    - automatic json encoding struct fields automatically
-- Batch execution of any mix of multiple operations with any number of given worker go routines
-- Operation builders to facilitate quickly building and executing table operations
-    - Single line of code can be used for most operations
-    - Handlers for operations that return records 
-- Atomic locking on any dynamodb record with the lock module
+##Features:
 
+### Input Builders 
 
-#### todo: finish documentation on each module
+Build inputs for API operations with input builders allowing more straight-forward building
+of more complicated operations. Example:
+```go
+builder := NewScanBuilder().SetTableName(tableName)
+builder.AddFilter(condition.And(
+    condition.Between("Foo", 0, 2),
+    condition.Equal("Bar", "Hello World"),
+))
+builder.AddProjectionNames("ID", "TimeStamp")
+builder.Build()
+```
+
+### Promises
+
+All `DynamoDB` API calls (e.g. `DynamoDB.Query()`) return a `Promise` type that will execute the API call in
+a go routine and will wait and return values by calling `Promise.Await`.
+Example:
+```go
+scanInput := NewScanInput().SetTableName(suite.table.Name())
+scanPromise := db.Scan(scanInput)
+scanOutput, err := scanPromise.Await()
+```
+
+Each API operation has its own `Promise` type that will return the correct type with `Await()`
+
+### Encoding
+
+More control over struct encoding with `dyno` struct tags including:
+- embedding (flattening) other structs or maps within structs with struct tags: `dyno:"*"`
+- prepended or appended key values to embedded structs: `dyno:"*,prepend=Foo,append=Bar"`
+- enable json conversion with struct tags: `dyno:",json"`
+- omit zero values with struct tags: `dyno:",omitzero"`
+- omit nil values with struct tags: `dyno:",omitnil`
+- omit nil or zero values with struct tags: `dyno:",omitempty`
+
+`ItemMarshaller` and `ItemUnmarshaller` interfaces can be implemented to directly control
+how a type will be marshalled or unmarshalled into a DynamoDB record with type `map[string]*dynamodb.AttributeValue`.
+
+Call encoder with `encoding.MarshalItem(myItem)` to marshal a value to a DynamoDB record and apply
+dyno struct tags and `ItemMarshaller` interface. 
+
+Or marshal a slice of DynamoDB record all at once items with `encoding.MarshalItems([]myItem{...})`
+
+### Pool
+
+Use the `Pool` type to limit parallel executions
+```go
+pool := NewPool(context.Background(), db, 10)
+scanPromise := pool.Scan(scanInput)
+scanOutput, err := scanPromise.Await()
+```
+
+### Distributed Locks
+
+The `Lock` module provides distributed locking functionality for dynamodb records:
+```go
+lock := lock.MustAcquire(tableName, itemKey, db,
+	lock.OptHeartbeatFrequency(time.Millisecond*200),
+    lock.OptTimeout(time.Second),
+    lock.OptLeaseDuration(time.Second))
+
+// release
+err = lock.Release()
+```
+
+---
+
+NOTE: This module is incomplete and in active development

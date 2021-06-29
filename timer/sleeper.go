@@ -20,7 +20,6 @@ type NextSleepDuration func(sleepDuration time.Duration, count int) time.Duratio
 
 // Sleeper is a more complex version of the base timer
 type Sleeper struct {
-	timeout       time.Duration
 	sleepDuration time.Duration
 	count         int
 	mu            sync.Mutex
@@ -35,15 +34,9 @@ type Sleeper struct {
 func (s *Sleeper) WithAddRandom(add time.Duration) *Sleeper {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.randAdd = add
-	return s
-}
 
-// WithTimeout adds a timeout to this sleeper
-func (s *Sleeper) WithTimeout(to time.Duration) *Sleeper {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.timeout = to
+	s.randAdd = add
+
 	return s
 }
 
@@ -51,7 +44,9 @@ func (s *Sleeper) WithTimeout(to time.Duration) *Sleeper {
 func (s *Sleeper) WithContext(ctx context.Context) *Sleeper {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	s.ctx = ctx
+
 	return s
 }
 
@@ -59,7 +54,6 @@ func (s *Sleeper) WithContext(ctx context.Context) *Sleeper {
 func NewSleeper(sleepDuration time.Duration) *Sleeper {
 	return &Sleeper{
 		sleepDuration: sleepDuration,
-		mu:            sync.Mutex{},
 		durationFunc: func(lastDuration time.Duration, count int) time.Duration {
 			return lastDuration
 		},
@@ -70,6 +64,7 @@ func NewSleeper(sleepDuration time.Duration) *Sleeper {
 func (s *Sleeper) Cancel() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	if s.done != nil {
 		s.done()
 	}
@@ -80,24 +75,25 @@ func (s *Sleeper) Cancel() {
 func (s *Sleeper) Sleep() <-chan error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	if !s.started {
+
 		if s.ctx == nil {
 			s.ctx = context.Background()
 		}
-		if s.timeout > 0 {
-			s.ctx, s.done = context.WithTimeout(s.ctx, s.timeout)
-		} else {
-			s.ctx, s.done = context.WithCancel(s.ctx)
-		}
+		s.ctx, s.done = context.WithCancel(s.ctx)
 		s.started = true
 	}
 	nextSleep := s.durationFunc(s.sleepDuration, s.count)
+
 	if s.randAdd > 0 {
 		nextSleep += RandomDuration(s.randAdd)
 	}
+
 	timer := time.NewTimer(nextSleep)
 	errorCh := make(chan error)
 	s.count++
+
 	go func() {
 		defer close(errorCh)
 		select {
@@ -115,24 +111,25 @@ func (s *Sleeper) Sleep() <-chan error {
 
 // NewExponentialSleeper returns a sleeper that will sleep with an exponentially increasing interval
 // useful for exponential backoff
-func NewExponentialSleeper(sleepDuration time.Duration) *Sleeper {
+func NewExponentialSleeper(sleepDuration time.Duration, alpha float64) *Sleeper {
 	return &Sleeper{
 		sleepDuration: sleepDuration,
-		mu:            sync.Mutex{},
 		durationFunc: func(sleepDuration time.Duration, count int) time.Duration {
-			return time.Duration(math.Pow(2, float64(count))) * sleepDuration
+			return time.Duration(math.Pow(alpha, float64(count))) * sleepDuration
 		},
 	}
 }
 
 // NewLinearSleeper returns a sleeper that will sleep with an linearly increasing interval
 // useful for linear backoff
-func NewLinearSleeper(sleepDuration time.Duration, alpha int) *Sleeper {
+func NewLinearSleeper(sleepDuration time.Duration, alpha int64) *Sleeper {
 	return &Sleeper{
 		sleepDuration: sleepDuration,
-		mu:            sync.Mutex{},
 		durationFunc: func(sleepDuration time.Duration, count int) time.Duration {
-			return time.Duration(alpha*count) * sleepDuration
+			if count == 0 {
+				return sleepDuration
+			}
+			return time.Duration(count << alpha) * sleepDuration
 		},
 	}
 }
@@ -141,7 +138,6 @@ func NewLinearSleeper(sleepDuration time.Duration, alpha int) *Sleeper {
 func NewCustomSleeper(sleepDuration time.Duration, sleepFunc NextSleepDuration) *Sleeper {
 	return &Sleeper{
 		sleepDuration: sleepDuration,
-		mu:            sync.Mutex{},
 		durationFunc:  sleepFunc,
 	}
 }

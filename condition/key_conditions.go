@@ -1,79 +1,9 @@
 package condition
 
 import (
-	"fmt"
-
-	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
-	"github.com/ericmaustin/dyno"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/ericmaustin/dyno/encoding"
 )
-
-// StringToKeyOperator converts the given string to an Operator
-func StringToKeyOperator(in string) Operator {
-	// if we have ae string, figure out which operator const to use
-	switch in {
-	case "=":
-		return OperatorEqual
-	case ">":
-		return OperatorGreaterThan
-	case "<":
-		return OperatorLessThan
-	case ">=":
-		return OperatorGreaterThanEqual
-	case "<=":
-		return OperatorLessThanEqual
-	case "><":
-		return OperatorBetween
-	case "between":
-		return OperatorBetween
-	case "b", "begins":
-		return OperatorBeginsWith
-	default:
-		panic(fmt.Errorf("no key operator found for %s", in))
-	}
-}
-
-// GetKeyCondition for provided key string, operator and ProjectionColumns
-func GetKeyCondition(key string, operator interface{}, values ...interface{}) expression.KeyConditionBuilder {
-
-	var op Operator
-
-	switch o := operator.(type) {
-	case string:
-		op = StringToKeyOperator(o)
-	case fmt.Stringer:
-		op = StringToKeyOperator(o.String())
-	case Operator:
-		// use operators as is
-		op = o
-	default:
-		panic(&dyno.Error{
-			Code:    dyno.ErrOperatorNotFound,
-			Message: fmt.Sprintf("No key operator exists for '%v'", o)})
-	}
-
-	switch op {
-	case OperatorEqual:
-		return KeyEqual(key, values[0])
-	case OperatorLessThan:
-		return KeyLessThan(key, values[0])
-	case OperatorLessThanEqual:
-		return KeyLessThanEqual(key, values[0])
-	case OperatorGreaterThan:
-		return KeyGreaterThan(key, values[0])
-	case OperatorGreaterThanEqual:
-		return KeyGreaterThanEqual(key, values[0])
-	case OperatorBetween:
-		return KeyBetween(key, values[0], values[1])
-	// string only operators
-	case OperatorBeginsWith:
-		return KeyBeginsWith(key, values[0])
-	}
-
-	panic(&dyno.Error{
-		Code:    dyno.ErrOperatorNotFound,
-		Message: fmt.Sprintf("No operator exists for '%v'", op)})
-}
 
 // KeyGreaterThan returns a KeyConditionBuilder with a GreaterThan condition for the given field name and value
 func KeyGreaterThan(name string, value interface{}) expression.KeyConditionBuilder {
@@ -111,19 +41,59 @@ func KeyBeginsWith(name string, value interface{}) expression.KeyConditionBuilde
 }
 
 // KeyAnd combines multiple KeyConditionBuilder conditions into And conditions
-func KeyAnd(conditions ...expression.KeyConditionBuilder) expression.KeyConditionBuilder {
+func KeyAnd(left expression.KeyConditionBuilder, right ...expression.KeyConditionBuilder) expression.KeyConditionBuilder {
 
-	if len(conditions) == 1 {
+	if len(right) < 1 {
 		// if we only have 1 condition just return it
-		return conditions[0]
+		return left
 	}
 
-	// else we have multiple conditions
-	cnd, conditions := conditions[0], conditions[1:]
+	cnd := left
 
-	for _, c := range conditions {
+	for _, c := range right {
 		cnd = cnd.And(c)
 	}
 
 	return cnd
+}
+
+// KeyConditionBuilder represents a key condition builder that can have conditions set dynmaically
+type KeyConditionBuilder struct {
+	*expression.KeyConditionBuilder
+}
+
+// IsEmpty checks is the condition set is empty
+func (ks *KeyConditionBuilder) IsEmpty() bool {
+	return ks.KeyConditionBuilder == nil
+}
+
+// And adds an And condition to the set
+func (ks *KeyConditionBuilder) And(conditions ...expression.KeyConditionBuilder) *KeyConditionBuilder {
+
+	var builder expression.KeyConditionBuilder
+
+	switch len(conditions) {
+	case 0:
+		return ks
+	case 1:
+		builder = conditions[0]
+	default:
+		builder = KeyAnd(conditions[0], conditions[1:]...)
+	}
+
+	if ks.IsEmpty() {
+		ks.KeyConditionBuilder = &builder
+		return ks
+	}
+	ks.KeyConditionBuilder.And(builder)
+	return ks
+}
+
+// Builder returns the condition set's complete Builder
+func (ks *KeyConditionBuilder) Builder() expression.KeyConditionBuilder {
+	if ks.KeyConditionBuilder == nil {
+		// empty expression.KeyConditionBuilder
+		return expression.KeyConditionBuilder{}
+	}
+	return *ks.KeyConditionBuilder
 }

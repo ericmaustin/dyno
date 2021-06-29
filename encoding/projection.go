@@ -2,7 +2,7 @@ package encoding
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 )
 
 // ProjectionBuilder returns a dynamo Expression name builder object with a set of Projection
