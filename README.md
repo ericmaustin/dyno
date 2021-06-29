@@ -61,7 +61,7 @@ testCacheMiddelWare := ScanAllMiddleWareFunc(func(next ScanAllHandler) ScanAllHa
     })
 })
 
-input, err := s.table.ScanBuilder().SetTableName(s.table.Name()).Build()
+input, err := NewScanBuilder(nil).SetTableName(s.table.Name()).Build()
 if err != nil {
     panic(err)
 }
