@@ -27,8 +27,8 @@ func (p *Pool) CreateTable(input *ddb.CreateTableInput, mw ...CreateTableMiddleW
 // CreateTableContext represents an exhaustive CreateTable operation request context
 type CreateTableContext struct {
 	context.Context
-	input  *ddb.CreateTableInput
-	client *ddb.Client
+	Input  *ddb.CreateTableInput
+	Client *ddb.Client
 }
 
 // CreateTableOutput represents the output for the CreateTable opration
@@ -73,7 +73,7 @@ type CreateTableFinalHandler struct{}
 
 // HandleCreateTable implements the CreateTableHandler
 func (h *CreateTableFinalHandler) HandleCreateTable(ctx *CreateTableContext, output *CreateTableOutput) {
-	output.Set(ctx.client.CreateTable(ctx, ctx.input))
+	output.Set(ctx.Client.CreateTable(ctx, ctx.Input))
 }
 
 // CreateTableMiddleWare is a middleware function use for wrapping CreateTableHandler requests
@@ -120,8 +120,8 @@ func (op *CreateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &CreateTableContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h CreateTableHandler

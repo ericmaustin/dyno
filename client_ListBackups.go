@@ -25,8 +25,8 @@ func (p *Pool) ListBackups(input *ddb.ListBackupsInput, mw ...ListBackupsMiddleW
 // ListBackupsContext represents an exhaustive ListBackups operation request context
 type ListBackupsContext struct {
 	context.Context
-	input  *ddb.ListBackupsInput
-	client *ddb.Client
+	Input  *ddb.ListBackupsInput
+	Client *ddb.Client
 }
 
 // ListBackupsOutput represents the output for the ListBackups opration
@@ -71,7 +71,7 @@ type ListBackupsFinalHandler struct {}
 
 // HandleListBackups implements the ListBackupsHandler
 func (h *ListBackupsFinalHandler) HandleListBackups(ctx *ListBackupsContext, output *ListBackupsOutput) {
-	output.Set(ctx.client.ListBackups(ctx, ctx.input))
+	output.Set(ctx.Client.ListBackups(ctx, ctx.Input))
 }
 
 // ListBackupsMiddleWare is a middleware function use for wrapping ListBackupsHandler requests
@@ -119,8 +119,8 @@ func (op *ListBackups) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &ListBackupsContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h ListBackupsHandler

@@ -25,8 +25,8 @@ func (p *Pool) ListTagsOfResource(input *ddb.ListTagsOfResourceInput, mw ...List
 // ListTagsOfResourceContext represents an exhaustive ListTagsOfResource operation request context
 type ListTagsOfResourceContext struct {
 	context.Context
-	input  *ddb.ListTagsOfResourceInput
-	client *ddb.Client
+	Input  *ddb.ListTagsOfResourceInput
+	Client *ddb.Client
 }
 
 // ListTagsOfResourceOutput represents the output for the ListTagsOfResource operation
@@ -71,7 +71,7 @@ type ListTagsOfResourceFinalHandler struct{}
 
 // HandleListTagsOfResource implements the ListTagsOfResourceHandler
 func (h *ListTagsOfResourceFinalHandler) HandleListTagsOfResource(ctx *ListTagsOfResourceContext, output *ListTagsOfResourceOutput) {
-	output.Set(ctx.client.ListTagsOfResource(ctx, ctx.input))
+	output.Set(ctx.Client.ListTagsOfResource(ctx, ctx.Input))
 }
 
 // ListTagsOfResourceMiddleWare is a middleware function use for wrapping ListTagsOfResourceHandler requests
@@ -119,8 +119,8 @@ func (op *ListTagsOfResource) DynoInvoke(ctx context.Context, client *ddb.Client
 
 	requestCtx := &ListTagsOfResourceContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h ListTagsOfResourceHandler

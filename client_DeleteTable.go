@@ -25,8 +25,8 @@ func (p *Pool) DeleteTable(input *ddb.DeleteTableInput, mw ...DeleteTableMiddleW
 // DeleteTableContext represents an exhaustive DeleteTable operation request context
 type DeleteTableContext struct {
 	context.Context
-	input  *ddb.DeleteTableInput
-	client *ddb.Client
+	Input  *ddb.DeleteTableInput
+	Client *ddb.Client
 }
 
 // DeleteTableOutput represents the output for the DeleteTable opration
@@ -71,7 +71,7 @@ type DeleteTableFinalHandler struct{}
 
 // HandleDeleteTable implements the DeleteTableHandler
 func (h *DeleteTableFinalHandler) HandleDeleteTable(ctx *DeleteTableContext, output *DeleteTableOutput) {
-	output.Set(ctx.client.DeleteTable(ctx, ctx.input))
+	output.Set(ctx.Client.DeleteTable(ctx, ctx.Input))
 }
 
 // DeleteTableMiddleWare is a middleware function use for wrapping DeleteTableHandler requests
@@ -119,8 +119,8 @@ func (op *DeleteTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &DeleteTableContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DeleteTableHandler

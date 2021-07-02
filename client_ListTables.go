@@ -25,8 +25,8 @@ func (p *Pool) ListTables(input *ddb.ListTablesInput, mw ...ListTablesMiddleWare
 // ListTablesContext represents an exhaustive ListTables operation request context
 type ListTablesContext struct {
 	context.Context
-	input  *ddb.ListTablesInput
-	client *ddb.Client
+	Input  *ddb.ListTablesInput
+	Client *ddb.Client
 }
 
 // ListTablesOutput represents the output for the ListTables operation
@@ -71,7 +71,7 @@ type ListTablesFinalHandler struct{}
 
 // HandleListTables implements the ListTablesHandler
 func (h *ListTablesFinalHandler) HandleListTables(ctx *ListTablesContext, output *ListTablesOutput) {
-	output.Set(ctx.client.ListTables(ctx, ctx.input))
+	output.Set(ctx.Client.ListTables(ctx, ctx.Input))
 }
 
 // ListTablesMiddleWare is a middleware function use for wrapping ListTablesHandler requests
@@ -119,8 +119,8 @@ func (op *ListTables) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &ListTablesContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h ListTablesHandler

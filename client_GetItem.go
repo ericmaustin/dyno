@@ -28,8 +28,8 @@ func (p *Pool) GetItem(input *ddb.GetItemInput, mw ...GetItemMiddleWare) *GetIte
 // GetItemContext represents an exhaustive GetItem operation request context
 type GetItemContext struct {
 	context.Context
-	input  *ddb.GetItemInput
-	client *ddb.Client
+	Input  *ddb.GetItemInput
+	Client *ddb.Client
 }
 
 // GetItemOutput represents the output for the GetItem operation
@@ -74,7 +74,7 @@ type GetItemFinalHandler struct{}
 
 // HandleGetItem implements the GetItemHandler
 func (h *GetItemFinalHandler) HandleGetItem(ctx *GetItemContext, output *GetItemOutput) {
-	output.Set(ctx.client.GetItem(ctx, ctx.input))
+	output.Set(ctx.Client.GetItem(ctx, ctx.Input))
 }
 
 // GetItemMiddleWare is a middleware function use for wrapping GetItemHandler requests
@@ -122,8 +122,8 @@ func (op *GetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &GetItemContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h GetItemHandler

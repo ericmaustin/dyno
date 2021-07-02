@@ -28,8 +28,8 @@ func (p *Pool) PutItem(input *ddb.PutItemInput, mw ...PutItemMiddleWare) *PutIte
 // PutItemContext represents an exhaustive PutItem operation request context
 type PutItemContext struct {
 	context.Context
-	input  *ddb.PutItemInput
-	client *ddb.Client
+	Input  *ddb.PutItemInput
+	Client *ddb.Client
 }
 
 // PutItemOutput represents the output for the PutItem opration
@@ -75,7 +75,7 @@ type PutItemFinalHandler struct{}
 
 // HandlePutItem implements the PutItemHandler
 func (h *PutItemFinalHandler) HandlePutItem(ctx *PutItemContext, output *PutItemOutput) {
-	output.Set(ctx.client.PutItem(ctx, ctx.input))
+	output.Set(ctx.Client.PutItem(ctx, ctx.Input))
 }
 
 // PutItemMiddleWare is a middleware function use for wrapping PutItemHandler requests
@@ -123,8 +123,8 @@ func (op *PutItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &PutItemContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h PutItemHandler

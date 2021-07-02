@@ -25,8 +25,8 @@ func (p *Pool) DescribeLimits(input *ddb.DescribeLimitsInput, mw ...DescribeLimi
 // DescribeLimitsContext represents an exhaustive DescribeLimits operation request context
 type DescribeLimitsContext struct {
 	context.Context
-	input  *ddb.DescribeLimitsInput
-	client *ddb.Client
+	Input  *ddb.DescribeLimitsInput
+	Client *ddb.Client
 }
 
 // DescribeLimitsOutput represents the output for the DescribeLimits opration
@@ -71,7 +71,7 @@ type DescribeLimitsFinalHandler struct{}
 
 // HandleDescribeLimits implements the DescribeLimitsHandler
 func (h *DescribeLimitsFinalHandler) HandleDescribeLimits(ctx *DescribeLimitsContext, output *DescribeLimitsOutput) {
-	output.Set(ctx.client.DescribeLimits(ctx, ctx.input))
+	output.Set(ctx.Client.DescribeLimits(ctx, ctx.Input))
 }
 
 // DescribeLimitsMiddleWare is a middleware function use for wrapping DescribeLimitsHandler requests
@@ -118,8 +118,8 @@ func (op *DescribeLimits) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &DescribeLimitsContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DescribeLimitsHandler

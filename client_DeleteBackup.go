@@ -25,8 +25,8 @@ func (p *Pool) DeleteBackup(input *ddb.DeleteBackupInput, mw ...DeleteBackupMidd
 // DeleteBackupContext represents an exhaustive DeleteBackup operation request context
 type DeleteBackupContext struct {
 	context.Context
-	input  *ddb.DeleteBackupInput
-	client *ddb.Client
+	Input  *ddb.DeleteBackupInput
+	Client *ddb.Client
 }
 
 // DeleteBackupOutput represents the output for the DeleteBackup operation
@@ -91,7 +91,7 @@ type DeleteBackupFinalHandler struct{}
 
 // HandleDeleteBackup implements the DeleteBackupHandler
 func (h *DeleteBackupFinalHandler) HandleDeleteBackup(ctx *DeleteBackupContext, output *DeleteBackupOutput) {
-	output.Set(ctx.client.DeleteBackup(ctx, ctx.input))
+	output.Set(ctx.Client.DeleteBackup(ctx, ctx.Input))
 }
 
 // DeleteBackupMiddleWare is a middleware function use for wrapping DeleteBackupHandler requests
@@ -139,8 +139,8 @@ func (op *DeleteBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &DeleteBackupContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DeleteBackupHandler

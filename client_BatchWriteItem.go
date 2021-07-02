@@ -42,8 +42,8 @@ func (p *Pool) BatchWriteItemAll(input *ddb.BatchWriteItemInput, mw ...BatchWrit
 // BatchWriteItemContext represents an exhaustive BatchWriteItem operation request context
 type BatchWriteItemContext struct {
 	context.Context
-	input  *ddb.BatchWriteItemInput
-	client *ddb.Client
+	Input  *ddb.BatchWriteItemInput
+	Client *ddb.Client
 }
 
 // BatchWriteItemOutput represents the output for the BatchWriteItem operation
@@ -101,7 +101,7 @@ type BatchWriteItemFinalHandler struct{}
 
 // HandleBatchWriteItem implements BatchWriteItemHandler
 func (b *BatchWriteItemFinalHandler) HandleBatchWriteItem(ctx *BatchWriteItemContext, output *BatchWriteItemOutput) {
-	output.Set(ctx.client.BatchWriteItem(ctx, ctx.input))
+	output.Set(ctx.Client.BatchWriteItem(ctx, ctx.Input))
 }
 
 // BatchWriteItem represents a BatchWriteItem operation
@@ -135,8 +135,8 @@ func (op *BatchWriteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &BatchWriteItemContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h BatchWriteItemHandler
@@ -167,8 +167,8 @@ func (op *BatchWriteItem) Await() (*ddb.BatchWriteItemOutput, error) {
 // BatchWriteItemAllContext represents an exhaustive BatchWriteItemAll operation request context
 type BatchWriteItemAllContext struct {
 	context.Context
-	input  *ddb.BatchWriteItemInput
-	client *ddb.Client
+	Input  *ddb.BatchWriteItemInput
+	Client *ddb.Client
 }
 
 // BatchWriteItemAllOutput represents the output for the BatchWriteItemAll operation
@@ -256,10 +256,10 @@ func (b *BatchWriteItemAllFinalHandler) HandleBatchWriteItemAll(ctx *BatchWriteI
 	defer func() { output.Set(outs, err) }()
 
 	// copy the scan so we're not mutating the original
-	input := CopyBatchWriteItemInput(ctx.input)
+	input := CopyBatchWriteItemInput(ctx.Input)
 
 	for {
-		if out, err = ctx.client.BatchWriteItem(ctx, input); err != nil {
+		if out, err = ctx.Client.BatchWriteItem(ctx, input); err != nil {
 			return
 		}
 
@@ -305,8 +305,8 @@ func (op *BatchWriteItemAll) DynoInvoke(ctx context.Context, client *ddb.Client)
 
 	requestCtx := &BatchWriteItemAllContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h BatchWriteItemAllHandler

@@ -25,8 +25,8 @@ func (p *Pool) ExecuteTransaction(input *ddb.ExecuteTransactionInput, mw ...Exec
 // ExecuteTransactionContext represents an exhaustive ExecuteTransaction operation request context
 type ExecuteTransactionContext struct {
 	context.Context
-	input  *ddb.ExecuteTransactionInput
-	client *ddb.Client
+	Input  *ddb.ExecuteTransactionInput
+	Client *ddb.Client
 }
 
 // ExecuteTransactionOutput represents the output for the ExecuteTransaction opration
@@ -71,7 +71,7 @@ type ExecuteTransactionFinalHandler struct{}
 
 // HandleExecuteTransaction implements the ExecuteTransactionHandler
 func (h *ExecuteTransactionFinalHandler) HandleExecuteTransaction(ctx *ExecuteTransactionContext, output *ExecuteTransactionOutput) {
-	output.Set(ctx.client.ExecuteTransaction(ctx, ctx.input))
+	output.Set(ctx.Client.ExecuteTransaction(ctx, ctx.Input))
 }
 
 // ExecuteTransactionMiddleWare is a middleware function use for wrapping ExecuteTransactionHandler requests
@@ -118,8 +118,8 @@ func (op *ExecuteTransaction) DynoInvoke(ctx context.Context, client *ddb.Client
 
 	requestCtx := &ExecuteTransactionContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h ExecuteTransactionHandler

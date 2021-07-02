@@ -27,8 +27,8 @@ func (p *Pool) UpdateContinuousBackups(input *ddb.UpdateContinuousBackupsInput, 
 // UpdateContinuousBackupsContext represents an exhaustive UpdateContinuousBackups operation request context
 type UpdateContinuousBackupsContext struct {
 	context.Context
-	input  *ddb.UpdateContinuousBackupsInput
-	client *ddb.Client
+	Input  *ddb.UpdateContinuousBackupsInput
+	Client *ddb.Client
 }
 
 // UpdateContinuousBackupsOutput represents the output for the UpdateContinuousBackups operation
@@ -73,7 +73,7 @@ type UpdateContinuousBackupsFinalHandler struct{}
 
 // HandleUpdateContinuousBackups implements the UpdateContinuousBackupsHandler
 func (h *UpdateContinuousBackupsFinalHandler) HandleUpdateContinuousBackups(ctx *UpdateContinuousBackupsContext, output *UpdateContinuousBackupsOutput) {
-	output.Set(ctx.client.UpdateContinuousBackups(ctx, ctx.input))
+	output.Set(ctx.Client.UpdateContinuousBackups(ctx, ctx.Input))
 }
 
 // UpdateContinuousBackupsMiddleWare is a middleware function use for wrapping UpdateContinuousBackupsHandler requests
@@ -121,8 +121,8 @@ func (op *UpdateContinuousBackups) DynoInvoke(ctx context.Context, client *ddb.C
 
 	requestCtx := &UpdateContinuousBackupsContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h UpdateContinuousBackupsHandler

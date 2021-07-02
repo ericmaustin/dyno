@@ -25,8 +25,8 @@ func (p *Pool) UpdateTable(input *ddb.UpdateTableInput, mw ...UpdateTableMiddleW
 // UpdateTableContext represents an exhaustive UpdateTable operation request context
 type UpdateTableContext struct {
 	context.Context
-	input  *ddb.UpdateTableInput
-	client *ddb.Client
+	Input  *ddb.UpdateTableInput
+	Client *ddb.Client
 }
 
 // UpdateTableOutput represents the output for the UpdateTable opration
@@ -72,7 +72,7 @@ type UpdateTableFinalHandler struct{}
 
 // HandleUpdateTable implements the UpdateTableHandler
 func (h *UpdateTableFinalHandler) HandleUpdateTable(ctx *UpdateTableContext, output *UpdateTableOutput) {
-	output.Set(ctx.client.UpdateTable(ctx, ctx.input))
+	output.Set(ctx.Client.UpdateTable(ctx, ctx.Input))
 }
 
 // UpdateTableMiddleWare is a middleware function use for wrapping UpdateTableHandler requests
@@ -119,8 +119,8 @@ func (op *UpdateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &UpdateTableContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h UpdateTableHandler

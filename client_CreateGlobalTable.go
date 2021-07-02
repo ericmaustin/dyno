@@ -26,8 +26,8 @@ func (p *Pool) CreateGlobalTable(input *ddb.CreateGlobalTableInput, mw ...Create
 // CreateGlobalTableContext represents an exhaustive CreateGlobalTable operation request context
 type CreateGlobalTableContext struct {
 	context.Context
-	input  *ddb.CreateGlobalTableInput
-	client *ddb.Client
+	Input  *ddb.CreateGlobalTableInput
+	Client *ddb.Client
 }
 
 // CreateGlobalTableOutput represents the output for the CreateGlobalTable opration
@@ -72,7 +72,7 @@ type CreateGlobalTableFinalHandler struct{}
 
 // HandleCreateGlobalTable implements the CreateGlobalTableHandler
 func (h *CreateGlobalTableFinalHandler) HandleCreateGlobalTable(ctx *CreateGlobalTableContext, output *CreateGlobalTableOutput) {
-	output.Set(ctx.client.CreateGlobalTable(ctx, ctx.input))
+	output.Set(ctx.Client.CreateGlobalTable(ctx, ctx.Input))
 }
 
 // CreateGlobalTableMiddleWare is a middleware function use for wrapping CreateGlobalTableHandler requests
@@ -119,8 +119,8 @@ func (op *CreateGlobalTable) DynoInvoke(ctx context.Context, client *ddb.Client)
 
 	requestCtx := &CreateGlobalTableContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h CreateGlobalTableHandler

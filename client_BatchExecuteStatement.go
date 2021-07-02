@@ -25,8 +25,8 @@ func (p *Pool) BatchExecuteStatement(input *ddb.BatchExecuteStatementInput, mw .
 // BatchExecuteStatementContext represents an exhaustive BatchExecuteStatement operation request context
 type BatchExecuteStatementContext struct {
 	context.Context
-	input  *ddb.BatchExecuteStatementInput
-	client *ddb.Client
+	Input  *ddb.BatchExecuteStatementInput
+	Client *ddb.Client
 }
 
 // BatchExecuteStatementOutput represents the output for the BatchExecuteStatement operation
@@ -71,7 +71,7 @@ type BatchExecuteStatementFinalHandler struct{}
 
 // HandleBatchExecuteStatement implements the BatchExecuteStatementHandler
 func (h *BatchExecuteStatementFinalHandler) HandleBatchExecuteStatement(ctx *BatchExecuteStatementContext, output *BatchExecuteStatementOutput) {
-	output.Set(ctx.client.BatchExecuteStatement(ctx, ctx.input))
+	output.Set(ctx.Client.BatchExecuteStatement(ctx, ctx.Input))
 }
 
 // BatchExecuteStatementMiddleWare is a middleware function use for wrapping BatchExecuteStatementHandler requests
@@ -118,8 +118,8 @@ func (op *BatchExecuteStatement) DynoInvoke(ctx context.Context, client *ddb.Cli
 
 	requestCtx := &BatchExecuteStatementContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h BatchExecuteStatementHandler

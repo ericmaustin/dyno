@@ -25,8 +25,8 @@ func (p *Pool) DescribeEndpoints(input *ddb.DescribeEndpointsInput, mw ...Descri
 // DescribeEndpointsContext represents an exhaustive DescribeEndpoints operation request context
 type DescribeEndpointsContext struct {
 	context.Context
-	input  *ddb.DescribeEndpointsInput
-	client *ddb.Client
+	Input  *ddb.DescribeEndpointsInput
+	Client *ddb.Client
 }
 
 // DescribeEndpointsOutput represents the output for the DescribeEndpoints opration
@@ -71,7 +71,7 @@ type DescribeEndpointsFinalHandler struct{}
 
 // HandleDescribeEndpoints implements the DescribeEndpointsHandler
 func (h *DescribeEndpointsFinalHandler) HandleDescribeEndpoints(ctx *DescribeEndpointsContext, output *DescribeEndpointsOutput) {
-	output.Set(ctx.client.DescribeEndpoints(ctx, ctx.input))
+	output.Set(ctx.Client.DescribeEndpoints(ctx, ctx.Input))
 }
 
 // DescribeEndpointsMiddleWare is a middleware function use for wrapping DescribeEndpointsHandler requests
@@ -118,8 +118,8 @@ func (op *DescribeEndpoints) DynoInvoke(ctx context.Context, client *ddb.Client)
 
 	requestCtx := &DescribeEndpointsContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DescribeEndpointsHandler

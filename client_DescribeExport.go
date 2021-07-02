@@ -25,8 +25,8 @@ func (p *Pool) DescribeExport(input *ddb.DescribeExportInput, mw ...DescribeExpo
 // DescribeExportContext represents an exhaustive DescribeExport operation request context
 type DescribeExportContext struct {
 	context.Context
-	input  *ddb.DescribeExportInput
-	client *ddb.Client
+	Input  *ddb.DescribeExportInput
+	Client *ddb.Client
 }
 
 // DescribeExportOutput represents the output for the DescribeExport opration
@@ -71,7 +71,7 @@ type DescribeExportFinalHandler struct{}
 
 // HandleDescribeExport implements the DescribeExportHandler
 func (h *DescribeExportFinalHandler) HandleDescribeExport(ctx *DescribeExportContext, output *DescribeExportOutput) {
-	output.Set(ctx.client.DescribeExport(ctx, ctx.input))
+	output.Set(ctx.Client.DescribeExport(ctx, ctx.Input))
 }
 
 // DescribeExportMiddleWare is a middleware function use for wrapping DescribeExportHandler requests
@@ -118,8 +118,8 @@ func (op *DescribeExport) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &DescribeExportContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DescribeExportHandler

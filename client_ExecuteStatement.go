@@ -25,8 +25,8 @@ func (p *Pool) ExecuteStatement(input *ddb.ExecuteStatementInput, mw ...ExecuteS
 // ExecuteStatementContext represents an exhaustive ExecuteStatement operation request context
 type ExecuteStatementContext struct {
 	context.Context
-	input  *ddb.ExecuteStatementInput
-	client *ddb.Client
+	Input  *ddb.ExecuteStatementInput
+	Client *ddb.Client
 }
 
 // ExecuteStatementOutput represents the output for the ExecuteStatement opration
@@ -71,7 +71,7 @@ type ExecuteStatementFinalHandler struct{}
 
 // HandleExecuteStatement implements the ExecuteStatementHandler
 func (h *ExecuteStatementFinalHandler) HandleExecuteStatement(ctx *ExecuteStatementContext, output *ExecuteStatementOutput) {
-	output.Set(ctx.client.ExecuteStatement(ctx, ctx.input))
+	output.Set(ctx.Client.ExecuteStatement(ctx, ctx.Input))
 }
 
 // ExecuteStatementMiddleWare is a middleware function use for wrapping ExecuteStatementHandler requests
@@ -118,8 +118,8 @@ func (op *ExecuteStatement) DynoInvoke(ctx context.Context, client *ddb.Client) 
 
 	requestCtx := &ExecuteStatementContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h ExecuteStatementHandler

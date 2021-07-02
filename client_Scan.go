@@ -46,8 +46,8 @@ func (p *Pool) ScanAll(input *ddb.ScanInput, mw ...ScanAllMiddleWare) *ScanAllPr
 // ScanContext represents an exhaustive Scan operation request context
 type ScanContext struct {
 	context.Context
-	input  *ddb.ScanInput
-	client *ddb.Client
+	Input  *ddb.ScanInput
+	Client *ddb.Client
 }
 
 // ScanOutput represents the output for the Scan opration
@@ -92,7 +92,7 @@ type ScanFinalHandler struct{}
 
 // HandleScan implements the ScanHandler
 func (h *ScanFinalHandler) HandleScan(ctx *ScanContext, output *ScanOutput) {
-	output.Set(ctx.client.Scan(ctx, ctx.input))
+	output.Set(ctx.Client.Scan(ctx, ctx.Input))
 }
 
 // ScanMiddleWare is a middleware function use for wrapping ScanHandler requests
@@ -140,8 +140,8 @@ func (op *Scan) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &ScanContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h ScanHandler
@@ -172,8 +172,8 @@ func (op *Scan) Await() (*ddb.ScanOutput, error) {
 // ScanAllContext represents an exhaustive ScanAll operation request context
 type ScanAllContext struct {
 	context.Context
-	input  *ddb.ScanInput
-	client *ddb.Client
+	Input  *ddb.ScanInput
+	Client *ddb.Client
 }
 
 // ScanAllOutput represents the output for the ScanAll opration
@@ -271,11 +271,11 @@ func (h *ScanAllFinalHandler) HandleScanAll(ctx *ScanAllContext, output *ScanAll
 	defer func() { output.Set(outs, err) }()
 
 	// copy the scan so we're not mutating the original
-	input := CopyScan(ctx.input)
+	input := CopyScan(ctx.Input)
 
 	for {
 
-		if out, err = ctx.client.Scan(ctx, input); err != nil {
+		if out, err = ctx.Client.Scan(ctx, input); err != nil {
 			return
 		}
 
@@ -321,8 +321,8 @@ func (op *ScanAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &ScanAllContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h ScanAllHandler

@@ -26,8 +26,8 @@ func (p *Pool) UpdateTimeToLive(input *ddb.UpdateTimeToLiveInput, mw ...UpdateTi
 // UpdateTimeToLiveContext represents an exhaustive UpdateTimeToLive operation request context
 type UpdateTimeToLiveContext struct {
 	context.Context
-	input  *ddb.UpdateTimeToLiveInput
-	client *ddb.Client
+	Input  *ddb.UpdateTimeToLiveInput
+	Client *ddb.Client
 }
 
 // UpdateTimeToLiveOutput represents the output for the UpdateTimeToLive opration
@@ -73,7 +73,7 @@ type UpdateTimeToLiveFinalHandler struct{}
 
 // HandleUpdateTimeToLive implements the UpdateTimeToLiveHandler
 func (h *UpdateTimeToLiveFinalHandler) HandleUpdateTimeToLive(ctx *UpdateTimeToLiveContext, output *UpdateTimeToLiveOutput) {
-	output.Set(ctx.client.UpdateTimeToLive(ctx, ctx.input))
+	output.Set(ctx.Client.UpdateTimeToLive(ctx, ctx.Input))
 }
 
 // UpdateTimeToLiveMiddleWare is a middleware function use for wrapping UpdateTimeToLiveHandler requests
@@ -120,8 +120,8 @@ func (op *UpdateTimeToLive) DynoInvoke(ctx context.Context, client *ddb.Client) 
 
 	requestCtx := &UpdateTimeToLiveContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h UpdateTimeToLiveHandler

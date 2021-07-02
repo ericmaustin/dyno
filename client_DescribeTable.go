@@ -61,8 +61,8 @@ func (p *Pool) TableNotExistsWaiter(input *ddb.DescribeTableInput, mw ...Describ
 // DescribeTableContext represents an exhaustive DescribeTable operation request context
 type DescribeTableContext struct {
 	context.Context
-	input  *ddb.DescribeTableInput
-	client *ddb.Client
+	Input  *ddb.DescribeTableInput
+	Client *ddb.Client
 }
 
 // DescribeTableOutput represents the output for the DescribeTable opration
@@ -120,7 +120,7 @@ type DescribeTableFinalHandler struct{}
 
 // HandleDescribeTable implements the DescribeTableHandler
 func (h *DescribeTableFinalHandler) HandleDescribeTable(ctx *DescribeTableContext, output *DescribeTableOutput) {
-	output.Set(ctx.client.DescribeTable(ctx, ctx.input))
+	output.Set(ctx.Client.DescribeTable(ctx, ctx.Input))
 }
 
 // DescribeTable represents a DescribeTable operation
@@ -178,7 +178,7 @@ func (h *TableExistsWaiterFinalHandler) HandleDescribeTable(ctx *DescribeTableCo
 	sleeper = timer.NewLinearSleeper(time.Millisecond*100, 2).WithContext(ctx)
 
 	for {
-		out, err = ctx.client.DescribeTable(ctx, ctx.input)
+		out, err = ctx.Client.DescribeTable(ctx, ctx.Input)
 		retry, err = tableExistsRetryState(out, err)
 
 		if !retry || err != nil {
@@ -236,7 +236,7 @@ func (h *TableNotExistsWaiterFinalHandler) HandleDescribeTable(ctx *DescribeTabl
 	sleeper = timer.NewLinearSleeper(time.Millisecond*100, 2).WithContext(ctx)
 
 	for {
-		out, err = ctx.client.DescribeTable(ctx, ctx.input)
+		out, err = ctx.Client.DescribeTable(ctx, ctx.Input)
 		retry, err = tableNotExistsRetryState(out, err)
 
 		if !retry || err != nil {
@@ -285,8 +285,8 @@ func invokeDescribeTableWithHandler(ctx context.Context, client *ddb.Client, inp
 
 	requestCtx := &DescribeTableContext{
 		Context: ctx,
-		client:  client,
-		input:   input,
+		Client:  client,
+		Input:   input,
 	}
 
 	// no middlewares

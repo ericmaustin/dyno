@@ -25,8 +25,8 @@ func (p *Pool) ExportTableToPointInTime(input *ddb.ExportTableToPointInTimeInput
 // ExportTableToPointInTimeContext represents an exhaustive ExportTableToPointInTime operation request context
 type ExportTableToPointInTimeContext struct {
 	context.Context
-	input  *ddb.ExportTableToPointInTimeInput
-	client *ddb.Client
+	Input  *ddb.ExportTableToPointInTimeInput
+	Client *ddb.Client
 }
 
 // ExportTableToPointInTimeOutput represents the output for the ExportTableToPointInTime opration
@@ -71,7 +71,7 @@ type ExportTableToPointInTimeFinalHandler struct{}
 
 // HandleExportTableToPointInTime implements the ExportTableToPointInTimeHandler
 func (h *ExportTableToPointInTimeFinalHandler) HandleExportTableToPointInTime(ctx *ExportTableToPointInTimeContext, output *ExportTableToPointInTimeOutput) {
-	output.Set(ctx.client.ExportTableToPointInTime(ctx, ctx.input))
+	output.Set(ctx.Client.ExportTableToPointInTime(ctx, ctx.Input))
 }
 
 // ExportTableToPointInTimeMiddleWare is a middleware function use for wrapping ExportTableToPointInTimeHandler requests
@@ -118,8 +118,8 @@ func (op *ExportTableToPointInTime) DynoInvoke(ctx context.Context, client *ddb.
 
 	requestCtx := &ExportTableToPointInTimeContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h ExportTableToPointInTimeHandler
