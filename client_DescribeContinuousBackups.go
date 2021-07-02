@@ -25,8 +25,8 @@ func (p *Pool) DescribeContinuousBackups(input *ddb.DescribeContinuousBackupsInp
 // DescribeContinuousBackupsContext represents an exhaustive DescribeContinuousBackups operation request context
 type DescribeContinuousBackupsContext struct {
 	context.Context
-	input  *ddb.DescribeContinuousBackupsInput
-	client *ddb.Client
+	Input  *ddb.DescribeContinuousBackupsInput
+	Client *ddb.Client
 }
 
 // DescribeContinuousBackupsOutput represents the output for the DescribeContinuousBackups opration
@@ -71,7 +71,7 @@ type DescribeContinuousBackupsFinalHandler struct{}
 
 // HandleDescribeContinuousBackups implements the DescribeContinuousBackupsHandler
 func (h *DescribeContinuousBackupsFinalHandler) HandleDescribeContinuousBackups(ctx *DescribeContinuousBackupsContext, output *DescribeContinuousBackupsOutput) {
-	output.Set(ctx.client.DescribeContinuousBackups(ctx, ctx.input))
+	output.Set(ctx.Client.DescribeContinuousBackups(ctx, ctx.Input))
 }
 
 // DescribeContinuousBackupsMiddleWare is a middleware function use for wrapping DescribeContinuousBackupsHandler requests
@@ -118,8 +118,8 @@ func (op *DescribeContinuousBackups) DynoInvoke(ctx context.Context, client *ddb
 
 	requestCtx := &DescribeContinuousBackupsContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DescribeContinuousBackupsHandler

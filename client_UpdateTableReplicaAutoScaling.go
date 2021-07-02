@@ -25,8 +25,8 @@ func (p *Pool) UpdateTableReplicaAutoScaling(input *ddb.UpdateTableReplicaAutoSc
 // UpdateTableReplicaAutoScalingContext represents an exhaustive UpdateTableReplicaAutoScaling operation request context
 type UpdateTableReplicaAutoScalingContext struct {
 	context.Context
-	input  *ddb.UpdateTableReplicaAutoScalingInput
-	client *ddb.Client
+	Input  *ddb.UpdateTableReplicaAutoScalingInput
+	Client *ddb.Client
 }
 
 // UpdateTableReplicaAutoScalingOutput represents the output for the UpdateTableReplicaAutoScaling opration
@@ -72,7 +72,7 @@ type UpdateTableReplicaAutoScalingFinalHandler struct{}
 
 // HandleUpdateTableReplicaAutoScaling implements the UpdateTableReplicaAutoScalingHandler
 func (h *UpdateTableReplicaAutoScalingFinalHandler) HandleUpdateTableReplicaAutoScaling(ctx *UpdateTableReplicaAutoScalingContext, output *UpdateTableReplicaAutoScalingOutput) {
-	output.Set(ctx.client.UpdateTableReplicaAutoScaling(ctx, ctx.input))
+	output.Set(ctx.Client.UpdateTableReplicaAutoScaling(ctx, ctx.Input))
 }
 
 // UpdateTableReplicaAutoScalingMiddleWare is a middleware function use for wrapping UpdateTableReplicaAutoScalingHandler requests
@@ -119,8 +119,8 @@ func (op *UpdateTableReplicaAutoScaling) DynoInvoke(ctx context.Context, client 
 
 	requestCtx := &UpdateTableReplicaAutoScalingContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h UpdateTableReplicaAutoScalingHandler

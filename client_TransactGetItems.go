@@ -27,8 +27,8 @@ func (p *Pool) TransactGetItems(input *ddb.TransactGetItemsInput, mw ...Transact
 // TransactGetItemsContext represents an exhaustive TransactGetItems operation request context
 type TransactGetItemsContext struct {
 	context.Context
-	input  *ddb.TransactGetItemsInput
-	client *ddb.Client
+	Input  *ddb.TransactGetItemsInput
+	Client *ddb.Client
 }
 
 // TransactGetItemsOutput represents the output for the TransactGetItems operation
@@ -73,7 +73,7 @@ type TransactGetItemsFinalHandler struct{}
 
 // HandleTransactGetItems implements the TransactGetItemsHandler
 func (h *TransactGetItemsFinalHandler) HandleTransactGetItems(ctx *TransactGetItemsContext, output *TransactGetItemsOutput) {
-	output.Set(ctx.client.TransactGetItems(ctx, ctx.input))
+	output.Set(ctx.Client.TransactGetItems(ctx, ctx.Input))
 }
 
 // TransactGetItemsMiddleWare is a middleware function use for wrapping TransactGetItemsHandler requests
@@ -121,8 +121,8 @@ func (op *TransactGetItems) DynoInvoke(ctx context.Context, client *ddb.Client) 
 
 	requestCtx := &TransactGetItemsContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h TransactGetItemsHandler

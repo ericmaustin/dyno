@@ -25,8 +25,8 @@ func (p *Pool) DescribeGlobalTableSettings(input *ddb.DescribeGlobalTableSetting
 // DescribeGlobalTableSettingsContext represents an exhaustive DescribeGlobalTableSettings operation request context
 type DescribeGlobalTableSettingsContext struct {
 	context.Context
-	input  *ddb.DescribeGlobalTableSettingsInput
-	client *ddb.Client
+	Input  *ddb.DescribeGlobalTableSettingsInput
+	Client *ddb.Client
 }
 
 // DescribeGlobalTableSettingsOutput represents the output for the DescribeGlobalTableSettings opration
@@ -71,7 +71,7 @@ type DescribeGlobalTableSettingsFinalHandler struct{}
 
 // HandleDescribeGlobalTableSettings implements the DescribeGlobalTableSettingsHandler
 func (h *DescribeGlobalTableSettingsFinalHandler) HandleDescribeGlobalTableSettings(ctx *DescribeGlobalTableSettingsContext, output *DescribeGlobalTableSettingsOutput) {
-	output.Set(ctx.client.DescribeGlobalTableSettings(ctx, ctx.input))
+	output.Set(ctx.Client.DescribeGlobalTableSettings(ctx, ctx.Input))
 }
 
 // DescribeGlobalTableSettingsMiddleWare is a middleware function use for wrapping DescribeGlobalTableSettingsHandler requests
@@ -118,8 +118,8 @@ func (op *DescribeGlobalTableSettings) DynoInvoke(ctx context.Context, client *d
 
 	requestCtx := &DescribeGlobalTableSettingsContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DescribeGlobalTableSettingsHandler

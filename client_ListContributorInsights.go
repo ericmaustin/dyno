@@ -25,8 +25,8 @@ func (p *Pool) ListContributorInsights(input *ddb.ListContributorInsightsInput, 
 // ListContributorInsightsContext represents an exhaustive ListContributorInsights operation request context
 type ListContributorInsightsContext struct {
 	context.Context
-	input  *ddb.ListContributorInsightsInput
-	client *ddb.Client
+	Input  *ddb.ListContributorInsightsInput
+	Client *ddb.Client
 }
 
 // ListContributorInsightsOutput represents the output for the ListContributorInsights operation
@@ -71,7 +71,7 @@ type ListContributorInsightsFinalHandler struct{}
 
 // HandleListContributorInsights implements the ListContributorInsightsHandler
 func (h *ListContributorInsightsFinalHandler) HandleListContributorInsights(ctx *ListContributorInsightsContext, output *ListContributorInsightsOutput) {
-	output.Set(ctx.client.ListContributorInsights(ctx, ctx.input))
+	output.Set(ctx.Client.ListContributorInsights(ctx, ctx.Input))
 }
 
 // ListContributorInsightsMiddleWare is a middleware function use for wrapping ListContributorInsightsHandler requests
@@ -119,8 +119,8 @@ func (op *ListContributorInsights) DynoInvoke(ctx context.Context, client *ddb.C
 
 	requestCtx := &ListContributorInsightsContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h ListContributorInsightsHandler

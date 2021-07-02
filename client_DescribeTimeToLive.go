@@ -25,8 +25,8 @@ func (p *Pool) DescribeTimeToLive(input *ddb.DescribeTimeToLiveInput, mw ...Desc
 // DescribeTimeToLiveContext represents an exhaustive DescribeTimeToLive operation request context
 type DescribeTimeToLiveContext struct {
 	context.Context
-	input  *ddb.DescribeTimeToLiveInput
-	client *ddb.Client
+	Input  *ddb.DescribeTimeToLiveInput
+	Client *ddb.Client
 }
 
 // DescribeTimeToLiveOutput represents the output for the DescribeTimeToLive opration
@@ -71,7 +71,7 @@ type DescribeTimeToLiveFinalHandler struct{}
 
 // HandleDescribeTimeToLive implements the DescribeTimeToLiveHandler
 func (h *DescribeTimeToLiveFinalHandler) HandleDescribeTimeToLive(ctx *DescribeTimeToLiveContext, output *DescribeTimeToLiveOutput) {
-	output.Set(ctx.client.DescribeTimeToLive(ctx, ctx.input))
+	output.Set(ctx.Client.DescribeTimeToLive(ctx, ctx.Input))
 }
 
 // DescribeTimeToLiveMiddleWare is a middleware function use for wrapping DescribeTimeToLiveHandler requests
@@ -118,8 +118,8 @@ func (op *DescribeTimeToLive) DynoInvoke(ctx context.Context, client *ddb.Client
 
 	requestCtx := &DescribeTimeToLiveContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DescribeTimeToLiveHandler

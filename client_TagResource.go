@@ -27,8 +27,8 @@ func (p *Pool) TagResource(input *ddb.TagResourceInput, mw ...TagResourceMiddleW
 // TagResourceContext represents an exhaustive TagResource operation request context
 type TagResourceContext struct {
 	context.Context
-	input  *ddb.TagResourceInput
-	client *ddb.Client
+	Input  *ddb.TagResourceInput
+	Client *ddb.Client
 }
 
 // TagResourceOutput represents the output for the TagResource operation
@@ -73,7 +73,7 @@ type TagResourceFinalHandler struct{}
 
 // HandleTagResource implements the TagResourceHandler
 func (h *TagResourceFinalHandler) HandleTagResource(ctx *TagResourceContext, output *TagResourceOutput) {
-	output.Set(ctx.client.TagResource(ctx, ctx.input))
+	output.Set(ctx.Client.TagResource(ctx, ctx.Input))
 }
 
 // TagResourceMiddleWare is a middleware function use for wrapping TagResourceHandler requests
@@ -121,8 +121,8 @@ func (op *TagResource) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &TagResourceContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h TagResourceHandler

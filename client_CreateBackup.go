@@ -25,8 +25,8 @@ func (p *Pool) CreateBackup(input *ddb.CreateBackupInput, mw ...CreateBackupMidd
 // CreateBackupContext represents an exhaustive CreateBackup operation request context
 type CreateBackupContext struct {
 	context.Context
-	input  *ddb.CreateBackupInput
-	client *ddb.Client
+	Input  *ddb.CreateBackupInput
+	Client *ddb.Client
 }
 
 // CreateBackupOutput represents the output for the CreateBackup operation
@@ -71,7 +71,7 @@ type CreateBackupFinalHandler struct{}
 
 // HandleCreateBackup implements the CreateBackupHandler
 func (h *CreateBackupFinalHandler) HandleCreateBackup(ctx *CreateBackupContext, output *CreateBackupOutput) {
-	output.Set(ctx.client.CreateBackup(ctx, ctx.input))
+	output.Set(ctx.Client.CreateBackup(ctx, ctx.Input))
 }
 
 // CreateBackupMiddleWare is a middleware function use for wrapping CreateBackupHandler requests
@@ -118,8 +118,8 @@ func (op *CreateBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &CreateBackupContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h CreateBackupHandler

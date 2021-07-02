@@ -44,8 +44,8 @@ func (p *Pool) BatchGetItemAll(input *ddb.BatchGetItemInput, mw ...BatchGetItemA
 // BatchGetItemContext represents an exhaustive BatchGetItem operation request context
 type BatchGetItemContext struct {
 	context.Context
-	input  *ddb.BatchGetItemInput
-	client *ddb.Client
+	Input  *ddb.BatchGetItemInput
+	Client *ddb.Client
 }
 
 // BatchGetItemOutput represents the output for the BatchGetItem operation
@@ -103,7 +103,7 @@ type BatchGetItemFinalHandler struct{}
 
 // HandleBatchGetItem returns the final BatchGetItemHandler that executes a dynamodb BatchGetItem operation
 func (b *BatchGetItemFinalHandler) HandleBatchGetItem(ctx *BatchGetItemContext, output *BatchGetItemOutput) {
-	output.Set(ctx.client.BatchGetItem(ctx, ctx.input))
+	output.Set(ctx.Client.BatchGetItem(ctx, ctx.Input))
 }
 
 // BatchGetItem represents a BatchGetItem operation
@@ -148,8 +148,8 @@ func (op *BatchGetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &BatchGetItemContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h BatchGetItemHandler
@@ -170,8 +170,8 @@ func (op *BatchGetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 // BatchGetItemAllContext represents an exhaustive BatchGetItemAll operation request context
 type BatchGetItemAllContext struct {
 	context.Context
-	input  *ddb.BatchGetItemInput
-	client *ddb.Client
+	Input  *ddb.BatchGetItemInput
+	Client *ddb.Client
 }
 
 // BatchGetItemAllOutput represents the output for the BatchGetItemAll opration
@@ -238,10 +238,10 @@ func (b *BatchGetItemAllFinalHandler) HandleBatchGetItemAll(ctx *BatchGetItemAll
 	defer func() { output.Set(outs, err) }()
 
 	// copy the scan so we're not mutating the original
-	input := CopyBatchGetItem(ctx.input)
+	input := CopyBatchGetItem(ctx.Input)
 
 	for {
-		if out, err = ctx.client.BatchGetItem(ctx, input); err != nil {
+		if out, err = ctx.Client.BatchGetItem(ctx, input); err != nil {
 			return
 		}
 
@@ -287,8 +287,8 @@ func (op *BatchGetItemAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &BatchGetItemAllContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h BatchGetItemAllHandler

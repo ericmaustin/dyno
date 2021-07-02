@@ -25,8 +25,8 @@ func (p *Pool) RestoreTableFromBackup(input *ddb.RestoreTableFromBackupInput, mw
 // RestoreTableFromBackupContext represents an exhaustive RestoreTableFromBackup operation request context
 type RestoreTableFromBackupContext struct {
 	context.Context
-	input  *ddb.RestoreTableFromBackupInput
-	client *ddb.Client
+	Input  *ddb.RestoreTableFromBackupInput
+	Client *ddb.Client
 }
 
 // RestoreTableFromBackupOutput represents the output for the RestoreTableFromBackup opration
@@ -71,7 +71,7 @@ type RestoreTableFromBackupFinalHandler struct{}
 
 // HandleRestoreTableFromBackup implements the RestoreTableFromBackupHandler
 func (h *RestoreTableFromBackupFinalHandler) HandleRestoreTableFromBackup(ctx *RestoreTableFromBackupContext, output *RestoreTableFromBackupOutput) {
-	output.Set(ctx.client.RestoreTableFromBackup(ctx, ctx.input))
+	output.Set(ctx.Client.RestoreTableFromBackup(ctx, ctx.Input))
 }
 
 // RestoreTableFromBackupMiddleWare is a middleware function use for wrapping RestoreTableFromBackupHandler requests
@@ -118,8 +118,8 @@ func (op *RestoreTableFromBackup) DynoInvoke(ctx context.Context, client *ddb.Cl
 
 	requestCtx := &RestoreTableFromBackupContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h RestoreTableFromBackupHandler

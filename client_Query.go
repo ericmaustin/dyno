@@ -45,8 +45,8 @@ func (p *Pool) QueryAll(input *ddb.QueryInput, mw ...QueryAllMiddleWare) *QueryA
 // QueryContext represents an exhaustive Query operation request context
 type QueryContext struct {
 	context.Context
-	input  *ddb.QueryInput
-	client *ddb.Client
+	Input  *ddb.QueryInput
+	Client *ddb.Client
 }
 
 // QueryOutput represents the output for the Query opration
@@ -91,7 +91,7 @@ type QueryFinalHandler struct {}
 
 // HandleQuery implements the QueryHandler
 func (h *QueryFinalHandler) HandleQuery(ctx *QueryContext, output *QueryOutput) {
-	output.Set(ctx.client.Query(ctx, ctx.input))
+	output.Set(ctx.Client.Query(ctx, ctx.Input))
 }
 
 // QueryMiddleWare is a middleware function use for wrapping QueryHandler requests
@@ -139,8 +139,8 @@ func (op *Query) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &QueryContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h QueryHandler
@@ -171,8 +171,8 @@ func (op *Query) Await() (*ddb.QueryOutput, error) {
 // QueryAllContext represents an exhaustive QueryAll operation request context
 type QueryAllContext struct {
 	context.Context
-	input  *ddb.QueryInput
-	client *ddb.Client
+	Input  *ddb.QueryInput
+	Client *ddb.Client
 }
 
 // QueryAllOutput represents the output for the QueryAll opration
@@ -239,11 +239,11 @@ func (h *QueryAllFinalHandler) HandleQueryAll(ctx *QueryAllContext, output *Quer
 	defer func() { output.Set(outs, err) }()
 
 	// copy the scan so we're not mutating the original
-	input := CopyQuery(ctx.input)
+	input := CopyQuery(ctx.Input)
 
 	for {
 
-		if out, err = ctx.client.Query(ctx, input); err != nil {
+		if out, err = ctx.Client.Query(ctx, input); err != nil {
 			return
 		}
 
@@ -289,8 +289,8 @@ func (op *QueryAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &QueryAllContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h QueryAllHandler

@@ -27,8 +27,8 @@ func (p *Pool) UpdateContributorInsights(input *ddb.UpdateContributorInsightsInp
 // UpdateContributorInsightsContext represents an exhaustive UpdateContributorInsights operation request context
 type UpdateContributorInsightsContext struct {
 	context.Context
-	input  *ddb.UpdateContributorInsightsInput
-	client *ddb.Client
+	Input  *ddb.UpdateContributorInsightsInput
+	Client *ddb.Client
 }
 
 // UpdateContributorInsightsOutput represents the output for the UpdateContributorInsights operation
@@ -73,7 +73,7 @@ type UpdateContributorInsightsFinalHandler struct{}
 
 // HandleUpdateContributorInsights implements the UpdateContributorInsightsHandler
 func (h *UpdateContributorInsightsFinalHandler) HandleUpdateContributorInsights(ctx *UpdateContributorInsightsContext, output *UpdateContributorInsightsOutput) {
-	output.Set(ctx.client.UpdateContributorInsights(ctx, ctx.input))
+	output.Set(ctx.Client.UpdateContributorInsights(ctx, ctx.Input))
 }
 
 // UpdateContributorInsightsMiddleWare is a middleware function use for wrapping UpdateContributorInsightsHandler requests
@@ -121,8 +121,8 @@ func (op *UpdateContributorInsights) DynoInvoke(ctx context.Context, client *ddb
 
 	requestCtx := &UpdateContributorInsightsContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h UpdateContributorInsightsHandler

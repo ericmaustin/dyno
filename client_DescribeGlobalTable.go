@@ -25,8 +25,8 @@ func (p *Pool) DescribeGlobalTable(input *ddb.DescribeGlobalTableInput, mw ...De
 // DescribeGlobalTableContext represents an exhaustive DescribeGlobalTable operation request context
 type DescribeGlobalTableContext struct {
 	context.Context
-	input  *ddb.DescribeGlobalTableInput
-	client *ddb.Client
+	Input  *ddb.DescribeGlobalTableInput
+	Client *ddb.Client
 }
 
 // DescribeGlobalTableOutput represents the output for the DescribeGlobalTable opration
@@ -71,7 +71,7 @@ type DescribeGlobalTableFinalHandler struct{}
 
 // HandleDescribeGlobalTable implements the DescribeGlobalTableHandler
 func (h *DescribeGlobalTableFinalHandler) HandleDescribeGlobalTable(ctx *DescribeGlobalTableContext, output *DescribeGlobalTableOutput) {
-	output.Set(ctx.client.DescribeGlobalTable(ctx, ctx.input))
+	output.Set(ctx.Client.DescribeGlobalTable(ctx, ctx.Input))
 }
 
 // DescribeGlobalTableMiddleWare is a middleware function use for wrapping DescribeGlobalTableHandler requests
@@ -118,8 +118,8 @@ func (op *DescribeGlobalTable) DynoInvoke(ctx context.Context, client *ddb.Clien
 
 	requestCtx := &DescribeGlobalTableContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DescribeGlobalTableHandler

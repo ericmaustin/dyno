@@ -30,8 +30,8 @@ func (p *Pool) UpdateItem(input *ddb.UpdateItemInput, mw ...UpdateItemMiddleWare
 // UpdateItemContext represents an exhaustive UpdateItem operation request context
 type UpdateItemContext struct {
 	context.Context
-	input  *ddb.UpdateItemInput
-	client *ddb.Client
+	Input  *ddb.UpdateItemInput
+	Client *ddb.Client
 }
 
 // UpdateItemOutput represents the output for the UpdateItem opration
@@ -76,7 +76,7 @@ type UpdateItemFinalHandler struct{}
 
 // HandleUpdateItem implements the UpdateItemHandler
 func (h *UpdateItemFinalHandler) HandleUpdateItem(ctx *UpdateItemContext, output *UpdateItemOutput) {
-	output.Set(ctx.client.UpdateItem(ctx, ctx.input))
+	output.Set(ctx.Client.UpdateItem(ctx, ctx.Input))
 }
 
 // UpdateItemMiddleWare is a middleware function use for wrapping UpdateItemHandler requests
@@ -123,8 +123,8 @@ func (op *UpdateItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &UpdateItemContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h UpdateItemHandler

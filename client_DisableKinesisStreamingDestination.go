@@ -25,8 +25,8 @@ func (p *Pool) DisableKinesisStreamingDestination(input *ddb.DisableKinesisStrea
 // DisableKinesisStreamingDestinationContext represents an exhaustive DisableKinesisStreamingDestination operation request context
 type DisableKinesisStreamingDestinationContext struct {
 	context.Context
-	input  *ddb.DisableKinesisStreamingDestinationInput
-	client *ddb.Client
+	Input  *ddb.DisableKinesisStreamingDestinationInput
+	Client *ddb.Client
 }
 
 // DisableKinesisStreamingDestinationOutput represents the output for the DisableKinesisStreamingDestination opration
@@ -71,7 +71,7 @@ type DisableKinesisStreamingDestinationFinalHandler struct{}
 
 // HandleDisableKinesisStreamingDestination implements the DisableKinesisStreamingDestinationHandler
 func (h *DisableKinesisStreamingDestinationFinalHandler) HandleDisableKinesisStreamingDestination(ctx *DisableKinesisStreamingDestinationContext, output *DisableKinesisStreamingDestinationOutput) {
-	output.Set(ctx.client.DisableKinesisStreamingDestination(ctx, ctx.input))
+	output.Set(ctx.Client.DisableKinesisStreamingDestination(ctx, ctx.Input))
 }
 
 // DisableKinesisStreamingDestinationMiddleWare is a middleware function use for wrapping DisableKinesisStreamingDestinationHandler requests
@@ -118,8 +118,8 @@ func (op *DisableKinesisStreamingDestination) DynoInvoke(ctx context.Context, cl
 
 	requestCtx := &DisableKinesisStreamingDestinationContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DisableKinesisStreamingDestinationHandler

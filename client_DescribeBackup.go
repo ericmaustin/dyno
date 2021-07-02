@@ -25,8 +25,8 @@ func (p *Pool) DescribeBackup(input *ddb.DescribeBackupInput, mw ...DescribeBack
 // DescribeBackupContext represents an exhaustive DescribeBackup operation request context
 type DescribeBackupContext struct {
 	context.Context
-	input  *ddb.DescribeBackupInput
-	client *ddb.Client
+	Input  *ddb.DescribeBackupInput
+	Client *ddb.Client
 }
 
 // DescribeBackupOutput represents the output for the DescribeBackup opration
@@ -71,7 +71,7 @@ type DescribeBackupFinalHandler struct{}
 
 // HandleDescribeBackup implements the DescribeBackupHandler
 func (h *DescribeBackupFinalHandler) HandleDescribeBackup(ctx *DescribeBackupContext, output *DescribeBackupOutput) {
-	output.Set(ctx.client.DescribeBackup(ctx, ctx.input))
+	output.Set(ctx.Client.DescribeBackup(ctx, ctx.Input))
 }
 
 // DescribeBackupMiddleWare is a middleware function use for wrapping DescribeBackupHandler requests
@@ -118,8 +118,8 @@ func (op *DescribeBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &DescribeBackupContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DescribeBackupHandler

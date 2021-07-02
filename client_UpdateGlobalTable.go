@@ -25,8 +25,8 @@ func (p *Pool) UpdateGlobalTable(input *ddb.UpdateGlobalTableInput, mw ...Update
 // UpdateGlobalTableContext represents an exhaustive UpdateGlobalTable operation request context
 type UpdateGlobalTableContext struct {
 	context.Context
-	input  *ddb.UpdateGlobalTableInput
-	client *ddb.Client
+	Input  *ddb.UpdateGlobalTableInput
+	Client *ddb.Client
 }
 
 // UpdateGlobalTableOutput represents the output for the UpdateGlobalTable opration
@@ -72,7 +72,7 @@ type UpdateGlobalTableFinalHandler struct{}
 
 // HandleUpdateGlobalTable implements the UpdateGlobalTableHandler
 func (h *UpdateGlobalTableFinalHandler) HandleUpdateGlobalTable(ctx *UpdateGlobalTableContext, output *UpdateGlobalTableOutput) {
-	output.Set(ctx.client.UpdateGlobalTable(ctx, ctx.input))
+	output.Set(ctx.Client.UpdateGlobalTable(ctx, ctx.Input))
 }
 
 // UpdateGlobalTableMiddleWare is a middleware function use for wrapping UpdateGlobalTableHandler requests
@@ -119,8 +119,8 @@ func (op *UpdateGlobalTable) DynoInvoke(ctx context.Context, client *ddb.Client)
 
 	requestCtx := &UpdateGlobalTableContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h UpdateGlobalTableHandler

@@ -25,8 +25,8 @@ func (p *Pool) ListGlobalTables(input *ddb.ListGlobalTablesInput, mw ...ListGlob
 // ListGlobalTablesContext represents an exhaustive ListGlobalTables operation request context
 type ListGlobalTablesContext struct {
 	context.Context
-	input  *ddb.ListGlobalTablesInput
-	client *ddb.Client
+	Input  *ddb.ListGlobalTablesInput
+	Client *ddb.Client
 }
 
 // ListGlobalTablesOutput represents the output for the ListGlobalTables operation
@@ -71,7 +71,7 @@ type ListGlobalTablesFinalHandler struct{}
 
 // HandleListGlobalTables implements the ListGlobalTablesHandler
 func (h *ListGlobalTablesFinalHandler) HandleListGlobalTables(ctx *ListGlobalTablesContext, output *ListGlobalTablesOutput) {
-	output.Set(ctx.client.ListGlobalTables(ctx, ctx.input))
+	output.Set(ctx.Client.ListGlobalTables(ctx, ctx.Input))
 }
 
 // ListGlobalTablesMiddleWare is a middleware function use for wrapping ListGlobalTablesHandler requests
@@ -119,8 +119,8 @@ func (op *ListGlobalTables) DynoInvoke(ctx context.Context, client *ddb.Client) 
 
 	requestCtx := &ListGlobalTablesContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h ListGlobalTablesHandler

@@ -30,8 +30,8 @@ func (p *Pool) DeleteItem(input *ddb.DeleteItemInput, mw ...DeleteItemMiddleWare
 // DeleteItemContext represents an exhaustive DeleteItem operation request context
 type DeleteItemContext struct {
 	context.Context
-	input  *ddb.DeleteItemInput
-	client *ddb.Client
+	Input  *ddb.DeleteItemInput
+	Client *ddb.Client
 }
 
 // DeleteItemOutput represents the output for the DeleteItem opration
@@ -76,7 +76,7 @@ type DeleteItemFinalHandler struct {}
 
 // HandleDeleteItem implements the DeleteItemHandler
 func (h *DeleteItemFinalHandler) HandleDeleteItem(ctx *DeleteItemContext, output *DeleteItemOutput) {
-	output.Set(ctx.client.DeleteItem(ctx, ctx.input))
+	output.Set(ctx.Client.DeleteItem(ctx, ctx.Input))
 }
 
 // DeleteItemMiddleWare is a middleware function use for wrapping DeleteItemHandler requests
@@ -124,8 +124,8 @@ func (op *DeleteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &DeleteItemContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DeleteItemHandler

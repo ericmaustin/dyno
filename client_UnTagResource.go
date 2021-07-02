@@ -26,8 +26,8 @@ func (p *Pool) UntagResource(input *ddb.UntagResourceInput, mw ...UntagResourceM
 // UntagResourceContext represents an exhaustive UntagResource operation request context
 type UntagResourceContext struct {
 	context.Context
-	input  *ddb.UntagResourceInput
-	client *ddb.Client
+	Input  *ddb.UntagResourceInput
+	Client *ddb.Client
 }
 
 // UntagResourceOutput represents the output for the UntagResource operation
@@ -72,7 +72,7 @@ type UntagResourceFinalHandler struct{}
 
 // HandleUntagResource implements the UntagResourceHandler
 func (h *UntagResourceFinalHandler) HandleUntagResource(ctx *UntagResourceContext, output *UntagResourceOutput) {
-	output.Set(ctx.client.UntagResource(ctx, ctx.input))
+	output.Set(ctx.Client.UntagResource(ctx, ctx.Input))
 }
 
 // UntagResourceMiddleWare is a middleware function use for wrapping UntagResourceHandler requests
@@ -120,8 +120,8 @@ func (op *UntagResource) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &UntagResourceContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h UntagResourceHandler

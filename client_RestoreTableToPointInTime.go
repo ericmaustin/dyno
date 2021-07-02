@@ -25,8 +25,8 @@ func (p *Pool) RestoreTableToPointInTime(input *ddb.RestoreTableToPointInTimeInp
 // RestoreTableToPointInTimeContext represents an exhaustive RestoreTableToPointInTime operation request context
 type RestoreTableToPointInTimeContext struct {
 	context.Context
-	input  *ddb.RestoreTableToPointInTimeInput
-	client *ddb.Client
+	Input  *ddb.RestoreTableToPointInTimeInput
+	Client *ddb.Client
 }
 
 // RestoreTableToPointInTimeOutput represents the output for the RestoreTableToPointInTime opration
@@ -71,7 +71,7 @@ type RestoreTableToPointInTimeFinalHandler struct{}
 
 // HandleRestoreTableToPointInTime implements the RestoreTableToPointInTimeHandler
 func (h *RestoreTableToPointInTimeFinalHandler) HandleRestoreTableToPointInTime(ctx *RestoreTableToPointInTimeContext, output *RestoreTableToPointInTimeOutput) {
-	output.Set(ctx.client.RestoreTableToPointInTime(ctx, ctx.input))
+	output.Set(ctx.Client.RestoreTableToPointInTime(ctx, ctx.Input))
 }
 
 // RestoreTableToPointInTimeMiddleWare is a middleware function use for wrapping RestoreTableToPointInTimeHandler requests
@@ -118,8 +118,8 @@ func (op *RestoreTableToPointInTime) DynoInvoke(ctx context.Context, client *ddb
 
 	requestCtx := &RestoreTableToPointInTimeContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h RestoreTableToPointInTimeHandler

@@ -25,8 +25,8 @@ func (p *Pool) ListExports(input *ddb.ListExportsInput, mw ...ListExportsMiddleW
 // ListExportsContext represents an exhaustive ListExports operation request context
 type ListExportsContext struct {
 	context.Context
-	input  *ddb.ListExportsInput
-	client *ddb.Client
+	Input  *ddb.ListExportsInput
+	Client *ddb.Client
 }
 
 // ListExportsOutput represents the output for the ListExports operation
@@ -71,7 +71,7 @@ type ListExportsFinalHandler struct{}
 
 // HandleListExports implements the ListExportsHandler
 func (h *ListExportsFinalHandler) HandleListExports(ctx *ListExportsContext, output *ListExportsOutput) {
-	output.Set(ctx.client.ListExports(ctx, ctx.input))
+	output.Set(ctx.Client.ListExports(ctx, ctx.Input))
 }
 
 // ListExportsMiddleWare is a middleware function use for wrapping ListExportsHandler requests
@@ -119,8 +119,8 @@ func (op *ListExports) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	requestCtx := &ListExportsContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h ListExportsHandler

@@ -27,8 +27,8 @@ func (p *Pool) TransactWriteItems(input *ddb.TransactWriteItemsInput, mw ...Tran
 // TransactWriteItemsContext represents an exhaustive TransactWriteItems operation request context
 type TransactWriteItemsContext struct {
 	context.Context
-	input  *ddb.TransactWriteItemsInput
-	client *ddb.Client
+	Input  *ddb.TransactWriteItemsInput
+	Client *ddb.Client
 }
 
 // TransactWriteItemsOutput represents the output for the TransactWriteItems operation
@@ -73,7 +73,7 @@ type TransactWriteItemsFinalHandler struct{}
 
 // HandleTransactWriteItems implements the TransactWriteItemsHandler
 func (h *TransactWriteItemsFinalHandler) HandleTransactWriteItems(ctx *TransactWriteItemsContext, output *TransactWriteItemsOutput) {
-	output.Set(ctx.client.TransactWriteItems(ctx, ctx.input))
+	output.Set(ctx.Client.TransactWriteItems(ctx, ctx.Input))
 }
 
 // TransactWriteItemsMiddleWare is a middleware function use for wrapping TransactWriteItemsHandler requests
@@ -121,8 +121,8 @@ func (op *TransactWriteItems) DynoInvoke(ctx context.Context, client *ddb.Client
 
 	requestCtx := &TransactWriteItemsContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h TransactWriteItemsHandler

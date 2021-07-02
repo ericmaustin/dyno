@@ -25,8 +25,8 @@ func (p *Pool) DescribeContributorInsights(input *ddb.DescribeContributorInsight
 // DescribeContributorInsightsContext represents an exhaustive DescribeContributorInsights operation request context
 type DescribeContributorInsightsContext struct {
 	context.Context
-	input  *ddb.DescribeContributorInsightsInput
-	client *ddb.Client
+	Input  *ddb.DescribeContributorInsightsInput
+	Client *ddb.Client
 }
 
 // DescribeContributorInsightsOutput represents the output for the DescribeContributorInsights opration
@@ -71,7 +71,7 @@ type DescribeContributorInsightsFinalHandler struct{}
 
 // HandleDescribeContributorInsights implements the DescribeContributorInsightsHandler
 func (h *DescribeContributorInsightsFinalHandler) HandleDescribeContributorInsights(ctx *DescribeContributorInsightsContext, output *DescribeContributorInsightsOutput) {
-	output.Set(ctx.client.DescribeContributorInsights(ctx, ctx.input))
+	output.Set(ctx.Client.DescribeContributorInsights(ctx, ctx.Input))
 }
 
 // DescribeContributorInsightsMiddleWare is a middleware function use for wrapping DescribeContributorInsightsHandler requests
@@ -118,8 +118,8 @@ func (op *DescribeContributorInsights) DynoInvoke(ctx context.Context, client *d
 
 	requestCtx := &DescribeContributorInsightsContext{
 		Context: ctx,
-		client:  client,
-		input:   op.input,
+		Client:  client,
+		Input:   op.input,
 	}
 
 	var h DescribeContributorInsightsHandler
