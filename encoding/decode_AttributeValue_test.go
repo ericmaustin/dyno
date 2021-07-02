@@ -16,6 +16,7 @@ func TestIntUnmarshaller(t *testing.T) {
 	if err := decoder(av); err != nil {
 		panic(err)
 	}
+
 	assert.Equal(t, 2, v)
 
 	avMap := map[string]ddb.AttributeValue{
@@ -48,6 +49,7 @@ func TestInt64Unmarshaller(t *testing.T) {
 	if err := decoder(av); err != nil {
 		panic(err)
 	}
+
 	assert.Equal(t, int64(2), v)
 
 	avMap := map[string]ddb.AttributeValue{
@@ -80,6 +82,7 @@ func TestStringUnmarshaller(t *testing.T) {
 	if err := decoder(av); err != nil {
 		panic(err)
 	}
+
 	assert.Equal(t, "hello world", v)
 
 	avMap := map[string]ddb.AttributeValue{
@@ -112,7 +115,41 @@ func TestFloat64Unmarshaller(t *testing.T) {
 	if err := decoder(av); err != nil {
 		panic(err)
 	}
+
 	assert.Equal(t, float64(2), v)
+
+	avMap := map[string]ddb.AttributeValue{
+		"Foo": &ddb.AttributeValueMemberN{Value: "1"},
+		"Bar": &ddb.AttributeValueMemberN{Value: "2"},
+	}
+
+	foo := float64(0)
+	bar := float64(0)
+
+	decoderMap := ValueUnmarshalerMap(map[string]attributevalue.Unmarshaler{
+		"Foo": Float64Unmarshaler(&foo),
+		"Bar": Float64Unmarshaler(&bar),
+	})
+
+	if err := decoderMap.UnmarshalAttributeValueMap(avMap); err != nil {
+		panic(err)
+	}
+
+	assert.Equal(t, float64(1), foo)
+	assert.Equal(t, float64(2), bar)
+}
+
+func TestFloat64PtrUnmarshaller(t *testing.T) {
+	v := new(float64)
+
+	decoder := Float64PtrUnmarshaler(&v)
+
+	av := &ddb.AttributeValueMemberN{Value: "2"}
+	if err := decoder(av); err != nil {
+		panic(err)
+	}
+
+	assert.Equal(t, float64(2), *v)
 
 	avMap := map[string]ddb.AttributeValue{
 		"Foo": &ddb.AttributeValueMemberN{Value: "1"},

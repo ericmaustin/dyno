@@ -124,6 +124,54 @@ func IntMarshaler(v *int, mode NilMode) MarshalFunc {
 	}
 }
 
+// MarshalUint marshals an AttributeValue into the given value
+func MarshalUint(v *uint, mode NilMode) ddb.AttributeValue {
+	if v == nil {
+		return numericNil(mode)
+	}
+
+	return &ddb.AttributeValueMemberN{Value: strconv.FormatUint(uint64(*v), 10)}
+}
+
+// UintMarshaler returns a MarshalFunc func that will generate an AttributeValue
+func UintMarshaler(v *uint, mode NilMode) MarshalFunc {
+	return func() (ddb.AttributeValue, error) {
+		return MarshalUint(v, mode), nil
+	}
+}
+
+// MarshalInt32 marshals an AttributeValue into the given value
+func MarshalInt32(v *int32, mode NilMode) ddb.AttributeValue {
+	if v == nil {
+		return numericNil(mode)
+	}
+
+	return &ddb.AttributeValueMemberN{Value: strconv.FormatInt(int64(*v), 10)}
+}
+
+// Int32Marshaler returns a MarshalFunc func that will generate an AttributeValue
+func Int32Marshaler(v *int32, mode NilMode) MarshalFunc {
+	return func() (ddb.AttributeValue, error) {
+		return MarshalInt32(v, mode), nil
+	}
+}
+
+// MarshalUint32 marshals an AttributeValue into the given value
+func MarshalUint32(v *uint32, mode NilMode) ddb.AttributeValue {
+	if v == nil {
+		return numericNil(mode)
+	}
+
+	return &ddb.AttributeValueMemberN{Value: strconv.FormatUint(uint64(*v), 10)}
+}
+
+// Uint32Marshaler returns a MarshalFunc func that will generate an AttributeValue
+func Uint32Marshaler(v *uint32, mode NilMode) MarshalFunc {
+	return func() (ddb.AttributeValue, error) {
+		return MarshalUint32(v, mode), nil
+	}
+}
+
 // MarshalInt64 marshals an AttributeValue into the given value
 func MarshalInt64(v *int64, mode NilMode) ddb.AttributeValue {
 	if v == nil {
@@ -137,6 +185,22 @@ func MarshalInt64(v *int64, mode NilMode) ddb.AttributeValue {
 func Int64Marshaler(v *int64, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
 		return MarshalInt64(v, mode), nil
+	}
+}
+
+// MarshalUint64 marshals an AttributeValue into the given value
+func MarshalUint64(v *uint64, mode NilMode) ddb.AttributeValue {
+	if v == nil {
+		return numericNil(mode)
+	}
+
+	return &ddb.AttributeValueMemberN{Value: strconv.FormatUint(*v, 10)}
+}
+
+// Uint64Marshaler returns a MarshalFunc func that will generate an AttributeValue
+func Uint64Marshaler(v *uint64, mode NilMode) MarshalFunc {
+	return func() (ddb.AttributeValue, error) {
+		return MarshalUint64(v, mode), nil
 	}
 }
 
