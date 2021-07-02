@@ -38,8 +38,10 @@ var (
 	ErrLockFailedToAcquire = errors.New("lock failed to be acquired")
 	//ErrLockFailedLeaseRenewal returned by Lock if lock lease could not be renewed
 	ErrLockFailedLeaseRenewal = errors.New("lock failed to renew its lease")
-	//ErrCodeConditionalCheckFailedException returned when lock fails a conditional check
-	ErrCodeConditionalCheckFailedException = errors.New("lock failed on conditional check")
+	//ErrConditionalCheckFailedException returned when lock fails a conditional check
+	ErrConditionalCheckFailedException = errors.New("lock failed on conditional check")
+	// ErrLockTimeout returned when lock cannot be acquired due to a timeout
+	ErrLockTimeout = errors.New("lock timeout")
 )
 
 type (
@@ -111,10 +113,11 @@ func (dl *Lock) Acquire() (err error) {
 	for {
 		select {
 		case <-timer.C:
-			return &dyno.Error{Code: dyno.ErrLockTimeout}
+			return ErrLockTimeout
 		case <-ticker.C:
 
-			updateOutput, err := dl.DB.UpdateItem(ctx, updateInput)
+			updateOutput, err := dl.DB.UpdateItem(ctx, updateInput).Await()
+
 			if err != nil {
 				var conditionalCheckError *types.ConditionalCheckFailedException
 				if errors.As(err, &conditionalCheckError) {
@@ -235,7 +238,7 @@ func (dl *Lock) renew() {
 	ctx, done := context.WithTimeout(dl.Context, dl.LeaseDuration)
 	defer done()
 
-	output, err := dl.DB.UpdateItem(ctx, updateInput)
+	output, err := dl.DB.UpdateItem(ctx, updateInput).Await()
 
 	select {
 	case <-dl.Context.Done():
@@ -267,10 +270,10 @@ func (dl *Lock) clear() {
 		AddCondition(condition.Equal(VersionFieldName, *dl.SessionID)).
 		Build()
 
-	if _, err = dl.DB.UpdateItem(context.Background(), updateInput); err != nil {
+	if _, err = dl.DB.UpdateItem(context.Background(), updateInput).Await(); err != nil {
 		var conditionalCheckErr *types.ConditionalCheckFailedException
 		if !errors.As(err, &conditionalCheckErr) {
-			panic(ErrCodeConditionalCheckFailedException)
+			panic(ErrConditionalCheckFailedException)
 		}
 	}
 }
