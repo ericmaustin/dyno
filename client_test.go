@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/ericmaustin/dyno/condition"
 	"github.com/ericmaustin/dyno/encoding"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -110,7 +112,12 @@ func (s *ClientTestSuite) TestScanWithMiddleware() {
 	s.Nil(cached)
 
 	// first call, should not be cached
-	input, err := s.table.ScanBuilder().SetTableName(s.table.Name()).Build()
+	input, err := s.table.ScanBuilder().
+		AddProjectionNames("id", "timestamp").
+		AddFilter(condition.GreaterThan("timestamp", 0)).
+		SetTableName(s.table.Name()).
+		Build()
+
 	if err != nil {
 		panic(err)
 	}
@@ -132,6 +139,32 @@ func (s *ClientTestSuite) TestScanWithMiddleware() {
 	s.NotNil(out)
 	s.NotNil(cached)
 	fmt.Println("CACHE RESULT:", MustYamlString(cached))
+}
+
+func (s *ClientTestSuite) TestQuery() {
+	id1 := s.testItems[0].ID
+
+	// first call, should not be cached
+	input, err := s.table.QueryBuilder().
+		AddProjectionNames("id", "timestamp").
+		AddKeyEquals("id", id1).
+		SetTableName(s.table.Name()).
+		Build()
+
+	if err != nil {
+		panic(err)
+	}
+
+	out, err := NewQuery(input).Invoke(context.Background(), s.client.DynamoDB()).Await()
+	if err != nil {
+		panic(err)
+	}
+
+	s.NotNil(out)
+
+	s.Equal(out.Items[0]["id"].(*ddb.AttributeValueMemberS).Value, id1)
+
+	fmt.Println(MustYamlString(out))
 }
 
 func TestClientSuite(t *testing.T) {
@@ -157,9 +190,9 @@ func TestClientSuite(t *testing.T) {
 		s.TestBatchWriteItemWithMiddleWare()
 	})
 	s.Run("read ops", func() {
+		s.TestQuery()
 		s.TestScanWithMiddleware()
 	})
 }
 
 // todo: add more tests
-

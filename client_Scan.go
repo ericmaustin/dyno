@@ -7,7 +7,6 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ericmaustin/dyno/condition"
-	"github.com/ericmaustin/dyno/encoding"
 	"sync"
 )
 
@@ -197,6 +196,7 @@ func (o *ScanAllOutput) Get() (out []*ddb.ScanOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -352,7 +352,7 @@ func NewScanInput(tableName *string) *ddb.ScanInput {
 // ScanBuilder extends dynamodb.ScanInput to allow dynamic input building
 type ScanBuilder struct {
 	*ddb.ScanInput
-	filter     *expression.ConditionBuilder
+	filter     condition.Builder
 	projection *expression.ProjectionBuilder
 }
 
@@ -379,35 +379,13 @@ func (bld *ScanBuilder) SetInput(input *ddb.ScanInput) *ScanBuilder {
 
 // AddProjection adds additional field names to the projection
 func (bld *ScanBuilder) AddProjection(names interface{}) *ScanBuilder {
-	nameBuilders := encoding.NameBuilders(names)
-
-	if bld.projection == nil {
-		proj := expression.ProjectionBuilder{}
-		proj = proj.AddNames(nameBuilders...)
-		bld.projection = &proj
-	} else {
-		*bld.projection = bld.projection.AddNames(nameBuilders...)
-	}
-
+	addProjection(&bld.projection, names)
 	return bld
 }
 
 // AddProjectionNames adds additional field names to the projection with strings
 func (bld *ScanBuilder) AddProjectionNames(names ...string) *ScanBuilder {
-	nameBuilders := make([]expression.NameBuilder, len(names))
-
-	for i, name := range names {
-		nameBuilders[i] = expression.Name(name)
-	}
-
-	if bld.projection == nil {
-		proj := expression.ProjectionBuilder{}
-		proj = proj.AddNames(nameBuilders...)
-		bld.projection = &proj
-	} else {
-		*bld.projection = bld.projection.AddNames(nameBuilders...)
-	}
-
+	addProjectionNames(&bld.projection, names)
 	return bld
 }
 
@@ -415,13 +393,7 @@ func (bld *ScanBuilder) AddProjectionNames(names ...string) *ScanBuilder {
 // adding multiple conditions by calling this multiple times will join the conditions with
 // an AND
 func (bld *ScanBuilder) AddFilter(cnd expression.ConditionBuilder) *ScanBuilder {
-	if bld.filter == nil {
-		bld.filter = &cnd
-	} else {
-		cnd = condition.And(*bld.filter, cnd)
-		bld.filter = &cnd
-	}
-
+	bld.filter.And(cnd)
 	return bld
 }
 
@@ -505,32 +477,35 @@ func (bld *ScanBuilder) SetTotalSegments(v int32) *ScanBuilder {
 
 // Build builds the dynamodb.ScanInput
 func (bld *ScanBuilder) Build() (*ddb.ScanInput, error) {
-	if bld.projection != nil || bld.filter != nil {
-		// only use expression builder if we have a projection or a filter
-		eb := expression.NewBuilder()
-
-		// add projection
-		if bld.projection != nil {
-			eb = eb.WithProjection(*bld.projection)
-		}
-
-		// add filter
-		if bld.filter != nil {
-			eb = eb.WithFilter(*bld.filter)
-		}
-
-		// build the Expression
-		expr, err := eb.Build()
-
-		if err != nil {
-			return nil, fmt.Errorf("ScanBuilder Build() failed while attempting to build expression: %v", err)
-		}
-
-		bld.ExpressionAttributeNames = expr.Names()
-		bld.ExpressionAttributeValues = expr.Values()
-		bld.FilterExpression = expr.Filter()
-		bld.ProjectionExpression = expr.Projection()
+	if bld.projection == nil && bld.filter.Empty() {
+		return bld.ScanInput, nil
 	}
+
+	// only use expression builder if we have a projection or a filter
+	eb := expression.NewBuilder()
+
+	// add projection
+	if bld.projection != nil {
+		eb = eb.WithProjection(*bld.projection)
+		bld.Select = ddbTypes.SelectSpecificAttributes
+	}
+
+	// add filter
+	if !bld.filter.Empty() {
+		eb = eb.WithFilter(bld.filter.Builder())
+	}
+
+	// build the Expression
+	expr, err := eb.Build()
+
+	if err != nil {
+		return nil, fmt.Errorf("ScanBuilder Build() failed while attempting to build expression: %v", err)
+	}
+
+	bld.ExpressionAttributeNames = expr.Names()
+	bld.ExpressionAttributeValues = expr.Values()
+	bld.FilterExpression = expr.Filter()
+	bld.ProjectionExpression = expr.Projection()
 
 	return bld.ScanInput, nil
 }

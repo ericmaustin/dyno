@@ -53,9 +53,9 @@ func (o *PutItemOutput) Get() (out *ddb.PutItemOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
-
 
 // PutItemHandler represents a handler for PutItem requests
 type PutItemHandler interface {
@@ -101,7 +101,7 @@ type PutItem struct {
 // NewPutItem creates a new PutItem
 func NewPutItem(input *ddb.PutItemInput, mws ...PutItemMiddleWare) *PutItem {
 	return &PutItem{
-		Promise:    NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
@@ -155,15 +155,13 @@ func (op *PutItem) Await() (*ddb.PutItemOutput, error) {
 // PutItemBuilder allows for dynamic building of a PutItem input
 type PutItemBuilder struct {
 	*ddb.PutItemInput
-	cnd *condition.Builder
+	cnd condition.Builder
 }
 
 // NewPutItemBuilder creates a new PutItemBuilder with PutItemOpt
 func NewPutItemBuilder(input *ddb.PutItemInput) *PutItemBuilder {
 
-	bld := &PutItemBuilder{
-		cnd: new(condition.Builder),
-	}
+	bld := &PutItemBuilder{}
 
 	if input != nil {
 		bld.PutItemInput = input

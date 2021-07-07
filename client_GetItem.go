@@ -53,6 +53,7 @@ func (o *GetItemOutput) Get() (out *ddb.GetItemOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -181,9 +182,15 @@ func (bld *GetItemBuilder) SetInput(input *ddb.GetItemInput) *GetItemBuilder {
 	return bld
 }
 
+// AddProjection additional fields to the projection
+func (bld *GetItemBuilder) AddProjection(names interface{}) *GetItemBuilder {
+	addProjection(&bld.projection, names)
+	return bld
+}
+
 // AddProjectionNames adds additional field names to the projection with strings
 func (bld *GetItemBuilder) AddProjectionNames(names ...string) *GetItemBuilder {
-	addProjectionNames(bld.projection, names)
+	addProjectionNames(&bld.projection, names)
 	return bld
 }
 
@@ -235,8 +242,10 @@ func (bld *GetItemBuilder) Build() (*ddb.GetItemInput, error) {
 		if err != nil {
 			return nil, fmt.Errorf("GetItemBuilder Build() failed while attempting to build expression: %v", err)
 		}
+
 		bld.ExpressionAttributeNames = expr.Names()
 		bld.ProjectionExpression = expr.Projection()
 	}
+
 	return bld.GetItemInput, nil
 }

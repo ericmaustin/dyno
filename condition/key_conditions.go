@@ -62,8 +62,8 @@ type KeyConditionBuilder struct {
 	*expression.KeyConditionBuilder
 }
 
-// IsEmpty checks is the condition set is empty
-func (ks *KeyConditionBuilder) IsEmpty() bool {
+// Empty checks is the condition set is empty
+func (ks *KeyConditionBuilder) Empty() bool {
 	return ks.KeyConditionBuilder == nil
 }
 
@@ -81,12 +81,14 @@ func (ks *KeyConditionBuilder) And(conditions ...expression.KeyConditionBuilder)
 		builder = KeyAnd(conditions[0], conditions[1:]...)
 	}
 
-	if ks.IsEmpty() {
+	if ks.Empty() {
 		ks.KeyConditionBuilder = &builder
 		return ks
 	}
 
-	ks.KeyConditionBuilder.And(builder)
+	bld := ks.KeyConditionBuilder.And(builder)
+
+	ks.KeyConditionBuilder = &bld
 
 	return ks
 }
