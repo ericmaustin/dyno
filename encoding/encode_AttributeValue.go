@@ -2,6 +2,7 @@ package encoding
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"strconv"
@@ -18,7 +19,11 @@ const (
 	NilNull
 	// NilNil will return nil instead of an AttributeValue
 	NilNil
+	// NilError will return an error if the value is Nil
+	NilError
 )
+
+var ErrNil = errors.New("value must not be nil when NilError flag is set")
 
 // MarshalFunc represents a func that Marshals an AttributeValue
 type MarshalFunc func() (ddb.AttributeValue, error)
@@ -64,223 +69,231 @@ func (em ValueMarshalMap) MarshalToMap(input map[string]ddb.AttributeValue) erro
 	return nil
 }
 
-func numericNil(mode NilMode) ddb.AttributeValue {
+func numericNil(mode NilMode) (ddb.AttributeValue, error) {
 	switch mode {
 	case NilZero:
-		return &ddb.AttributeValueMemberN{Value: "0"}
+		return &ddb.AttributeValueMemberN{Value: "0"}, nil
 	case NilNull:
-		return &ddb.AttributeValueMemberNULL{Value: true}
+		return &ddb.AttributeValueMemberNULL{Value: true}, nil
+	case NilError:
+		return nil, ErrNil
 	}
 	// NilNil
-	return nil
+	return nil, nil
 }
 
-func stringNil(mode NilMode) ddb.AttributeValue {
+func stringNil(mode NilMode) (ddb.AttributeValue, error) {
 	switch mode {
 	case NilZero:
-		return &ddb.AttributeValueMemberS{Value: ""}
+		return &ddb.AttributeValueMemberS{Value: ""}, nil
 	case NilNull:
-		return &ddb.AttributeValueMemberNULL{Value: true}
+		return &ddb.AttributeValueMemberNULL{Value: true}, nil
+	case NilError:
+		return nil, ErrNil
 	}
 	// NilNil
-	return nil
+	return nil, nil
 }
 
-func boolNil(mode NilMode) ddb.AttributeValue {
+func boolNil(mode NilMode) (ddb.AttributeValue, error) {
 	switch mode {
 	case NilZero:
-		return &ddb.AttributeValueMemberBOOL{Value: false}
+		return &ddb.AttributeValueMemberBOOL{Value: false}, nil
 	case NilNull:
-		return &ddb.AttributeValueMemberNULL{Value: true}
+		return &ddb.AttributeValueMemberNULL{Value: true}, nil
+	case NilError:
+		return nil, ErrNil
 	}
 	// NilNil
-	return nil
+	return nil, nil
 }
 
-func bytesNil(mode NilMode) ddb.AttributeValue {
+func bytesNil(mode NilMode) (ddb.AttributeValue, error) {
 	switch mode {
 	case NilZero:
-		return &ddb.AttributeValueMemberB{Value: make([]byte, 0)}
+		return &ddb.AttributeValueMemberB{Value: make([]byte, 0)}, nil
 	case NilNull:
-		return &ddb.AttributeValueMemberNULL{Value: true}
+		return &ddb.AttributeValueMemberNULL{Value: true}, nil
+	case NilError:
+		return nil, ErrNil
 	}
 	// NilNil
-	return nil
+	return nil, nil
 }
 
 // MarshalInt marshals an AttributeValue into the given value
-func MarshalInt(v *int, mode NilMode) ddb.AttributeValue {
+func MarshalInt(v *int, mode NilMode) (ddb.AttributeValue, error) {
 	if v == nil {
 		return numericNil(mode)
 	}
 
-	return &ddb.AttributeValueMemberN{Value: strconv.Itoa(*v)}
+	return &ddb.AttributeValueMemberN{Value: strconv.Itoa(*v)}, nil
 }
 
 // IntMarshaler returns a MarshalFunc func that will generate an AttributeValue
 func IntMarshaler(v *int, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalInt(v, mode), nil
+		return MarshalInt(v, mode)
 	}
 }
 
 // MarshalUint marshals an AttributeValue into the given value
-func MarshalUint(v *uint, mode NilMode) ddb.AttributeValue {
+func MarshalUint(v *uint, mode NilMode) (ddb.AttributeValue, error) {
 	if v == nil {
 		return numericNil(mode)
 	}
 
-	return &ddb.AttributeValueMemberN{Value: strconv.FormatUint(uint64(*v), 10)}
+	return &ddb.AttributeValueMemberN{Value: strconv.FormatUint(uint64(*v), 10)}, nil
 }
 
 // UintMarshaler returns a MarshalFunc func that will generate an AttributeValue
 func UintMarshaler(v *uint, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalUint(v, mode), nil
+		return MarshalUint(v, mode)
 	}
 }
 
 // MarshalInt32 marshals an AttributeValue into the given value
-func MarshalInt32(v *int32, mode NilMode) ddb.AttributeValue {
+func MarshalInt32(v *int32, mode NilMode) (ddb.AttributeValue, error) {
 	if v == nil {
 		return numericNil(mode)
 	}
 
-	return &ddb.AttributeValueMemberN{Value: strconv.FormatInt(int64(*v), 10)}
+	return &ddb.AttributeValueMemberN{Value: strconv.FormatInt(int64(*v), 10)}, nil
 }
 
 // Int32Marshaler returns a MarshalFunc func that will generate an AttributeValue
 func Int32Marshaler(v *int32, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalInt32(v, mode), nil
+		return MarshalInt32(v, mode)
 	}
 }
 
 // MarshalUint32 marshals an AttributeValue into the given value
-func MarshalUint32(v *uint32, mode NilMode) ddb.AttributeValue {
+func MarshalUint32(v *uint32, mode NilMode) (ddb.AttributeValue, error) {
 	if v == nil {
 		return numericNil(mode)
 	}
 
-	return &ddb.AttributeValueMemberN{Value: strconv.FormatUint(uint64(*v), 10)}
+	return &ddb.AttributeValueMemberN{Value: strconv.FormatUint(uint64(*v), 10)}, nil
 }
 
 // Uint32Marshaler returns a MarshalFunc func that will generate an AttributeValue
 func Uint32Marshaler(v *uint32, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalUint32(v, mode), nil
+		return MarshalUint32(v, mode)
 	}
 }
 
 // MarshalInt64 marshals an AttributeValue into the given value
-func MarshalInt64(v *int64, mode NilMode) ddb.AttributeValue {
+func MarshalInt64(v *int64, mode NilMode) (ddb.AttributeValue, error) {
 	if v == nil {
 		return numericNil(mode)
 	}
 
-	return &ddb.AttributeValueMemberN{Value: strconv.FormatInt(*v, 10)}
+	return &ddb.AttributeValueMemberN{Value: strconv.FormatInt(*v, 10)}, nil
 }
 
 // Int64Marshaler returns a MarshalFunc func that will generate an AttributeValue
 func Int64Marshaler(v *int64, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalInt64(v, mode), nil
+		return MarshalInt64(v, mode)
 	}
 }
 
 // MarshalUint64 marshals an AttributeValue into the given value
-func MarshalUint64(v *uint64, mode NilMode) ddb.AttributeValue {
+func MarshalUint64(v *uint64, mode NilMode) (ddb.AttributeValue, error) {
 	if v == nil {
 		return numericNil(mode)
 	}
 
-	return &ddb.AttributeValueMemberN{Value: strconv.FormatUint(*v, 10)}
+	return &ddb.AttributeValueMemberN{Value: strconv.FormatUint(*v, 10)}, nil
 }
 
 // Uint64Marshaler returns a MarshalFunc func that will generate an AttributeValue
 func Uint64Marshaler(v *uint64, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalUint64(v, mode), nil
+		return MarshalUint64(v, mode)
 	}
 }
 
 // MarshalFloat32 marshals an AttributeValue into the given value
-func MarshalFloat32(v *float32, mode NilMode) ddb.AttributeValue {
+func MarshalFloat32(v *float32, mode NilMode) (ddb.AttributeValue, error) {
 	if v == nil {
 		return numericNil(mode)
 	}
 
-	return &ddb.AttributeValueMemberN{Value: strconv.FormatFloat(float64(*v), 'g', -1, 32)}
+	return &ddb.AttributeValueMemberN{Value: strconv.FormatFloat(float64(*v), 'g', -1, 32)}, nil
 }
 
 // Float32Marshaler returns a MarshalFunc func that will generate an AttributeValue
 func Float32Marshaler(v *float32, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalFloat32(v, mode), nil
+		return MarshalFloat32(v, mode)
 	}
 }
 
 // MarshalFloat64 marshals an AttributeValue into the given value
-func MarshalFloat64(v *float64, mode NilMode) ddb.AttributeValue {
+func MarshalFloat64(v *float64, mode NilMode) (ddb.AttributeValue, error) {
 	if v == nil {
 		return numericNil(mode)
 	}
 
-	return &ddb.AttributeValueMemberN{Value: strconv.FormatFloat(*v, 'g', -1, 64)}
+	return &ddb.AttributeValueMemberN{Value: strconv.FormatFloat(*v, 'g', -1, 64)}, nil
 }
 
 // Float64Marshaler returns a MarshalFunc func that will generate an AttributeValue
 func Float64Marshaler(v *float64, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalFloat64(v, mode), nil
+		return MarshalFloat64(v, mode)
 	}
 }
 
 // MarshalBool marshals an AttributeValue into the given value
-func MarshalBool(v *bool, mode NilMode) ddb.AttributeValue {
+func MarshalBool(v *bool, mode NilMode) (ddb.AttributeValue, error) {
 	if v == nil {
 		return boolNil(mode)
 	}
 
-	return &ddb.AttributeValueMemberBOOL{Value: *v}
+	return &ddb.AttributeValueMemberBOOL{Value: *v}, nil
 }
 
 // BoolMarshaler returns a MarshalFunc func that will generate an AttributeValue
 func BoolMarshaler(v *bool, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalBool(v, mode), nil
+		return MarshalBool(v, mode)
 	}
 }
 
 // MarshalString marshals an AttributeValue into the given value
-func MarshalString(v *string, mode NilMode) ddb.AttributeValue {
+func MarshalString(v *string, mode NilMode) (ddb.AttributeValue, error) {
 	if v == nil {
 		return stringNil(mode)
 	}
 
-	return &ddb.AttributeValueMemberS{Value: *v}
+	return &ddb.AttributeValueMemberS{Value: *v}, nil
 }
 
 // StringMarshaler returns a MarshalFunc func that will generate an AttributeValue
 func StringMarshaler(v *string, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalString(v, mode), nil
+		return MarshalString(v, mode)
 	}
 }
 
 // MarshalBytes marshals an AttributeValue into the given value
-func MarshalBytes(v []byte, mode NilMode) ddb.AttributeValue {
+func MarshalBytes(v []byte, mode NilMode) (ddb.AttributeValue, error) {
 	if len(v) < 1 {
 		return bytesNil(mode)
 	}
 
-	return &ddb.AttributeValueMemberB{Value: v}
+	return &ddb.AttributeValueMemberB{Value: v}, nil
 }
 
 // BytesMarshaler returns a MarshalFunc func that will generate an AttributeValue
 func BytesMarshaler(v []byte, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalBytes(v, mode), nil
+		return MarshalBytes(v, mode)
 	}
 }
 
@@ -302,7 +315,7 @@ func JSONMarshaler(v interface{}) MarshalFunc {
 }
 
 // MarshalUnixNano marshals an AttributeValue into the given value
-func MarshalUnixNano(v *time.Time, mode NilMode) ddb.AttributeValue {
+func MarshalUnixNano(v *time.Time, mode NilMode) (ddb.AttributeValue, error) {
 	if v == nil {
 		return numericNil(mode)
 	}
@@ -315,22 +328,24 @@ func MarshalUnixNano(v *time.Time, mode NilMode) ddb.AttributeValue {
 // UnixNanoMarshaler returns a MarshalFunc func that will generate an AttributeValue
 func UnixNanoMarshaler(v *time.Time, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalUnixNano(v, mode), nil
+		return MarshalUnixNano(v, mode)
 	}
 }
 
 // MarshalUnix marshals an AttributeValue into the given value
-func MarshalUnix(v *time.Time, mode NilMode) ddb.AttributeValue {
+func MarshalUnix(v *time.Time, mode NilMode) (ddb.AttributeValue, error) {
 	if v == nil {
 		return numericNil(mode)
 	}
+
 	intV := v.Unix()
+
 	return MarshalInt64(&intV, mode)
 }
 
 // UnixMarshaler returns a MarshalFunc func that will generate an AttributeValue
 func UnixMarshaler(v *time.Time, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
-		return MarshalUnix(v, mode), nil
+		return MarshalUnix(v, mode)
 	}
 }
