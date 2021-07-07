@@ -105,15 +105,15 @@ func NewUpdateContributorInsights(input *ddb.UpdateContributorInsightsInput, mws
 	}
 }
 
-// Invoke invokes the UpdateContributorInsights operation and returns a UpdateContributorInsightsPromise
+// DynoInvoke invokes the UpdateContributorInsights operation and returns a UpdateContributorInsightsPromise
 func (op *UpdateContributorInsights) Invoke(ctx context.Context, client *ddb.Client) *UpdateContributorInsights {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *UpdateContributorInsights) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *UpdateContributorInsights) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(UpdateContributorInsightsOutput)
 

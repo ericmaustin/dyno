@@ -123,15 +123,15 @@ func NewScan(input *ddb.ScanInput, mws ...ScanMiddleWare) *Scan {
 	}
 }
 
-// Invoke invokes the Scan operation and returns a ScanPromise
+// DynoInvoke invokes the Scan operation and returns a ScanPromise
 func (op *Scan) Invoke(ctx context.Context, client *ddb.Client) *Scan {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *Scan) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *Scan) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(ScanOutput)
 
@@ -306,15 +306,15 @@ func NewScanAll(input *ddb.ScanInput, mws ...ScanAllMiddleWare) *ScanAll {
 	}
 }
 
-// Invoke invokes the ScanAll operation and returns a ScanAllPromise
+// DynoInvoke invokes the ScanAll operation and returns a ScanAllPromise
 func (op *ScanAll) Invoke(ctx context.Context, client *ddb.Client) *ScanAllPromise {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op.promise
 }
 
 // DynoInvoke the Operation interface
-func (op *ScanAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *ScanAll) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ScanAllOutput)
 
 	defer func() { op.promise.SetResponse(output.Get()) }()

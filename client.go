@@ -38,7 +38,7 @@ type Operation interface {
 // OperationF is an operation function that implements Operation
 type OperationF func(context.Context, *ddb.Client)
 
-// DynoInvoke implements Operation
+// Invoke implements Operation
 func (op OperationF) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	op(ctx, client)
 }

@@ -105,15 +105,15 @@ func NewTagResource(input *ddb.TagResourceInput, mws ...TagResourceMiddleWare) *
 	}
 }
 
-// Invoke invokes the TagResource operation and returns a TagResourcePromise
+// DynoInvoke invokes the TagResource operation and returns a TagResourcePromise
 func (op *TagResource) Invoke(ctx context.Context, client *ddb.Client) *TagResource {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *TagResource) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *TagResource) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(TagResourceOutput)
 

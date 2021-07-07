@@ -103,15 +103,15 @@ func NewDescribeEndpoints(input *ddb.DescribeEndpointsInput, mws ...DescribeEndp
 	}
 }
 
-// Invoke invokes the DescribeEndpoints operation and returns a DescribeEndpointsPromise
+// DynoInvoke invokes the DescribeEndpoints operation and returns a DescribeEndpointsPromise
 func (op *DescribeEndpoints) Invoke(ctx context.Context, client *ddb.Client) *DescribeEndpoints {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeEndpoints) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeEndpoints) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeEndpointsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

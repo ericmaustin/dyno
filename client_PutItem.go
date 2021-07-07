@@ -107,15 +107,15 @@ func NewPutItem(input *ddb.PutItemInput, mws ...PutItemMiddleWare) *PutItem {
 	}
 }
 
-// Invoke invokes the PutItem operation and returns a PutItemPromise
+// DynoInvoke invokes the PutItem operation and returns a PutItemPromise
 func (op *PutItem) Invoke(ctx context.Context, client *ddb.Client) *PutItem {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *PutItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *PutItem) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(PutItemOutput)
 

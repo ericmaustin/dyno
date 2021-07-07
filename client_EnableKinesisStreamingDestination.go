@@ -103,15 +103,15 @@ func NewEnableKinesisStreamingDestination(input *ddb.EnableKinesisStreamingDesti
 	}
 }
 
-// Invoke invokes the EnableKinesisStreamingDestination operation and returns a EnableKinesisStreamingDestinationPromise
+// DynoInvoke invokes the EnableKinesisStreamingDestination operation and returns a EnableKinesisStreamingDestinationPromise
 func (op *EnableKinesisStreamingDestination) Invoke(ctx context.Context, client *ddb.Client) *EnableKinesisStreamingDestination {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *EnableKinesisStreamingDestination) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *EnableKinesisStreamingDestination) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(EnableKinesisStreamingDestinationOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -103,15 +103,15 @@ func NewDescribeTableReplicaAutoScaling(input *ddb.DescribeTableReplicaAutoScali
 	}
 }
 
-// Invoke invokes the DescribeTableReplicaAutoScaling operation and returns a DescribeTableReplicaAutoScalingPromise
+// DynoInvoke invokes the DescribeTableReplicaAutoScaling operation and returns a DescribeTableReplicaAutoScalingPromise
 func (op *DescribeTableReplicaAutoScaling) Invoke(ctx context.Context, client *ddb.Client) *DescribeTableReplicaAutoScaling {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeTableReplicaAutoScaling) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeTableReplicaAutoScaling) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeTableReplicaAutoScalingOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

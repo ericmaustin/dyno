@@ -105,15 +105,15 @@ func NewUpdateTimeToLive(input *ddb.UpdateTimeToLiveInput, mws ...UpdateTimeToLi
 	}
 }
 
-// Invoke invokes the UpdateTimeToLive operation and returns a UpdateTimeToLivePromise
+// DynoInvoke invokes the UpdateTimeToLive operation and returns a UpdateTimeToLivePromise
 func (op *UpdateTimeToLive) Invoke(ctx context.Context, client *ddb.Client) *UpdateTimeToLive {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *UpdateTimeToLive) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *UpdateTimeToLive) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateTimeToLiveOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

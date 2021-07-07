@@ -105,15 +105,15 @@ func NewUpdateContinuousBackups(input *ddb.UpdateContinuousBackupsInput, mws ...
 	}
 }
 
-// Invoke invokes the UpdateContinuousBackups operation and returns a UpdateContinuousBackupsPromise
+// DynoInvoke invokes the UpdateContinuousBackups operation and returns a UpdateContinuousBackupsPromise
 func (op *UpdateContinuousBackups) Invoke(ctx context.Context, client *ddb.Client) *UpdateContinuousBackups {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *UpdateContinuousBackups) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *UpdateContinuousBackups) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(UpdateContinuousBackupsOutput)
 

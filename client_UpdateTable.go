@@ -104,15 +104,15 @@ func NewUpdateTable(input *ddb.UpdateTableInput, mws ...UpdateTableMiddleWare) *
 	}
 }
 
-// Invoke invokes the UpdateTable operation and returns a UpdateTablePromise
+// DynoInvoke invokes the UpdateTable operation and returns a UpdateTablePromise
 func (op *UpdateTable) Invoke(ctx context.Context, client *ddb.Client) *UpdateTable {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *UpdateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *UpdateTable) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateTableOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

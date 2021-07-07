@@ -103,15 +103,15 @@ func NewDescribeGlobalTable(input *ddb.DescribeGlobalTableInput, mws ...Describe
 	}
 }
 
-// Invoke invokes the DescribeGlobalTable operation and returns a DescribeGlobalTablePromise
+// DynoInvoke invokes the DescribeGlobalTable operation and returns a DescribeGlobalTablePromise
 func (op *DescribeGlobalTable) Invoke(ctx context.Context, client *ddb.Client) *DescribeGlobalTable {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeGlobalTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeGlobalTable) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeGlobalTableOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

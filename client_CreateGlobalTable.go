@@ -104,15 +104,22 @@ func NewCreateGlobalTable(input *ddb.CreateGlobalTableInput, mws ...CreateGlobal
 	}
 }
 
-// Invoke invokes the CreateGlobalTable operation and returns a CreateGlobalTablePromise
+// Invoke invokes the CreateGlobalTable operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *CreateGlobalTable) Invoke(ctx context.Context, client *ddb.Client) *CreateGlobalTable {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *CreateGlobalTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the CreateGlobalTable operation
+func (op *CreateGlobalTable) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(CreateGlobalTableOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -103,15 +103,15 @@ func NewListContributorInsights(input *ddb.ListContributorInsightsInput, mws ...
 	}
 }
 
-// Invoke invokes the ListContributorInsights operation and returns it
+// DynoInvoke invokes the ListContributorInsights operation and returns it
 func (op *ListContributorInsights) Invoke(ctx context.Context, client *ddb.Client) *ListContributorInsights {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ListContributorInsights) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *ListContributorInsights) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(ListContributorInsightsOutput)
 

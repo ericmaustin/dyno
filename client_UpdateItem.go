@@ -108,15 +108,15 @@ func NewUpdateItem(input *ddb.UpdateItemInput, mws ...UpdateItemMiddleWare) *Upd
 	}
 }
 
-// Invoke invokes the UpdateItem operation and returns a UpdateItemPromise
+// DynoInvoke invokes the UpdateItem operation and returns a UpdateItemPromise
 func (op *UpdateItem) Invoke(ctx context.Context, client *ddb.Client) *UpdateItem {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *UpdateItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *UpdateItem) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateItemOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

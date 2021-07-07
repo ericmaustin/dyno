@@ -104,15 +104,15 @@ func NewUntagResource(input *ddb.UntagResourceInput, mws ...UntagResourceMiddleW
 	}
 }
 
-// Invoke invokes the UntagResource operation and returns a UntagResourcePromise
+// DynoInvoke invokes the UntagResource operation and returns a UntagResourcePromise
 func (op *UntagResource) Invoke(ctx context.Context, client *ddb.Client) *UntagResource {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *UntagResource) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *UntagResource) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(UntagResourceOutput)
 

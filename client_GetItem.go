@@ -107,15 +107,15 @@ func NewGetItem(input *ddb.GetItemInput, mws ...GetItemMiddleWare) *GetItem {
 	}
 }
 
-// Invoke invokes the GetItem operation and returns a GetItemPromise
+// DynoInvoke invokes the GetItem operation and returns a GetItemPromise
 func (op *GetItem) Invoke(ctx context.Context, client *ddb.Client) *GetItem {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *GetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *GetItem) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(GetItemOutput)
 

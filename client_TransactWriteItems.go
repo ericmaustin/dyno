@@ -105,15 +105,15 @@ func NewTransactWriteItems(input *ddb.TransactWriteItemsInput, mws ...TransactWr
 	}
 }
 
-// Invoke invokes the TransactWriteItems operation and returns a TransactWriteItemsPromise
+// DynoInvoke invokes the TransactWriteItems operation and returns a TransactWriteItemsPromise
 func (op *TransactWriteItems) Invoke(ctx context.Context, client *ddb.Client) *TransactWriteItems {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *TransactWriteItems) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *TransactWriteItems) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(TransactWriteItemsOutput)
 

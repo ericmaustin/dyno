@@ -103,15 +103,15 @@ func NewDescribeTimeToLive(input *ddb.DescribeTimeToLiveInput, mws ...DescribeTi
 	}
 }
 
-// Invoke invokes the DescribeTimeToLive operation and returns a DescribeTimeToLivePromise
+// DynoInvoke invokes the DescribeTimeToLive operation and returns a DescribeTimeToLivePromise
 func (op *DescribeTimeToLive) Invoke(ctx context.Context, client *ddb.Client) *DescribeTimeToLive {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeTimeToLive) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeTimeToLive) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeTimeToLiveOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

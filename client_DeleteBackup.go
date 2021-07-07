@@ -123,16 +123,22 @@ func NewDeleteBackup(input *ddb.DeleteBackupInput, mws ...DeleteBackupMiddleWare
 	}
 }
 
-// Invoke invokes the DeleteBackup operation and returns a DeleteBackupPromise
+// Invoke invokes the DeleteBackup operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DeleteBackup) Invoke(ctx context.Context, client *ddb.Client) *DeleteBackup {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *DeleteBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the DeleteBackup operation
+func (op *DeleteBackup) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DeleteBackupOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

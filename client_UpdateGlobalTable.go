@@ -104,15 +104,15 @@ func NewUpdateGlobalTable(input *ddb.UpdateGlobalTableInput, mws ...UpdateGlobal
 	}
 }
 
-// Invoke invokes the UpdateGlobalTable operation and returns a UpdateGlobalTablePromise
+// DynoInvoke invokes the UpdateGlobalTable operation and returns a UpdateGlobalTablePromise
 func (op *UpdateGlobalTable) Invoke(ctx context.Context, client *ddb.Client) *UpdateGlobalTable {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *UpdateGlobalTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *UpdateGlobalTable) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateGlobalTableOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -103,15 +103,15 @@ func NewDescribeContributorInsights(input *ddb.DescribeContributorInsightsInput,
 	}
 }
 
-// Invoke invokes the DescribeContributorInsights operation and returns a DescribeContributorInsightsPromise
+// DynoInvoke invokes the DescribeContributorInsights operation and returns a DescribeContributorInsightsPromise
 func (op *DescribeContributorInsights) Invoke(ctx context.Context, client *ddb.Client) *DescribeContributorInsights {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeContributorInsights) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeContributorInsights) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeContributorInsightsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

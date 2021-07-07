@@ -103,15 +103,15 @@ func NewRestoreTableToPointInTime(input *ddb.RestoreTableToPointInTimeInput, mws
 	}
 }
 
-// Invoke invokes the RestoreTableToPointInTime operation and returns a RestoreTableToPointInTimePromise
+// DynoInvoke invokes the RestoreTableToPointInTime operation and returns a RestoreTableToPointInTimePromise
 func (op *RestoreTableToPointInTime) Invoke(ctx context.Context, client *ddb.Client) *RestoreTableToPointInTime {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *RestoreTableToPointInTime) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *RestoreTableToPointInTime) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(RestoreTableToPointInTimeOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

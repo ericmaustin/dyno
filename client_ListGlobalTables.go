@@ -103,15 +103,15 @@ func NewListGlobalTables(input *ddb.ListGlobalTablesInput, mws ...ListGlobalTabl
 	}
 }
 
-// Invoke invokes the ListGlobalTables operation and returns it
+// DynoInvoke invokes the ListGlobalTables operation and returns it
 func (op *ListGlobalTables) Invoke(ctx context.Context, client *ddb.Client) *ListGlobalTables {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ListGlobalTables) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *ListGlobalTables) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(ListGlobalTablesOutput)
 

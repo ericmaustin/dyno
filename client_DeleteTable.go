@@ -103,15 +103,15 @@ func NewDeleteTable(input *ddb.DeleteTableInput, mws ...DeleteTableMiddleWare) *
 	}
 }
 
-// Invoke invokes the DeleteTable operation and returns a DeleteTablePromise
+// DynoInvoke invokes the DeleteTable operation and returns a DeleteTablePromise
 func (op *DeleteTable) Invoke(ctx context.Context, client *ddb.Client) *DeleteTable {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DeleteTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *DeleteTable) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(DeleteTableOutput)
 

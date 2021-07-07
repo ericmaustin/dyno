@@ -139,15 +139,15 @@ func NewDescribeTable(input *ddb.DescribeTableInput, mws ...DescribeTableMiddleW
 	}
 }
 
-// Invoke invokes the DescribeTable operation and returns a DescribeTablePromise
+// DynoInvoke invokes the DescribeTable operation and returns a DescribeTablePromise
 func (op *DescribeTable) Invoke(ctx context.Context, client *ddb.Client) *DescribeTable {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeTable) Invoke(ctx context.Context, client *ddb.Client) {
 	invokeDescribeTableWithHandler(ctx, client, op.input, new(DescribeTableFinalHandler), op.middleWares, op.Promise)
 }
 
@@ -207,15 +207,15 @@ func NewTableExistsWaiter(input *ddb.DescribeTableInput, mws ...DescribeTableMid
 	}
 }
 
-// Invoke invokes the TableExistsWaiter operation
+// DynoInvoke invokes the TableExistsWaiter operation
 func (op *TableExistsWaiter) Invoke(ctx context.Context, client *ddb.Client) *TableExistsWaiter {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *TableExistsWaiter) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *TableExistsWaiter) Invoke(ctx context.Context, client *ddb.Client) {
 	invokeDescribeTableWithHandler(ctx, client, op.input, new(TableExistsWaiterFinalHandler), op.middleWares, op.Promise)
 }
 
@@ -265,15 +265,15 @@ func NewTableNotExistsWaiter(input *ddb.DescribeTableInput, mws ...DescribeTable
 	}
 }
 
-// Invoke invokes the TableNotExistsWaiter operation
+// DynoInvoke invokes the TableNotExistsWaiter operation
 func (op *TableNotExistsWaiter) Invoke(ctx context.Context, client *ddb.Client) *TableNotExistsWaiter {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *TableNotExistsWaiter) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *TableNotExistsWaiter) Invoke(ctx context.Context, client *ddb.Client) {
 	invokeDescribeTableWithHandler(ctx, client, op.input, new(TableNotExistsWaiterFinalHandler), op.middleWares, op.Promise)
 }
 

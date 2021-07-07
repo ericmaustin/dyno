@@ -103,15 +103,15 @@ func NewDisableKinesisStreamingDestination(input *ddb.DisableKinesisStreamingDes
 	}
 }
 
-// Invoke invokes the DisableKinesisStreamingDestination operation and returns a DisableKinesisStreamingDestinationPromise
+// DynoInvoke invokes the DisableKinesisStreamingDestination operation and returns a DisableKinesisStreamingDestinationPromise
 func (op *DisableKinesisStreamingDestination) Invoke(ctx context.Context, client *ddb.Client) *DisableKinesisStreamingDestination {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DisableKinesisStreamingDestination) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *DisableKinesisStreamingDestination) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DisableKinesisStreamingDestinationOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

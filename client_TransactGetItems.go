@@ -105,15 +105,15 @@ func NewTransactGetItems(input *ddb.TransactGetItemsInput, mws ...TransactGetIte
 	}
 }
 
-// Invoke invokes the TransactGetItems operation and returns a TransactGetItemsPromise
+// DynoInvoke invokes the TransactGetItems operation and returns a TransactGetItemsPromise
 func (op *TransactGetItems) Invoke(ctx context.Context, client *ddb.Client) *TransactGetItems {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *TransactGetItems) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *TransactGetItems) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(TransactGetItemsOutput)
 

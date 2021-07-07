@@ -122,15 +122,15 @@ func NewQuery(input *ddb.QueryInput, mws ...QueryMiddleWare) *Query {
 	}
 }
 
-// Invoke invokes the Query operation and returns a QueryPromise
+// DynoInvoke invokes the Query operation and returns a QueryPromise
 func (op *Query) Invoke(ctx context.Context, client *ddb.Client) *Query {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *Query) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *Query) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(QueryOutput)
 
@@ -273,15 +273,15 @@ func NewQueryAll(input *ddb.QueryInput, mws ...QueryAllMiddleWare) *QueryAll {
 	}
 }
 
-// Invoke invokes the QueryAll operation and returns a QueryAllPromise
+// DynoInvoke invokes the QueryAll operation and returns a QueryAllPromise
 func (op *QueryAll) Invoke(ctx context.Context, client *ddb.Client) *QueryAll {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke the Operation interface
-func (op *QueryAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *QueryAll) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(QueryAllOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

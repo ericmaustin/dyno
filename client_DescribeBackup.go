@@ -103,15 +103,15 @@ func NewDescribeBackup(input *ddb.DescribeBackupInput, mws ...DescribeBackupMidd
 	}
 }
 
-// Invoke invokes the DescribeBackup operation and returns a DescribeBackupPromise
+// DynoInvoke invokes the DescribeBackup operation and returns a DescribeBackupPromise
 func (op *DescribeBackup) Invoke(ctx context.Context, client *ddb.Client) *DescribeBackup {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeBackup) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeBackupOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

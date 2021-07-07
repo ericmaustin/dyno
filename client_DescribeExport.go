@@ -103,15 +103,15 @@ func NewDescribeExport(input *ddb.DescribeExportInput, mws ...DescribeExportMidd
 	}
 }
 
-// Invoke invokes the DescribeExport operation and returns a DescribeExportPromise
+// DynoInvoke invokes the DescribeExport operation and returns a DescribeExportPromise
 func (op *DescribeExport) Invoke(ctx context.Context, client *ddb.Client) *DescribeExport {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeExport) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeExport) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeExportOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -103,15 +103,15 @@ func NewListTagsOfResource(input *ddb.ListTagsOfResourceInput, mws ...ListTagsOf
 	}
 }
 
-// Invoke invokes the ListTagsOfResource operation and returns it
+// DynoInvoke invokes the ListTagsOfResource operation and returns it
 func (op *ListTagsOfResource) Invoke(ctx context.Context, client *ddb.Client) *ListTagsOfResource {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ListTagsOfResource) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *ListTagsOfResource) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(ListTagsOfResourceOutput)
 

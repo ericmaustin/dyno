@@ -103,15 +103,15 @@ func NewListBackups(input *ddb.ListBackupsInput, mws ...ListBackupsMiddleWare) *
 	}
 }
 
-// Invoke invokes the ListBackups operation and returns a ListBackupsPromise
+// DynoInvoke invokes the ListBackups operation and returns a ListBackupsPromise
 func (op *ListBackups) Invoke(ctx context.Context, client *ddb.Client) *ListBackups {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ListBackups) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *ListBackups) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(ListBackupsOutput)
 

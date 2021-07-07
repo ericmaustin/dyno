@@ -103,15 +103,15 @@ func NewRestoreTableFromBackup(input *ddb.RestoreTableFromBackupInput, mws ...Re
 	}
 }
 
-// Invoke invokes the RestoreTableFromBackup operation and returns a RestoreTableFromBackupPromise
+// DynoInvoke invokes the RestoreTableFromBackup operation and returns a RestoreTableFromBackupPromise
 func (op *RestoreTableFromBackup) Invoke(ctx context.Context, client *ddb.Client) *RestoreTableFromBackup {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *RestoreTableFromBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *RestoreTableFromBackup) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(RestoreTableFromBackupOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

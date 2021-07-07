@@ -103,15 +103,15 @@ func NewDescribeKinesisStreamingDestination(input *ddb.DescribeKinesisStreamingD
 	}
 }
 
-// Invoke invokes the DescribeKinesisStreamingDestination operation and returns a DescribeKinesisStreamingDestinationPromise
+// DynoInvoke invokes the DescribeKinesisStreamingDestination operation and returns a DescribeKinesisStreamingDestinationPromise
 func (op *DescribeKinesisStreamingDestination) Invoke(ctx context.Context, client *ddb.Client) *DescribeKinesisStreamingDestination {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeKinesisStreamingDestination) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeKinesisStreamingDestination) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeKinesisStreamingDestinationOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

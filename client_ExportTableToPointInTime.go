@@ -103,15 +103,15 @@ func NewExportTableToPointInTime(input *ddb.ExportTableToPointInTimeInput, mws .
 	}
 }
 
-// Invoke invokes the ExportTableToPointInTime operation and returns a ExportTableToPointInTimePromise
+// DynoInvoke invokes the ExportTableToPointInTime operation and returns a ExportTableToPointInTimePromise
 func (op *ExportTableToPointInTime) Invoke(ctx context.Context, client *ddb.Client) *ExportTableToPointInTime {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ExportTableToPointInTime) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *ExportTableToPointInTime) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ExportTableToPointInTimeOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

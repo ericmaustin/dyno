@@ -103,15 +103,15 @@ func NewListExports(input *ddb.ListExportsInput, mws ...ListExportsMiddleWare) *
 	}
 }
 
-// Invoke invokes the ListExports operation and returns it
+// DynoInvoke invokes the ListExports operation and returns it
 func (op *ListExports) Invoke(ctx context.Context, client *ddb.Client) *ListExports {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ListExports) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *ListExports) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(ListExportsOutput)
 

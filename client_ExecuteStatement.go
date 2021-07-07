@@ -103,15 +103,15 @@ func NewExecuteStatement(input *ddb.ExecuteStatementInput, mws ...ExecuteStateme
 	}
 }
 
-// Invoke invokes the ExecuteStatement operation and returns a ExecuteStatementPromise
+// DynoInvoke invokes the ExecuteStatement operation and returns a ExecuteStatementPromise
 func (op *ExecuteStatement) Invoke(ctx context.Context, client *ddb.Client) *ExecuteStatement {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ExecuteStatement) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *ExecuteStatement) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ExecuteStatementOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

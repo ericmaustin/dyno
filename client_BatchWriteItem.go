@@ -121,18 +121,25 @@ func NewBatchWriteItem(input *ddb.BatchWriteItemInput, mws ...BatchWriteItemMidd
 	}
 }
 
-// Invoke invokes the BatchWriteItem operation and returns a BatchWriteItemPromise
+// Invoke invokes the BatchWriteItem operation and returns the BatchWriteItem
 func (op *BatchWriteItem) Invoke(ctx context.Context, client *ddb.Client) *BatchWriteItem {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise is now waiting for a response
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *BatchWriteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise is now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the BatchWriteItem operation
+func (op *BatchWriteItem) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(BatchWriteItemOutput)
 
-	defer func() { op.SetResponse(output.Get()) }()
+	defer func(){ op.SetResponse(output.Get()) }()
 
 	requestCtx := &BatchWriteItemContext{
 		Context: ctx,
@@ -291,15 +298,22 @@ func NewBatchWriteItemAll(input *ddb.BatchWriteItemInput, mws ...BatchWriteItemA
 	}
 }
 
-// Invoke invokes the BatchWriteItemAll operation and returns a BatchWriteItemAllPromise
+// Invoke invokes the BatchWriteItemAll operation and returns the BatchWriteItemAll
 func (op *BatchWriteItemAll) Invoke(ctx context.Context, client *ddb.Client) *BatchWriteItemAll {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a result
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
-// DynoInvoke the Operation interface
+// DynoInvoke implements the Operation interface
 func (op *BatchWriteItemAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a result
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the BatchWriteItemAll operation
+func (op *BatchWriteItemAll) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(BatchWriteItemAllOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

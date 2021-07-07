@@ -103,15 +103,15 @@ func NewListTables(input *ddb.ListTablesInput, mws ...ListTablesMiddleWare) *Lis
 	}
 }
 
-// Invoke invokes the ListTables operation and returns it
+// DynoInvoke invokes the ListTables operation and returns it
 func (op *ListTables) Invoke(ctx context.Context, client *ddb.Client) *ListTables {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ListTables) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *ListTables) Invoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(ListTablesOutput)
 

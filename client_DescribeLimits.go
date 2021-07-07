@@ -103,15 +103,15 @@ func NewDescribeLimits(input *ddb.DescribeLimitsInput, mws ...DescribeLimitsMidd
 	}
 }
 
-// Invoke invokes the DescribeLimits operation and returns a DescribeLimitsPromise
+// DynoInvoke invokes the DescribeLimits operation and returns a DescribeLimitsPromise
 func (op *DescribeLimits) Invoke(ctx context.Context, client *ddb.Client) *DescribeLimits {
-	go op.DynoInvoke(ctx, client)
+	go op.Invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeLimits) DynoInvoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeLimits) Invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeLimitsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()
