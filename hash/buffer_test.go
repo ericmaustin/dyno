@@ -38,3 +38,5 @@ func TestAvHash(t *testing.T) {
 	fmt.Println(buf2.String())
 	fmt.Println(buf3.String())
 }
+
+// todo: query, scan, etc. tests

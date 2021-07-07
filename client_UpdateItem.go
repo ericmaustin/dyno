@@ -170,11 +170,17 @@ type UpdateItemBuilder struct {
 
 // NewUpdateItemBuilder creates a new UpdateItemBuilder
 func NewUpdateItemBuilder(input *ddb.UpdateItemInput) *UpdateItemBuilder {
-	if input != nil {
-		return &UpdateItemBuilder{UpdateItemInput: input}
+	bld := &UpdateItemBuilder{
+		cnd: new(condition.Builder),
 	}
 
-	return &UpdateItemBuilder{UpdateItemInput: NewUpdateItemInput(nil)}
+	if input != nil {
+		bld.UpdateItemInput = input
+	} else {
+		bld.UpdateItemInput =  NewUpdateItemInput(nil)
+	}
+
+	return bld
 }
 
 // Add adds an Add operation on this update with the given field name and value

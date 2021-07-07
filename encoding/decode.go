@@ -166,7 +166,9 @@ func unmarshalMapToStruct(item map[string]ddb.AttributeValue, rv reflect.Value, 
 				if err = unmarshalMapToStruct(item, targetVal, fc.Prepend, fc.Append); err != nil {
 					return err
 				}
+
 				fv.Set(Indirect(targetVal, false))
+
 			case reflect.Map:
 				if err = unmarshalMapToEmbeddedMap(item, fv, fc.Prepend, fc.Append); err != nil {
 					return err
@@ -216,6 +218,7 @@ func unmarshalMapToEmbeddedMap(item map[string]ddb.AttributeValue, rv reflect.Va
 			if err := unmarshalMap(item[keyStr], target, new(fieldConfig)); err != nil {
 				return err
 			}
+
 			rv.SetMapIndex(key, target.Elem())
 		}
 	}

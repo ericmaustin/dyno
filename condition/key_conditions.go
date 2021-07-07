@@ -85,15 +85,18 @@ func (ks *KeyConditionBuilder) And(conditions ...expression.KeyConditionBuilder)
 		ks.KeyConditionBuilder = &builder
 		return ks
 	}
+
 	ks.KeyConditionBuilder.And(builder)
+
 	return ks
 }
 
 // Builder returns the condition set's complete Builder
 func (ks *KeyConditionBuilder) Builder() expression.KeyConditionBuilder {
-	if ks.KeyConditionBuilder == nil {
+	if ks == nil || ks.KeyConditionBuilder == nil {
 		// empty expression.KeyConditionBuilder
 		return expression.KeyConditionBuilder{}
 	}
+
 	return *ks.KeyConditionBuilder
 }
