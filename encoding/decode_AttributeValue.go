@@ -174,7 +174,7 @@ func Int32Unmarshaler(v *uint32) UnmarshalerFunc {
 }
 
 // UnmarshalUint32Ptr unmarshals an AttributeValue into the given value
-func UnmarshalUint32Ptr(av ddb.AttributeValue, v **int32) error {
+func UnmarshalUint32Ptr(av ddb.AttributeValue, v **uint32) error {
 	nv, ok := av.(*ddb.AttributeValueMemberN)
 	if !ok {
 		if avNull, ok := av.(*ddb.AttributeValueMemberNULL); ok && avNull.Value {
@@ -192,29 +192,29 @@ func UnmarshalUint32Ptr(av ddb.AttributeValue, v **int32) error {
 	}
 
 	if *v == nil {
-		*v = new(int32)
+		*v = new(uint32)
 	}
 
-	**v = int32(i)
+	**v = uint32(i)
 
 	return nil
 }
 
 
 // UnmarshalUint32 unmarshals an AttributeValue into the given value
-func UnmarshalUint32(av ddb.AttributeValue, v *int32) error {
+func UnmarshalUint32(av ddb.AttributeValue, v *uint32) error {
 	return UnmarshalUint32Ptr(av, &v)
 }
 
 // Uint32PtrUnmarshaler returns a UnmarshalerFunc func that will unmarshal an AttributeValue into the given ptr
-func Uint32PtrUnmarshaler(v **int32) UnmarshalerFunc {
+func Uint32PtrUnmarshaler(v **uint32) UnmarshalerFunc {
 	return func(av ddb.AttributeValue) error {
 		return UnmarshalUint32Ptr(av, v)
 	}
 }
 
 // Uint32Unmarshaler returns a UnmarshalerFunc func that will unmarshal an AttributeValue into the given ptr
-func Uint32Unmarshaler(v *int32) UnmarshalerFunc {
+func Uint32Unmarshaler(v *uint32) UnmarshalerFunc {
 	return func(av ddb.AttributeValue) error {
 		return UnmarshalUint32(av, v)
 	}
