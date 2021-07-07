@@ -93,13 +93,6 @@ func getTestStruct() *testStruct {
 	}
 }
 
-func MustBeInt(i int, err error) int {
-	if err != nil {
-		panic(err)
-	}
-	return i
-}
-
 func TestStructToAttributeValueMap(t *testing.T) {
 
 	s := getTestStruct()
@@ -117,7 +110,6 @@ func TestStructToAttributeValueMap(t *testing.T) {
 	assert.Equal(t, av["prependSubInt"].(*ddb.AttributeValueMemberN).Value, fmt.Sprintf("%d", s.SubStructPrepend.SubInt))
 	assert.Equal(t, av["SubIntappend"].(*ddb.AttributeValueMemberN).Value, fmt.Sprintf("%d", s.SubStructAppend.SubInt))
 	assert.Equal(t, av["IntPtrOmitNil"].(*ddb.AttributeValueMemberN).Value, fmt.Sprintf("%d", *s.IntPtrOmitNil))
-	// todo: wtf this is so long, is there a way to see if we can shorten a reference like this?
 	assert.Equal(t, av["StringMap"].(*ddb.AttributeValueMemberM).Value["stringMap1"].(*ddb.AttributeValueMemberS).Value, s.StringMap["stringMap1"])
 	assert.Equal(t, av["prepend_embededMap1"].(*ddb.AttributeValueMemberS).Value, s.EmbeddedMap["embededMap1"])
 }
