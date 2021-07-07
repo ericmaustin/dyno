@@ -5,14 +5,73 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"io"
 	"sort"
 )
 
-// TODO: doc comments
+// GetItemInputString creates a string from a GetItemInput
+func GetItemInputString(input *ddb.GetItemInput) string {
+	return NewBuffer().WriteGetItemInput(input).String()
+}
 
+// GetItemInputSHA256String creates a SHA256 string from a GetItemInput
+func GetItemInputSHA256String(input *ddb.GetItemInput) string {
+	return NewBuffer().WriteGetItemInput(input).SHA256String()
+}
+
+// GetItemInputSHA256 creates a SHA256 string from a GetItemInput
+func GetItemInputSHA256(input *ddb.GetItemInput) [32]byte {
+	return NewBuffer().WriteGetItemInput(input).SHA256()
+}
+
+// BatchGetItemInputString creates a string from a BatchGetItemInput
+func BatchGetItemInputString(input *ddb.BatchGetItemInput) string {
+	return NewBuffer().WriteBatchGetItemInput(input).String()
+}
+
+// BatchGetItemInputSHA256String creates a SHA256 string from a BatchGetItemInput
+func BatchGetItemInputSHA256String(input *ddb.BatchGetItemInput) string {
+	return NewBuffer().WriteBatchGetItemInput(input).SHA256String()
+}
+
+// BatchGetItemInputSHA256 creates a SHA256 string from a BatchGetItemInput
+func BatchGetItemInputSHA256(input *ddb.BatchGetItemInput) [32]byte {
+	return NewBuffer().WriteBatchGetItemInput(input).SHA256()
+}
+
+// ScanInputString creates a string from a ScanInput
+func ScanInputString(input *ddb.ScanInput) string {
+	return NewBuffer().WriteScanInput(input).String()
+}
+
+// ScanInputSHA256String creates a SHA256 string from a ScanInput
+func ScanInputSHA256String(input *ddb.ScanInput) string {
+	return NewBuffer().WriteScanInput(input).SHA256String()
+}
+
+// ScanInputSHA256 creates a SHA256 string from a ScanInput
+func ScanInputSHA256(input *ddb.ScanInput) [32]byte {
+	return NewBuffer().WriteScanInput(input).SHA256()
+}
+
+// QueryInputString creates a string from a QueryInput
+func QueryInputString(input *ddb.QueryInput) string {
+	return NewBuffer().WriteQueryInput(input).String()
+}
+
+// QueryInputSHA256String creates a SHA256 string from a QueryInput
+func QueryInputSHA256String(input *ddb.QueryInput) string {
+	return NewBuffer().WriteQueryInput(input).SHA256String()
+}
+
+// QueryInputSHA256 creates a SHA256 string from a QueryInput
+func QueryInputSHA256(input *ddb.QueryInput) [32]byte {
+	return NewBuffer().WriteQueryInput(input).SHA256()
+}
+
+// Buffer is a bytes Buffer used to create hashes for dynamodb inputs
 type Buffer struct {
 	*bytes.Buffer
 }
@@ -519,7 +578,7 @@ func (b *Buffer) WriteRequestItems(v map[string]types.KeysAndAttributes) *Buffer
 }
 
 // WriteQueryInput writes a dynamodb.QueryInput to the Buffer
-func (b *Buffer) WriteQueryInput(in *dynamodb.QueryInput) *Buffer {
+func (b *Buffer) WriteQueryInput(in *ddb.QueryInput) *Buffer {
 	b.WriteConsistentRead(in.ConsistentRead)
 	b.WriteExclusiveStartKey(in.ExclusiveStartKey)
 	b.WriteExpressionAttributeNames(in.ExpressionAttributeNames)
@@ -546,7 +605,7 @@ func (b *Buffer) WriteQueryInput(in *dynamodb.QueryInput) *Buffer {
 }
 
 // WriteScanInput writes a dynamodb.ScanInput to the Buffer
-func (b *Buffer) WriteScanInput(in *dynamodb.ScanInput) *Buffer {
+func (b *Buffer) WriteScanInput(in *ddb.ScanInput) *Buffer {
 	b.WriteConsistentRead(in.ConsistentRead)
 	b.WriteExclusiveStartKey(in.ExclusiveStartKey)
 	b.WriteExpressionAttributeNames(in.ExpressionAttributeNames)
@@ -578,7 +637,7 @@ func (b *Buffer) WriteScanInput(in *dynamodb.ScanInput) *Buffer {
 }
 
 // WriteGetItemInput writes a dynamodb.GetItemInput to the Buffer
-func (b *Buffer) WriteGetItemInput(in *dynamodb.GetItemInput) *Buffer {
+func (b *Buffer) WriteGetItemInput(in *ddb.GetItemInput) *Buffer {
 	b.WriteConsistentRead(in.ConsistentRead)
 	b.WriteExpressionAttributeNames(in.ExpressionAttributeNames)
 
@@ -596,7 +655,7 @@ func (b *Buffer) WriteGetItemInput(in *dynamodb.GetItemInput) *Buffer {
 }
 
 // WriteBatchGetItemInput writes a dynamodb.BatchGetItemInput to the Buffer
-func (b *Buffer) WriteBatchGetItemInput(in *dynamodb.BatchGetItemInput) *Buffer {
+func (b *Buffer) WriteBatchGetItemInput(in *ddb.BatchGetItemInput) *Buffer {
 	b.WriteRequestItems(in.RequestItems)
 	b.WriteReturnConsumedCapacity(in.ReturnConsumedCapacity)
 

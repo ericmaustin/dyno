@@ -55,6 +55,7 @@ func (o *DeleteItemOutput) Get() (out *ddb.DeleteItemOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -172,10 +173,17 @@ type DeleteItemBuilder struct {
 
 // NewDeleteItemBuilder creates a new DeleteItemInput with DeleteItemOpt
 func NewDeleteItemBuilder(input *ddb.DeleteItemInput) *DeleteItemBuilder {
-	if input != nil {
-		return &DeleteItemBuilder{DeleteItemInput: input}
+	bld := &DeleteItemBuilder{
+		cnd: new(condition.Builder),
 	}
-	return &DeleteItemBuilder{DeleteItemInput: NewDeleteItemInput(nil, nil)}
+
+	if input != nil {
+		bld.DeleteItemInput = input
+	} else {
+		bld.DeleteItemInput = NewDeleteItemInput(nil, nil)
+	}
+
+	return bld
 }
 
 // SetKey sets the target key for the item to tbe deleted
@@ -243,9 +251,11 @@ func (bld *DeleteItemBuilder) Build() (*ddb.DeleteItemInput, error) {
 		if err != nil {
 			return nil, fmt.Errorf("DeleteItemInput.Build() encountered an error while attempting to build an expression: %v", err)
 		}
+
 		bld.ConditionExpression = e.Condition()
 		bld.ExpressionAttributeNames = e.Names()
 		bld.ExpressionAttributeValues = e.Values()
 	}
+
 	return bld.DeleteItemInput, nil
 }

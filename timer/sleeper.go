@@ -77,13 +77,14 @@ func (s *Sleeper) Sleep() <-chan error {
 	defer s.mu.Unlock()
 
 	if !s.started {
-
 		if s.ctx == nil {
 			s.ctx = context.Background()
 		}
+
 		s.ctx, s.done = context.WithCancel(s.ctx)
 		s.started = true
 	}
+
 	nextSleep := s.durationFunc(s.sleepDuration, s.count)
 
 	if s.randAdd > 0 {

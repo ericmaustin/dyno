@@ -160,11 +160,18 @@ type PutItemBuilder struct {
 
 // NewPutItemBuilder creates a new PutItemBuilder with PutItemOpt
 func NewPutItemBuilder(input *ddb.PutItemInput) *PutItemBuilder {
-	if input != nil {
-		return &PutItemBuilder{PutItemInput: input}
+
+	bld := &PutItemBuilder{
+		cnd: new(condition.Builder),
 	}
 
-	return &PutItemBuilder{PutItemInput: NewPutItemInput(nil, nil)}
+	if input != nil {
+		bld.PutItemInput = input
+	} else {
+		bld.PutItemInput = NewPutItemInput(nil, nil)
+	}
+
+	return bld
 }
 
 // SetItem shadows dynamodb.PutItemInput and sets the item that will be used to build the put input

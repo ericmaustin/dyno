@@ -36,8 +36,11 @@ func In(name string, values ...interface{}) expression.ConditionBuilder {
 	for i, val := range values {
 		encoded[i] = expression.Value(val)
 	}
+
 	var right expression.OperandBuilder
+
 	other := make([]expression.OperandBuilder, 0)
+
 	for _, v := range encoded {
 		if right == nil {
 			right = v
@@ -45,6 +48,7 @@ func In(name string, values ...interface{}) expression.ConditionBuilder {
 			other = append(other, v)
 		}
 	}
+
 	return expression.Name(name).In(right, other...)
 }
 
@@ -78,9 +82,8 @@ func NotExists(name string) expression.ConditionBuilder {
 	return expression.Name(name).AttributeNotExists()
 }
 
-//And (Condition And) returns an Expression.Build that joins one or more provided conditions with an AND condition
-//	returns
-//		expression.ConditionBuilder: the Expression builder value
+// And (Condition And) returns an Expression.Build that joins one or more provided conditions with an AND condition
+//	returns an expression.ConditionBuilder: the Expression builder value
 func And(left expression.ConditionBuilder, right ...expression.ConditionBuilder) expression.ConditionBuilder {
 
 	if len(right) < 1 {
@@ -176,7 +179,7 @@ func (b *Builder) Or(conditions ...expression.ConditionBuilder) *Builder {
 
 // Builder returns the expression.ConditionBuilder
 func (b *Builder) Builder() expression.ConditionBuilder {
-	if b.ConditionBuilder == nil {
+	if b == nil || b.ConditionBuilder == nil {
 		return expression.ConditionBuilder{}
 	}
 
