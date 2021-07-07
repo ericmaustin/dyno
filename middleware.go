@@ -13,7 +13,7 @@ type UnmarshalMiddleWare struct {
 }
 
 // BatchGetItemAllMiddleWare implements the BatchGetItemAllMiddleWare interface
-func (mw *Unmarshaler) BatchGetItemAllMiddleWare(next BatchGetItemAllHandler) BatchGetItemAllHandler {
+func (mw *UnmarshalMiddleWare) BatchGetItemAllMiddleWare(next BatchGetItemAllHandler) BatchGetItemAllHandler {
 	return BatchGetItemAllHandlerFunc(func(ctx *BatchGetItemAllContext, output *BatchGetItemAllOutput) {
 		next.HandleBatchGetItemAll(ctx, output)
 		outs, err := output.Get()
@@ -34,7 +34,7 @@ func (mw *Unmarshaler) BatchGetItemAllMiddleWare(next BatchGetItemAllHandler) Ba
 }
 
 // GetItemMiddleWare implements the GetItemMiddleWare interface
-func (mw *Unmarshaler) GetItemMiddleWare(next GetItemHandler) GetItemHandler {
+func (mw *UnmarshalMiddleWare) GetItemMiddleWare(next GetItemHandler) GetItemHandler {
 	return GetItemHandlerFunc(func(ctx *GetItemContext, output *GetItemOutput) {
 		next.HandleGetItem(ctx, output)
 		out, err := output.Get()
@@ -49,7 +49,7 @@ func (mw *Unmarshaler) GetItemMiddleWare(next GetItemHandler) GetItemHandler {
 }
 
 // QueryMiddleWare implements the QueryMiddleWare interface
-func (mw *Unmarshaler) QueryMiddleWare(next QueryHandler) QueryHandler {
+func (mw *UnmarshalMiddleWare) QueryMiddleWare(next QueryHandler) QueryHandler {
 	return QueryHandlerFunc(func(ctx *QueryContext, output *QueryOutput) {
 		next.HandleQuery(ctx, output)
 		out, err := output.Get()
@@ -66,7 +66,7 @@ func (mw *Unmarshaler) QueryMiddleWare(next QueryHandler) QueryHandler {
 }
 
 // QueryAllMiddleWare implements the QueryAllMiddleWare interface
-func (mw *Unmarshaler) QueryAllMiddleWare(next QueryAllHandler) QueryAllHandler {
+func (mw *UnmarshalMiddleWare) QueryAllMiddleWare(next QueryAllHandler) QueryAllHandler {
 	return QueryAllHandlerFunc(func(ctx *QueryAllContext, output *QueryAllOutput) {
 		next.HandleQueryAll(ctx, output)
 		outs, err := output.Get()
@@ -85,7 +85,7 @@ func (mw *Unmarshaler) QueryAllMiddleWare(next QueryAllHandler) QueryAllHandler 
 }
 
 // ScanMiddleWare implements the ScanMiddleWare interface
-func (mw *Unmarshaler) ScanMiddleWare(next ScanHandler) ScanHandler {
+func (mw *UnmarshalMiddleWare) ScanMiddleWare(next ScanHandler) ScanHandler {
 	return ScanHandlerFunc(func(ctx *ScanContext, output *ScanOutput) {
 		next.HandleScan(ctx, output)
 		out, err := output.Get()
@@ -102,7 +102,7 @@ func (mw *Unmarshaler) ScanMiddleWare(next ScanHandler) ScanHandler {
 }
 
 // ScanAllMiddleWare implements the ScanAllMiddleWare interface
-func (mw *Unmarshaler) ScanAllMiddleWare(next ScanAllHandler) ScanAllHandler {
+func (mw *UnmarshalMiddleWare) ScanAllMiddleWare(next ScanAllHandler) ScanAllHandler {
 	return ScanAllHandlerFunc(func(ctx *ScanAllContext, output *ScanAllOutput) {
 		next.HandleScanAll(ctx, output)
 		outs, err := output.Get()
@@ -121,39 +121,22 @@ func (mw *Unmarshaler) ScanAllMiddleWare(next ScanAllHandler) ScanAllHandler {
 }
 
 // NewUnmarshaler creates a new Unmarshaler with a given target interface{}
-func NewUnmarshaler(target interface{}) *Unmarshaler {
+func NewUnmarshaler(target interface{}) *UnmarshalMiddleWare {
 
-	mw := &Unmarshaler{
-		target: target,
+	mu := &sync.Mutex{}
+
+	return &UnmarshalMiddleWare{
+		Unmarshal: func(av map[string]types.AttributeValue) error {
+			mu.Lock()
+			defer mu.Unlock()
+
+			return encoding.UnmarshalMap(av, target)
+		},
+		UnmarshalSlice: func(avs []map[string]types.AttributeValue) error {
+			mu.Lock()
+			defer mu.Unlock()
+
+			return encoding.UnmarshalMaps(avs, target)
+		},
 	}
-
-	mw.UnmarshalMiddleWare = UnmarshalMiddleWare{
-		Unmarshal:      mw.Unmarshal,
-		UnmarshalSlice: mw.UnmarshalSlice,
-	}
-
-	return mw
-}
-
-// Unmarshaler is used to unmarshal the result of a get, scan, or query operation to a given target interface
-type Unmarshaler struct {
-	UnmarshalMiddleWare
-	target interface{}
-	mu sync.Mutex
-}
-
-// Unmarshal unmarshals a single attribute value item
-func (mw *Unmarshaler) Unmarshal(av map[string]types.AttributeValue) error {
-	mw.mu.Lock()
-	defer mw.mu.Unlock()
-
-	return encoding.UnmarshalMap(av, mw.target)
-}
-
-// UnmarshalSlice unmarshals a slice of attribute value maps
-func (mw *Unmarshaler) UnmarshalSlice(avs []map[string]types.AttributeValue) error {
-	mw.mu.Lock()
-	defer mw.mu.Unlock()
-	
-	return encoding.UnmarshalMaps(avs, mw.target)
 }
