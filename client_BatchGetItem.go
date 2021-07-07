@@ -351,13 +351,13 @@ func (bld *BatchGetItemBuilder) initTable(tableName string) {
 
 // AddProjection adds additional field names to the projection
 func (bld *BatchGetItemBuilder) AddProjection(projection interface{}) *BatchGetItemBuilder {
-	addProjection(bld.projection, projection)
+	addProjection(&bld.projection, projection)
 	return bld
 }
 
 // AddProjectionNames adds additional field names to the projection with strings
 func (bld *BatchGetItemBuilder) AddProjectionNames(names ...string) *BatchGetItemBuilder {
-	addProjectionNames(bld.projection, names)
+	addProjectionNames(&bld.projection, names)
 	return bld
 }
 

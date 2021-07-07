@@ -67,6 +67,7 @@ func (o *BatchWriteItemOutput) Get() (out *ddb.BatchWriteItemOutput, err error) 
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 

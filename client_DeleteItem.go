@@ -10,7 +10,6 @@ import (
 	"sync"
 )
 
-
 // DeleteItem executes DeleteItem operation and returns a DeleteItemPromise
 func (c *Client) DeleteItem(ctx context.Context, input *ddb.DeleteItemInput, mw ...DeleteItemMiddleWare) *DeleteItem {
 	return NewDeleteItem(input, mw...).Invoke(ctx, c.ddb)
@@ -38,7 +37,7 @@ type DeleteItemContext struct {
 type DeleteItemOutput struct {
 	out *ddb.DeleteItemOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -73,7 +72,7 @@ func (h DeleteItemHandlerFunc) HandleDeleteItem(ctx *DeleteItemContext, output *
 }
 
 // DeleteItemFinalHandler is the final DeleteItemHandler that executes a dynamodb DeleteItem operation
-type DeleteItemFinalHandler struct {}
+type DeleteItemFinalHandler struct{}
 
 // HandleDeleteItem implements the DeleteItemHandler
 func (h *DeleteItemFinalHandler) HandleDeleteItem(ctx *DeleteItemContext, output *DeleteItemOutput) {
@@ -103,7 +102,7 @@ type DeleteItem struct {
 // NewDeleteItem creates a new DeleteItem
 func NewDeleteItem(input *ddb.DeleteItemInput, mws ...DeleteItemMiddleWare) *DeleteItem {
 	return &DeleteItem{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
@@ -168,14 +167,12 @@ func NewDeleteItemInput(tableName *string, key map[string]ddbTypes.AttributeValu
 // DeleteItemBuilder is used for dynamically building a DeleteItemInput
 type DeleteItemBuilder struct {
 	*ddb.DeleteItemInput
-	cnd *condition.Builder
+	cnd condition.Builder
 }
 
 // NewDeleteItemBuilder creates a new DeleteItemInput with DeleteItemOpt
 func NewDeleteItemBuilder(input *ddb.DeleteItemInput) *DeleteItemBuilder {
-	bld := &DeleteItemBuilder{
-		cnd: new(condition.Builder),
-	}
+	bld := &DeleteItemBuilder{}
 
 	if input != nil {
 		bld.DeleteItemInput = input

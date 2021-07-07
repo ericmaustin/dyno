@@ -91,50 +91,30 @@ func CopyCondition(cnd types.Condition) types.Condition {
 }
 
 // addProjectionNames adds a string slice of projection values to a expression.ProjectionBuilder
-func addProjectionNames(projectionBuilder *expression.ProjectionBuilder, names []string) {
+func addProjectionNames(projectionBuilder **expression.ProjectionBuilder, names []string) {
 	// nameBuilders := encoding.NameBuilders(names)
 	nameBuilders := make([]expression.NameBuilder, len(names))
 	for i, name := range names {
 		nameBuilders[i] = expression.Name(name)
 	}
 
-	if projectionBuilder != nil {
-		*projectionBuilder = projectionBuilder.AddNames(nameBuilders...)
-		return
+	if *projectionBuilder == nil {
+		*projectionBuilder = new(expression.ProjectionBuilder)
 	}
 
-	proj := expression.ProjectionBuilder{}
-	proj = proj.AddNames(nameBuilders...)
-	projectionBuilder = &proj
+	**projectionBuilder = (*projectionBuilder).AddNames(nameBuilders...)
 }
 
 //addProjection adds a projection value interface to a expression.ProjectionBuilder
-func addProjection(projectionBuilder *expression.ProjectionBuilder, projection interface{}) {
+func addProjection(projectionBuilder **expression.ProjectionBuilder, projection interface{}) {
 	nameBuilders := encoding.NameBuilders(projection)
-	if projectionBuilder != nil {
-		*projectionBuilder = projectionBuilder.AddNames(nameBuilders...)
-		return
-	}
-	proj := expression.ProjectionBuilder{}
-	proj = proj.AddNames(nameBuilders...)
-	projectionBuilder = &proj
-}
 
-//
-//// IsAwsErrorCode checks to see if the provided err is an aws error, and if so if it matches any of the provided codes
-//func IsAwsErrorCode(err error, codes ...string) bool {
-//	if err == nil {
-//		return false
-//	}
-//	if awsErr, ok := err.(awserr.Error); ok {
-//		for _, code := range codes {
-//			if awsErr.Code() == code {
-//				return true
-//			}
-//		}
-//	}
-//	return false
-//}
+	if *projectionBuilder == nil {
+		*projectionBuilder = new(expression.ProjectionBuilder)
+	}
+
+	**projectionBuilder = (*projectionBuilder).AddNames(nameBuilders...)
+}
 
 // CopyKeysAndAttributes creates a deep copy of a KeysAndAttributes
 func CopyKeysAndAttributes(input types.KeysAndAttributes) types.KeysAndAttributes {

@@ -102,7 +102,7 @@ type UpdateItem struct {
 // NewUpdateItem creates a new UpdateItem
 func NewUpdateItem(input *ddb.UpdateItemInput, mws ...UpdateItemMiddleWare) *UpdateItem {
 	return &UpdateItem{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
@@ -165,19 +165,17 @@ func NewUpdateItemInput(tableName *string) *ddb.UpdateItemInput {
 type UpdateItemBuilder struct {
 	*ddb.UpdateItemInput
 	updateBuilder expression.UpdateBuilder
-	cnd           *condition.Builder
+	cnd           condition.Builder
 }
 
 // NewUpdateItemBuilder creates a new UpdateItemBuilder
 func NewUpdateItemBuilder(input *ddb.UpdateItemInput) *UpdateItemBuilder {
-	bld := &UpdateItemBuilder{
-		cnd: new(condition.Builder),
-	}
+	bld := &UpdateItemBuilder{}
 
 	if input != nil {
 		bld.UpdateItemInput = input
 	} else {
-		bld.UpdateItemInput =  NewUpdateItemInput(nil)
+		bld.UpdateItemInput = NewUpdateItemInput(nil)
 	}
 
 	return bld

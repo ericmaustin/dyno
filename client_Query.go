@@ -6,7 +6,6 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ericmaustin/dyno/condition"
-	"github.com/ericmaustin/dyno/encoding"
 	"sync"
 )
 
@@ -53,7 +52,7 @@ type QueryContext struct {
 type QueryOutput struct {
 	out *ddb.QueryOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -87,7 +86,7 @@ func (h QueryHandlerFunc) HandleQuery(ctx *QueryContext, output *QueryOutput) {
 }
 
 // QueryFinalHandler is the final QueryHandler that executes a dynamodb Query operation
-type QueryFinalHandler struct {}
+type QueryFinalHandler struct{}
 
 // HandleQuery implements the QueryHandler
 func (h *QueryFinalHandler) HandleQuery(ctx *QueryContext, output *QueryOutput) {
@@ -117,7 +116,7 @@ type Query struct {
 // NewQuery creates a new Query
 func NewQuery(input *ddb.QueryInput, mws ...QueryMiddleWare) *Query {
 	return &Query{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
@@ -135,7 +134,7 @@ func (op *Query) DynoInvoke(ctx context.Context, client *ddb.Client) {
 
 	output := new(QueryOutput)
 
-	defer func() {op.SetResponse(output.Get())}()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &QueryContext{
 		Context: ctx,
@@ -179,7 +178,7 @@ type QueryAllContext struct {
 type QueryAllOutput struct {
 	out []*ddb.QueryOutput
 	err error
-	mu sync.RWMutex
+	mu  sync.RWMutex
 }
 
 // Set sets the output
@@ -226,7 +225,7 @@ func (mw QueryAllMiddleWareFunc) QueryAllMiddleWare(next QueryAllHandler) QueryA
 }
 
 // QueryAllFinalHandler is the final QueryAllHandler that executes a dynamodb QueryAll operation
-type QueryAllFinalHandler struct {}
+type QueryAllFinalHandler struct{}
 
 // HandleQueryAll implements the QueryAllHandler
 func (h *QueryAllFinalHandler) HandleQueryAll(ctx *QueryAllContext, output *QueryAllOutput) {
@@ -268,7 +267,7 @@ type QueryAll struct {
 // NewQueryAll creates a new QueryAll
 func NewQueryAll(input *ddb.QueryInput, mws ...QueryAllMiddleWare) *QueryAll {
 	return &QueryAll{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
@@ -330,8 +329,8 @@ func NewQueryInput(tableName *string) *ddb.QueryInput {
 // QueryBuilder dynamically constructs a QueryInput
 type QueryBuilder struct {
 	*ddb.QueryInput
-	keyCnd     *expression.KeyConditionBuilder
-	filter     *expression.ConditionBuilder
+	keyCnd     condition.KeyConditionBuilder
+	filter     condition.Builder
 	projection *expression.ProjectionBuilder
 }
 
@@ -340,6 +339,7 @@ func NewQueryBuilder(input *ddb.QueryInput) *QueryBuilder {
 	if input != nil {
 		return &QueryBuilder{QueryInput: input}
 	}
+
 	return &QueryBuilder{QueryInput: NewQueryInput(nil)}
 }
 
@@ -363,13 +363,7 @@ func (bld *QueryBuilder) SetDescOrder() *QueryBuilder {
 // adding multiple conditions by calling this multiple times will join the conditions with
 // an AND
 func (bld *QueryBuilder) AddKeyCondition(cnd expression.KeyConditionBuilder) *QueryBuilder {
-	if bld.keyCnd == nil {
-		bld.keyCnd = &cnd
-	} else {
-		cnd = condition.KeyAnd(*bld.keyCnd, cnd)
-		bld.keyCnd = &cnd
-	}
-
+	bld.keyCnd.And(cnd)
 	return bld
 }
 
@@ -383,27 +377,19 @@ func (bld *QueryBuilder) AddKeyEquals(fieldName string, value interface{}) *Quer
 // adding multiple conditions by calling this multiple times will join the conditions with
 // an AND
 func (bld *QueryBuilder) AddFilter(cnd expression.ConditionBuilder) *QueryBuilder {
-	if bld.filter == nil {
-		bld.filter = &cnd
-	} else {
-		cnd = condition.And(*bld.filter, cnd)
-		bld.filter = &cnd
-	}
+	bld.filter.And(cnd)
+	return bld
+}
+
+// AddProjection additional fields to the projection
+func (bld *QueryBuilder) AddProjection(names interface{}) *QueryBuilder {
+	addProjection(&bld.projection, names)
 	return bld
 }
 
 // AddProjectionNames adds additional field names to the projection
 func (bld *QueryBuilder) AddProjectionNames(names ...string) *QueryBuilder {
-	nameBuilders := encoding.NameBuilders(names)
-
-	if bld.projection == nil {
-		proj := expression.ProjectionBuilder{}
-		proj = proj.AddNames(nameBuilders...)
-		bld.projection = &proj
-	} else {
-		*bld.projection = bld.projection.AddNames(nameBuilders...)
-	}
-
+	addProjectionNames(&bld.projection, names)
 	return bld
 }
 
@@ -511,7 +497,7 @@ func (bld *QueryBuilder) SetTableName(v string) *QueryBuilder {
 
 // Build builds the dynamodb.QueryInput
 func (bld *QueryBuilder) Build() (*ddb.QueryInput, error) {
-	if bld.projection == nil && bld.keyCnd == nil && bld.filter == nil {
+	if bld.projection == nil && bld.keyCnd.Empty() && bld.filter.Empty() {
 		// no expression builder is needed
 		return bld.QueryInput, nil
 	}
@@ -520,16 +506,17 @@ func (bld *QueryBuilder) Build() (*ddb.QueryInput, error) {
 	// add projection
 	if bld.projection != nil {
 		builder = builder.WithProjection(*bld.projection)
+		bld.Select = ddbTypes.SelectSpecificAttributes
 	}
 
 	// add key condition
-	if bld.keyCnd != nil {
-		builder = builder.WithKeyCondition(*bld.keyCnd)
+	if !bld.keyCnd.Empty() {
+		builder = builder.WithKeyCondition(bld.keyCnd.Builder())
 	}
 
 	// add filter
-	if bld.filter != nil {
-		builder = builder.WithFilter(*bld.filter)
+	if !bld.filter.Empty() {
+		builder = builder.WithFilter(bld.filter.Builder())
 	}
 
 	// build the Expression
