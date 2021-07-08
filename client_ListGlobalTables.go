@@ -103,16 +103,22 @@ func NewListGlobalTables(input *ddb.ListGlobalTablesInput, mws ...ListGlobalTabl
 	}
 }
 
-// Invoke invokes the ListGlobalTables operation and returns it
+// Invoke invokes the ListGlobalTables operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *ListGlobalTables) Invoke(ctx context.Context, client *ddb.Client) *ListGlobalTables {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *ListGlobalTables) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the ListGlobalTables operation
+func (op *ListGlobalTables) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ListGlobalTablesOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

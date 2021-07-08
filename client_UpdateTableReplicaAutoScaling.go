@@ -104,15 +104,22 @@ func NewUpdateTableReplicaAutoScaling(input *ddb.UpdateTableReplicaAutoScalingIn
 	}
 }
 
-// Invoke invokes the UpdateTableReplicaAutoScaling operation and returns a UpdateTableReplicaAutoScalingPromise
+// Invoke invokes the UpdateTableReplicaAutoScaling operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *UpdateTableReplicaAutoScaling) Invoke(ctx context.Context, client *ddb.Client) *UpdateTableReplicaAutoScaling {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *UpdateTableReplicaAutoScaling) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the UpdateTableReplicaAutoScaling operation
+func (op *UpdateTableReplicaAutoScaling) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateTableReplicaAutoScalingOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -103,16 +103,22 @@ func NewListTables(input *ddb.ListTablesInput, mws ...ListTablesMiddleWare) *Lis
 	}
 }
 
-// Invoke invokes the ListTables operation and returns it
+// Invoke invokes the ListTables operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *ListTables) Invoke(ctx context.Context, client *ddb.Client) *ListTables {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *ListTables) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the ListTables operation
+func (op *ListTables) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ListTablesOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -107,16 +107,22 @@ func NewGetItem(input *ddb.GetItemInput, mws ...GetItemMiddleWare) *GetItem {
 	}
 }
 
-// Invoke invokes the GetItem operation and returns a GetItemPromise
+// Invoke invokes the GetItem operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *GetItem) Invoke(ctx context.Context, client *ddb.Client) *GetItem {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *GetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the GetItem operation
+func (op *GetItem) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(GetItemOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

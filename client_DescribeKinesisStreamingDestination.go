@@ -50,6 +50,7 @@ func (o *DescribeKinesisStreamingDestinationOutput) Get() (out *ddb.DescribeKine
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -97,21 +98,29 @@ type DescribeKinesisStreamingDestination struct {
 // NewDescribeKinesisStreamingDestination creates a new DescribeKinesisStreamingDestination
 func NewDescribeKinesisStreamingDestination(input *ddb.DescribeKinesisStreamingDestinationInput, mws ...DescribeKinesisStreamingDestinationMiddleWare) *DescribeKinesisStreamingDestination {
 	return &DescribeKinesisStreamingDestination{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// Invoke invokes the DescribeKinesisStreamingDestination operation and returns a DescribeKinesisStreamingDestinationPromise
+// Invoke invokes the DescribeKinesisStreamingDestination operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DescribeKinesisStreamingDestination) Invoke(ctx context.Context, client *ddb.Client) *DescribeKinesisStreamingDestination {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *DescribeKinesisStreamingDestination) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the DescribeKinesisStreamingDestination operation
+func (op *DescribeKinesisStreamingDestination) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeKinesisStreamingDestinationOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

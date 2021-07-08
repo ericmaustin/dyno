@@ -132,19 +132,24 @@ func NewBatchGetItem(input *ddb.BatchGetItemInput, mws ...BatchGetItemMiddleWare
 	}
 }
 
-// Invoke invokes the BatchGetItem operation and returns a BatchGetItemPromise
+// Invoke invokes the BatchGetItem in a goroutine operation and returns a BatchGetItemPromise
 func (op *BatchGetItem) Invoke(ctx context.Context, client *ddb.Client) *BatchGetItem {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise is now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *BatchGetItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise is now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the BatchGetItem
+func (op *BatchGetItem) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(BatchGetItemOutput)
-
-	defer func() { op.SetResponse(output.Get()) }()
+	defer func(){ op.SetResponse(output.Get()) }()
 
 	requestCtx := &BatchGetItemContext{
 		Context: ctx,
@@ -272,18 +277,26 @@ func NewBatchGetItemAll(input *ddb.BatchGetItemInput, mws ...BatchGetItemAllMidd
 	}
 }
 
-// Invoke invokes the BatchGetItemAll operation and returns a BatchGetItemAllPromise
+// Invoke invokes the BatchGetItemAll operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *BatchGetItemAll) Invoke(ctx context.Context, client *ddb.Client) *BatchGetItemAll {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
-// DynoInvoke the Operation interface
+// DynoInvoke implements the Operation interface
 func (op *BatchGetItemAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the BatchGetItemAll operation
+func (op *BatchGetItemAll) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(BatchGetItemAllOutput)
 
-	defer func() { op.SetResponse(output.Get()) }()
+	defer func(){ op.SetResponse(output.Get()) }()
 
 	requestCtx := &BatchGetItemAllContext{
 		Context: ctx,

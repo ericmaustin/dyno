@@ -103,15 +103,22 @@ func NewExecuteStatement(input *ddb.ExecuteStatementInput, mws ...ExecuteStateme
 	}
 }
 
-// Invoke invokes the ExecuteStatement operation and returns a ExecuteStatementPromise
+// Invoke invokes the ExecuteStatement operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *ExecuteStatement) Invoke(ctx context.Context, client *ddb.Client) *ExecuteStatement {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *ExecuteStatement) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the ExecuteStatement operation
+func (op *ExecuteStatement) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ExecuteStatementOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -50,6 +50,7 @@ func (o *BatchExecuteStatementOutput) Get() (out *ddb.BatchExecuteStatementOutpu
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -97,21 +98,29 @@ type BatchExecuteStatement struct {
 // NewBatchExecuteStatement creates a new BatchExecuteStatement
 func NewBatchExecuteStatement(input *ddb.BatchExecuteStatementInput, mws ...BatchExecuteStatementMiddleWare) *BatchExecuteStatement {
 	return &BatchExecuteStatement{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// Invoke invokes the BatchExecuteStatement operation and returns a BatchExecuteStatementPromise
+// Invoke invokes the BatchExecuteStatement operation in a goroutine and returns a BatchExecuteStatementPromise
 func (op *BatchExecuteStatement) Invoke(ctx context.Context, client *ddb.Client) *BatchExecuteStatement {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting()
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *BatchExecuteStatement) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting()
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the BatchExecuteStatement
+func (op *BatchExecuteStatement) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(BatchExecuteStatementOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

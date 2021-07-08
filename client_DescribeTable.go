@@ -86,6 +86,7 @@ func (o *DescribeTableOutput) Get() (out *ddb.DescribeTableOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -133,21 +134,29 @@ type DescribeTable struct {
 // NewDescribeTable creates a new DescribeTable
 func NewDescribeTable(input *ddb.DescribeTableInput, mws ...DescribeTableMiddleWare) *DescribeTable {
 	return &DescribeTable{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// Invoke invokes the DescribeTable operation and returns a DescribeTablePromise
+// Invoke invokes the DescribeTable operation and this DescribeTable
 func (op *DescribeTable) Invoke(ctx context.Context, client *ddb.Client) *DescribeTable {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *DescribeTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the DescribeLimits operation
+func (op *DescribeTable) invoke(ctx context.Context, client *ddb.Client) {
 	invokeDescribeTableWithHandler(ctx, client, op.input, new(DescribeTableFinalHandler), op.middleWares, op.Promise)
 }
 
@@ -201,21 +210,28 @@ type TableExistsWaiter struct {
 // NewTableExistsWaiter creates a new TableExistsWaiter operation on the given client with a given DescribeTableInput and options
 func NewTableExistsWaiter(input *ddb.DescribeTableInput, mws ...DescribeTableMiddleWare) *TableExistsWaiter {
 	return &TableExistsWaiter{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// Invoke invokes the TableExistsWaiter operation
+// Invoke invokes the TableExistsWaiter operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *TableExistsWaiter) Invoke(ctx context.Context, client *ddb.Client) *TableExistsWaiter {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *TableExistsWaiter) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// DynoInvoke implements the Operation interface
+func (op *TableExistsWaiter) invoke(ctx context.Context, client *ddb.Client) {
 	invokeDescribeTableWithHandler(ctx, client, op.input, new(TableExistsWaiterFinalHandler), op.middleWares, op.Promise)
 }
 
@@ -259,21 +275,28 @@ type TableNotExistsWaiter struct {
 // NewTableNotExistsWaiter creates a new TableNotExistsWaiter operation on the given client with a given DescribeTableInput and options
 func NewTableNotExistsWaiter(input *ddb.DescribeTableInput, mws ...DescribeTableMiddleWare) *TableNotExistsWaiter {
 	return &TableNotExistsWaiter{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// Invoke invokes the TableNotExistsWaiter operation
+// Invoke invokes the TableNotExistsWaiter operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *TableNotExistsWaiter) Invoke(ctx context.Context, client *ddb.Client) *TableNotExistsWaiter {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *TableNotExistsWaiter) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the TableNotExistsWaiter operation
+func (op *TableNotExistsWaiter) invoke(ctx context.Context, client *ddb.Client) {
 	invokeDescribeTableWithHandler(ctx, client, op.input, new(TableNotExistsWaiterFinalHandler), op.middleWares, op.Promise)
 }
 

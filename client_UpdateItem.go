@@ -108,15 +108,22 @@ func NewUpdateItem(input *ddb.UpdateItemInput, mws ...UpdateItemMiddleWare) *Upd
 	}
 }
 
-// Invoke invokes the UpdateItem operation and returns a UpdateItemPromise
+// Invoke invokes the UpdateItem operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *UpdateItem) Invoke(ctx context.Context, client *ddb.Client) *UpdateItem {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *UpdateItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the UpdateItem operation
+func (op *UpdateItem) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateItemOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

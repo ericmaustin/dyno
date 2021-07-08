@@ -52,6 +52,7 @@ func (o *UpdateContinuousBackupsOutput) Get() (out *ddb.UpdateContinuousBackupsO
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+	
 	return
 }
 
@@ -105,16 +106,22 @@ func NewUpdateContinuousBackups(input *ddb.UpdateContinuousBackupsInput, mws ...
 	}
 }
 
-// Invoke invokes the UpdateContinuousBackups operation and returns a UpdateContinuousBackupsPromise
+// Invoke invokes the UpdateContinuousBackups operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *UpdateContinuousBackups) Invoke(ctx context.Context, client *ddb.Client) *UpdateContinuousBackups {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *UpdateContinuousBackups) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the UpdateContinuousBackups operation
+func (op *UpdateContinuousBackups) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateContinuousBackupsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -52,6 +52,7 @@ func (o *UpdateContributorInsightsOutput) Get() (out *ddb.UpdateContributorInsig
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+	
 	return
 }
 
@@ -105,16 +106,22 @@ func NewUpdateContributorInsights(input *ddb.UpdateContributorInsightsInput, mws
 	}
 }
 
-// Invoke invokes the UpdateContributorInsights operation and returns a UpdateContributorInsightsPromise
+// Invoke invokes the UpdateContributorInsights operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *UpdateContributorInsights) Invoke(ctx context.Context, client *ddb.Client) *UpdateContributorInsights {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *UpdateContributorInsights) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the UpdateContributorInsights operation
+func (op *UpdateContributorInsights) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateContributorInsightsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

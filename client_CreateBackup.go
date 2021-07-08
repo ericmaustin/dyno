@@ -97,21 +97,29 @@ type CreateBackup struct {
 // NewCreateBackup creates a new CreateBackup
 func NewCreateBackup(input *ddb.CreateBackupInput, mws ...CreateBackupMiddleWare) *CreateBackup {
 	return &CreateBackup{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// Invoke invokes the CreateBackup operation and returns a CreateBackupPromise
+// Invoke invokes the CreateBackup operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *CreateBackup) Invoke(ctx context.Context, client *ddb.Client) *CreateBackup {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *CreateBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the CreateBackup operation
+func (op *CreateBackup) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(CreateBackupOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

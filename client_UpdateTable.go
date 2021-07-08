@@ -104,15 +104,22 @@ func NewUpdateTable(input *ddb.UpdateTableInput, mws ...UpdateTableMiddleWare) *
 	}
 }
 
-// Invoke invokes the UpdateTable operation and returns a UpdateTablePromise
+// Invoke invokes the UpdateTable operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *UpdateTable) Invoke(ctx context.Context, client *ddb.Client) *UpdateTable {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *UpdateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the UpdateTable operation
+func (op *UpdateTable) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateTableOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

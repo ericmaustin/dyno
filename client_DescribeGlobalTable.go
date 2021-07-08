@@ -50,6 +50,7 @@ func (o *DescribeGlobalTableOutput) Get() (out *ddb.DescribeGlobalTableOutput, e
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -97,21 +98,29 @@ type DescribeGlobalTable struct {
 // NewDescribeGlobalTable creates a new DescribeGlobalTable
 func NewDescribeGlobalTable(input *ddb.DescribeGlobalTableInput, mws ...DescribeGlobalTableMiddleWare) *DescribeGlobalTable {
 	return &DescribeGlobalTable{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// Invoke invokes the DescribeGlobalTable operation and returns a DescribeGlobalTablePromise
+// Invoke invokes the DescribeGlobalTable operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DescribeGlobalTable) Invoke(ctx context.Context, client *ddb.Client) *DescribeGlobalTable {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *DescribeGlobalTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the DescribeGlobalTable operation
+func (op *DescribeGlobalTable) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeGlobalTableOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

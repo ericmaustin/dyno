@@ -50,6 +50,7 @@ func (o *DescribeExportOutput) Get() (out *ddb.DescribeExportOutput, err error) 
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -97,21 +98,29 @@ type DescribeExport struct {
 // NewDescribeExport creates a new DescribeExport
 func NewDescribeExport(input *ddb.DescribeExportInput, mws ...DescribeExportMiddleWare) *DescribeExport {
 	return &DescribeExport{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// Invoke invokes the DescribeExport operation and returns a DescribeExportPromise
+// Invoke invokes the DescribeExport operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DescribeExport) Invoke(ctx context.Context, client *ddb.Client) *DescribeExport {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *DescribeExport) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the DescribeExport operation
+func (op *DescribeExport) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeExportOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

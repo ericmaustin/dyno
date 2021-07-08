@@ -50,6 +50,7 @@ func (o *RestoreTableFromBackupOutput) Get() (out *ddb.RestoreTableFromBackupOut
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+	
 	return
 }
 
@@ -103,15 +104,22 @@ func NewRestoreTableFromBackup(input *ddb.RestoreTableFromBackupInput, mws ...Re
 	}
 }
 
-// Invoke invokes the RestoreTableFromBackup operation and returns a RestoreTableFromBackupPromise
+// Invoke invokes the RestoreTableFromBackup operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *RestoreTableFromBackup) Invoke(ctx context.Context, client *ddb.Client) *RestoreTableFromBackup {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *RestoreTableFromBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the RestoreTableFromBackup operation
+func (op *RestoreTableFromBackup) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(RestoreTableFromBackupOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

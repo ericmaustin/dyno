@@ -50,6 +50,7 @@ func (o *DescribeContinuousBackupsOutput) Get() (out *ddb.DescribeContinuousBack
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -97,21 +98,29 @@ type DescribeContinuousBackups struct {
 // NewDescribeContinuousBackups creates a new DescribeContinuousBackups
 func NewDescribeContinuousBackups(input *ddb.DescribeContinuousBackupsInput, mws ...DescribeContinuousBackupsMiddleWare) *DescribeContinuousBackups {
 	return &DescribeContinuousBackups{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// Invoke invokes the DescribeContinuousBackups operation and returns a DescribeContinuousBackupsPromise
+// Invoke invokes the DescribeContinuousBackups operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DescribeContinuousBackups) Invoke(ctx context.Context, client *ddb.Client) *DescribeContinuousBackups {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *DescribeContinuousBackups) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the DescribeContinuousBackups operation
+func (op *DescribeContinuousBackups) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeContinuousBackupsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -52,6 +52,7 @@ func (o *CreateTableOutput) Get() (out *ddb.CreateTableOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -99,21 +100,29 @@ type CreateTable struct {
 // NewCreateTable creates a new CreateTable
 func NewCreateTable(input *ddb.CreateTableInput, mws ...CreateTableMiddleWare) *CreateTable {
 	return &CreateTable{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// Invoke invokes the CreateTable operation and returns a CreateTablePromise
+// Invoke invokes the CreateTable operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *CreateTable) Invoke(ctx context.Context, client *ddb.Client) *CreateTable {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *CreateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the CreateTable operation
+func (op *CreateTable) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(CreateTableOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()
@@ -125,6 +134,7 @@ func (op *CreateTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	var h CreateTableHandler
+
 	h = new(CreateTableFinalHandler)
 
 	// no middlewares

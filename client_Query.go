@@ -122,16 +122,22 @@ func NewQuery(input *ddb.QueryInput, mws ...QueryMiddleWare) *Query {
 	}
 }
 
-// Invoke invokes the Query operation and returns a QueryPromise
+// Invoke invokes the Query operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *Query) Invoke(ctx context.Context, client *ddb.Client) *Query {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
 func (op *Query) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the Query operation
+func (op *Query) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(QueryOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()
@@ -273,15 +279,22 @@ func NewQueryAll(input *ddb.QueryInput, mws ...QueryAllMiddleWare) *QueryAll {
 	}
 }
 
-// Invoke invokes the QueryAll operation and returns a QueryAllPromise
+// Invoke invokes the QueryAll operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *QueryAll) Invoke(ctx context.Context, client *ddb.Client) *QueryAll {
-	go op.DynoInvoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
-// DynoInvoke the Operation interface
+// DynoInvoke implements the Operation interface
 func (op *QueryAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the QueryAll operation
+func (op *QueryAll) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(QueryAllOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

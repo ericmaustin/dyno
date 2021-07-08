@@ -68,11 +68,18 @@ func (s *ClientTestSuite) TestBatchWriteItemWithMiddleWare() {
 		})
 	})
 
-	// first call, should not be cached
-	out, err := s.table.BatchPut(items, cacheMW).Invoke(context.Background(), s.client.DynamoDB()).Await()
+	op := s.table.BatchPut(items, cacheMW)
+	s.Equal(PromisePending, op.GetState())
+	op.Invoke(context.Background(), s.client.DynamoDB())
+	s.Equal(PromiseWaiting, op.GetState())
+	s.Greater(int64(op.Duration()), int64(0))
+	out, err := op.Await()
+
 	if err != nil {
 		panic(err)
 	}
+
+	s.Equal(PromiseReady, op.GetState())
 
 	s.NotNil(out)
 	s.Greater(len(cached), 0)
