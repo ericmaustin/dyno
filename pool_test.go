@@ -17,7 +17,7 @@ type PoolTestSuite struct {
 	suite.Suite
 	pool                *Pool
 	table               *Table
-	db                  *Client
+	db                  *Session
 	testItems           []*TestItem
 	testMarshalledItems []*TestItemMarshaller
 }
@@ -52,7 +52,7 @@ func (suite *PoolTestSuite) TearDownSuite() {
 		panic(err)
 	}
 
-	if _, err := suite.db.TableNotExistsWaiter(context.Background(), suite.table.DescribeTableInput()).Await(); err != nil {
+	if _, err := suite.db.TableNotExistsWaiter(suite.table.DescribeTableInput()).Await(); err != nil {
 		panic(err)
 	}
 
@@ -73,10 +73,7 @@ func (suite *PoolTestSuite) TestPoolConcurrency() {
 	}
 
 	for _, op := range ops {
-		if err := suite.pool.Do(op); err != nil {
-			panic(err)
-		}
-
+	 	suite.pool.Do(op)
 		assert.LessOrEqual(suite.T(), suite.pool.ActiveCount(), uint64(3))
 	}
 
@@ -96,11 +93,10 @@ func (suite *PoolTestSuite) TestPutItems() {
 
 		op := NewPutItem(NewPutItemInput(suite.table.TableName, avMap))
 
-		if err = suite.pool.Do(op); err != nil {
-			panic(err)
-		}
+		suite.pool.Do(op)
 
 		out, err := op.Await()
+
 		if err != nil {
 			panic(err)
 		}
@@ -119,9 +115,7 @@ func (suite *PoolTestSuite) TestPutItems() {
 
 		op := NewPutItem(NewPutItemInput(suite.table.TableName, avMap))
 
-		if err = suite.pool.Do(op); err != nil {
-			panic(err)
-		}
+		suite.pool.Do(op)
 
 		out, err := op.Await()
 

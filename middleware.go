@@ -12,22 +12,19 @@ type UnmarshalMiddleWare struct {
 	UnmarshalSlice func(ms []map[string]types.AttributeValue) error
 }
 
-// BatchGetItemAllMiddleWare implements the BatchGetItemAllMiddleWare interface
-func (mw *UnmarshalMiddleWare) BatchGetItemAllMiddleWare(next BatchGetItemAllHandler) BatchGetItemAllHandler {
-	return BatchGetItemAllHandlerFunc(func(ctx *BatchGetItemAllContext, output *BatchGetItemAllOutput) {
-		next.HandleBatchGetItemAll(ctx, output)
-		outs, err := output.Get()
+// BatchGetItemMiddleWare implements the BatchGetItemMiddleWare interface
+func (mw *UnmarshalMiddleWare) BatchGetItemMiddleWare(next BatchGetItemHandler) BatchGetItemHandler {
+	return BatchGetItemHandlerFunc(func(ctx *BatchGetItemContext, output *BatchGetItemOutput) {
+		next.HandleBatchGetItem(ctx, output)
+		out, err := output.Get()
 		if err != nil {
 			return
 		}
-		for _, out := range outs {
-			if len(out.Responses) > 0 {
-				for _, avs := range out.Responses {
-					if err = mw.UnmarshalSlice(avs); err != nil {
-						output.Set(nil, err)
-						return
-					}
-				}
+
+		for _, avs := range out.Responses {
+			if err = mw.UnmarshalSlice(avs); err != nil {
+				output.Set(nil, err)
+				return
 			}
 		}
 	})
@@ -41,6 +38,7 @@ func (mw *UnmarshalMiddleWare) GetItemMiddleWare(next GetItemHandler) GetItemHan
 		if err != nil {
 			return
 		}
+
 		if err = mw.Unmarshal(out.Item); err != nil {
 			output.Set(nil, err)
 			return
@@ -56,29 +54,11 @@ func (mw *UnmarshalMiddleWare) QueryMiddleWare(next QueryHandler) QueryHandler {
 		if err != nil {
 			return
 		}
+
 		if len(out.Items) > 0 {
 			if err = mw.UnmarshalSlice(out.Items); err != nil {
 				output.Set(nil, err)
 				return
-			}
-		}
-	})
-}
-
-// QueryAllMiddleWare implements the QueryAllMiddleWare interface
-func (mw *UnmarshalMiddleWare) QueryAllMiddleWare(next QueryAllHandler) QueryAllHandler {
-	return QueryAllHandlerFunc(func(ctx *QueryAllContext, output *QueryAllOutput) {
-		next.HandleQueryAll(ctx, output)
-		outs, err := output.Get()
-		if err != nil {
-			return
-		}
-		for _, out := range outs {
-			if len(out.Items) > 0 {
-				if err = mw.UnmarshalSlice(out.Items); err != nil {
-					output.Set(nil, err)
-					return
-				}
 			}
 		}
 	})
@@ -92,29 +72,11 @@ func (mw *UnmarshalMiddleWare) ScanMiddleWare(next ScanHandler) ScanHandler {
 		if err != nil {
 			return
 		}
+
 		if len(out.Items) > 0 {
 			if err = mw.UnmarshalSlice(out.Items); err != nil {
 				output.Set(nil, err)
 				return
-			}
-		}
-	})
-}
-
-// ScanAllMiddleWare implements the ScanAllMiddleWare interface
-func (mw *UnmarshalMiddleWare) ScanAllMiddleWare(next ScanAllHandler) ScanAllHandler {
-	return ScanAllHandlerFunc(func(ctx *ScanAllContext, output *ScanAllOutput) {
-		next.HandleScanAll(ctx, output)
-		outs, err := output.Get()
-		if err != nil {
-			return
-		}
-		for _, out := range outs {
-			if len(out.Items) > 0 {
-				if err = mw.UnmarshalSlice(out.Items); err != nil {
-					output.Set(nil, err)
-					return
-				}
 			}
 		}
 	})

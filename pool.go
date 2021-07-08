@@ -8,14 +8,14 @@ import (
 	"sync/atomic"
 )
 
-// NewPool creates a new pool with a context Client connection and limit
+// NewPool creates a new pool with a context Session connection and limit
 // the context is used for all Executions
 func NewPool(ctx context.Context, client *ddb.Client, limit uint64) *Pool {
 	return &Pool{
-		ctx:      ctx,
-		client:   client,
-		limit:    limit,
-		id:       ksuid.New().String(),
+		ctx:    ctx,
+		client: client,
+		limit:  limit,
+		id:     ksuid.New().String(),
 	}
 }
 
@@ -23,9 +23,9 @@ func NewPool(ctx context.Context, client *ddb.Client, limit uint64) *Pool {
 type Pool struct {
 	ctx       context.Context
 	client    *ddb.Client // dynamoDB is the client
-	limit     uint64 // limit is the max number of active tasks that can be running at the same time
-	taskCount uint64 // taskCount holds the count of active tasks and uses sync.atomic for getting and setting
-	id        string // id allows us to identify pools easily (e.g. for logging purposes)
+	limit     uint64      // limit is the max number of active tasks that can be running at the same time
+	taskCount uint64      // taskCount holds the count of active tasks and uses sync.atomic for getting and setting
+	id        string      // id allows us to identify pools easily (e.g. for logging purposes)
 }
 
 // Limit returns the Pool limit
@@ -75,19 +75,19 @@ func (p *Pool) ActiveCount() uint64 {
 }
 
 // Do executes one or more Operations
-func (p *Pool) Do(ops ...Operation) (err error) {
-
+func (p *Pool) Do(ops ...Operation) {
 	for _, op := range ops {
-		if err = p.claimSlot(); err != nil {
+		op.SetRunning() // flag operation as waiting
+
+		if err := p.claimSlot(); err != nil {
+			op.SetResponse(nil, err)
 			return
 		}
 
 		go func(op Operation) {
-			defer func() {
-				p.subActive(1) // decrement the active count
-			}()
+			defer func() { p.subActive(1) }() // decrement the active count
 
-			op.DynoInvoke(p.ctx, p.client)
+			op.InvokeDynoOperation(p.ctx, p.client)
 		}(op)
 	}
 
@@ -99,8 +99,8 @@ func (p *Pool) Do(ops ...Operation) (err error) {
 func (p *Pool) Wait() <-chan struct{} {
 	out := make(chan struct{})
 
-	go func(){
-		defer func(){
+	go func() {
+		defer func() {
 			out <- struct{}{}
 			close(out)
 		}()
