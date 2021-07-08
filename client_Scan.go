@@ -15,7 +15,7 @@ func (c *Client) Scan(ctx context.Context, input *ddb.ScanInput, mw ...ScanMiddl
 	return NewScan(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// Scan executes a Scan operation with a ScanInput in this pool and returns the ScanPromise
+// Scan executes a Scan operation with a ScanInput in this pool and returns the Scan
 func (p *Pool) Scan(input *ddb.ScanInput, mw ...ScanMiddleWare) *Scan {
 	op := NewScan(input, mw...)
 
@@ -26,20 +26,20 @@ func (p *Pool) Scan(input *ddb.ScanInput, mw ...ScanMiddleWare) *Scan {
 	return op
 }
 
-// ScanAll executes ScanAll operation and returns a ScanAllPromise
-func (c *Client) ScanAll(ctx context.Context, input *ddb.ScanInput, mw ...ScanAllMiddleWare) *ScanAllPromise {
+// ScanAll executes ScanAll operation and returns a ScanAll
+func (c *Client) ScanAll(ctx context.Context, input *ddb.ScanInput, mw ...ScanAllMiddleWare) *ScanAll {
 	return NewScanAll(input, mw...).Invoke(ctx, c.ddb)
 }
 
-// ScanAll executes a ScanAll operation with a ScanInput in this pool and returns the ScanAllPromise
-func (p *Pool) ScanAll(input *ddb.ScanInput, mw ...ScanAllMiddleWare) *ScanAllPromise {
+// ScanAll executes a ScanAll operation with a ScanInput in this pool and returns this ScanAll
+func (p *Pool) ScanAll(input *ddb.ScanInput, mw ...ScanAllMiddleWare) *ScanAll {
 	op := NewScanAll(input, mw...)
 
 	if err := p.Do(op); err != nil {
-		op.promise.SetResponse(nil, err)
+		op.SetResponse(nil, err)
 	}
 
-	return op.promise
+	return op
 }
 
 // ScanContext represents an exhaustive Scan operation request context
@@ -70,6 +70,7 @@ func (o *ScanOutput) Get() (out *ddb.ScanOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+	
 	return
 }
 
@@ -123,16 +124,22 @@ func NewScan(input *ddb.ScanInput, mws ...ScanMiddleWare) *Scan {
 	}
 }
 
-// DynoInvoke invokes the Scan operation and returns a ScanPromise
+// Invoke invokes the Scan operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *Scan) Invoke(ctx context.Context, client *ddb.Client) *Scan {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *Scan) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *Scan) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the Scan operation
+func (op *Scan) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ScanOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()
@@ -200,37 +207,6 @@ func (o *ScanAllOutput) Get() (out []*ddb.ScanOutput, err error) {
 	return
 }
 
-// ScanAllPromise represents a promise for the ScanAll
-type ScanAllPromise struct {
-	*Promise
-}
-
-// GetResponse returns the GetResponse output and error
-// if Output has not been set yet nil is returned
-func (p *ScanAllPromise) GetResponse() ([]*ddb.ScanOutput, error) {
-	out, err := p.Promise.GetResponse()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.([]*ddb.ScanOutput), err
-}
-
-// Await waits for the ScanAllPromise to be fulfilled and then returns a ScanAllOutput and error
-func (p *ScanAllPromise) Await() ([]*ddb.ScanOutput, error) {
-	out, err := p.Promise.Await()
-	if out == nil {
-		return nil, err
-	}
-
-	return out.([]*ddb.ScanOutput), err
-}
-
-// newScanAllPromise returns a new ScanAllPromise
-func newScanAllPromise() *ScanAllPromise {
-	return &ScanAllPromise{NewPromise()}
-}
-
 // ScanAllHandler represents a handler for ScanAll requests
 type ScanAllHandler interface {
 	HandleScanAll(ctx *ScanAllContext, output *ScanAllOutput)
@@ -292,7 +268,7 @@ func (h *ScanAllFinalHandler) HandleScanAll(ctx *ScanAllContext, output *ScanAll
 
 // ScanAll represents a ScanAll operation
 type ScanAll struct {
-	promise     *ScanAllPromise
+	*Promise
 	input       *ddb.ScanInput
 	middleWares []ScanAllMiddleWare
 }
@@ -302,22 +278,29 @@ func NewScanAll(input *ddb.ScanInput, mws ...ScanAllMiddleWare) *ScanAll {
 	return &ScanAll{
 		input:       input,
 		middleWares: mws,
-		promise:     newScanAllPromise(),
+		Promise:     NewPromise(),
 	}
 }
 
-// DynoInvoke invokes the ScanAll operation and returns a ScanAllPromise
-func (op *ScanAll) Invoke(ctx context.Context, client *ddb.Client) *ScanAllPromise {
-	go op.Invoke(ctx, client)
+// Invoke invokes the ScanAll operation in a goroutine and returns a BatchGetItemAllPromise
+func (op *ScanAll) Invoke(ctx context.Context, client *ddb.Client) *ScanAll {
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
-	return op.promise
+	return op
 }
 
-// DynoInvoke the Operation interface
-func (op *ScanAll) Invoke(ctx context.Context, client *ddb.Client) {
+// DynoInvoke implements the Operation interface
+func (op *ScanAll) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the ScanAll operation
+func (op *ScanAll) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ScanAllOutput)
 
-	defer func() { op.promise.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &ScanAllContext{
 		Context: ctx,
@@ -338,6 +321,16 @@ func (op *ScanAll) Invoke(ctx context.Context, client *ddb.Client) {
 	}
 
 	h.HandleScanAll(requestCtx, output)
+}
+
+// Await waits for the ScanAllPromise to be fulfilled and then returns a ScanAllOutput and error
+func (op *ScanAll) Await() ([]*ddb.ScanOutput, error) {
+	out, err := op.Promise.Await()
+	if out == nil {
+		return nil, err
+	}
+
+	return out.([]*ddb.ScanOutput), err
 }
 
 // NewScanInput creates a new ScanInput with a table name

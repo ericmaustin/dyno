@@ -103,16 +103,22 @@ func NewListContributorInsights(input *ddb.ListContributorInsightsInput, mws ...
 	}
 }
 
-// DynoInvoke invokes the ListContributorInsights operation and returns it
+// Invoke invokes the ListContributorInsights operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *ListContributorInsights) Invoke(ctx context.Context, client *ddb.Client) *ListContributorInsights {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ListContributorInsights) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *ListContributorInsights) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the ListContributorInsights operation
+func (op *ListContributorInsights) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ListContributorInsightsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

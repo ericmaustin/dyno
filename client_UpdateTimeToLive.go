@@ -105,15 +105,22 @@ func NewUpdateTimeToLive(input *ddb.UpdateTimeToLiveInput, mws ...UpdateTimeToLi
 	}
 }
 
-// DynoInvoke invokes the UpdateTimeToLive operation and returns a UpdateTimeToLivePromise
+// Invoke invokes the UpdateTimeToLive operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *UpdateTimeToLive) Invoke(ctx context.Context, client *ddb.Client) *UpdateTimeToLive {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *UpdateTimeToLive) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *UpdateTimeToLive) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the UpdateTimeToLive operation
+func (op *UpdateTimeToLive) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateTimeToLiveOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

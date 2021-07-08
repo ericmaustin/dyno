@@ -50,6 +50,7 @@ func (o *DeleteTableOutput) Get() (out *ddb.DeleteTableOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -97,22 +98,29 @@ type DeleteTable struct {
 // NewDeleteTable creates a new DeleteTable
 func NewDeleteTable(input *ddb.DeleteTableInput, mws ...DeleteTableMiddleWare) *DeleteTable {
 	return &DeleteTable{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// DynoInvoke invokes the DeleteTable operation and returns a DeleteTablePromise
+// Invoke invokes the DeleteTable operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DeleteTable) Invoke(ctx context.Context, client *ddb.Client) *DeleteTable {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DeleteTable) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *DeleteTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the DeleteTable operation
+func (op *DeleteTable) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DeleteTableOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -52,6 +52,7 @@ func (o *TagResourceOutput) Get() (out *ddb.TagResourceOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -105,16 +106,22 @@ func NewTagResource(input *ddb.TagResourceInput, mws ...TagResourceMiddleWare) *
 	}
 }
 
-// DynoInvoke invokes the TagResource operation and returns a TagResourcePromise
+// Invoke invokes the TagResource operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *TagResource) Invoke(ctx context.Context, client *ddb.Client) *TagResource {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *TagResource) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *TagResource) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the TagResource operation
+func (op *TagResource) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(TagResourceOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -103,15 +103,22 @@ func NewEnableKinesisStreamingDestination(input *ddb.EnableKinesisStreamingDesti
 	}
 }
 
-// DynoInvoke invokes the EnableKinesisStreamingDestination operation and returns a EnableKinesisStreamingDestinationPromise
+// Invoke invokes the EnableKinesisStreamingDestination operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *EnableKinesisStreamingDestination) Invoke(ctx context.Context, client *ddb.Client) *EnableKinesisStreamingDestination {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *EnableKinesisStreamingDestination) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *EnableKinesisStreamingDestination) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the EnableKinesisStreamingDestination operation
+func (op *EnableKinesisStreamingDestination) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(EnableKinesisStreamingDestinationOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -97,7 +97,7 @@ type CreateBackup struct {
 // NewCreateBackup creates a new CreateBackup
 func NewCreateBackup(input *ddb.CreateBackupInput, mws ...CreateBackupMiddleWare) *CreateBackup {
 	return &CreateBackup{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
@@ -106,6 +106,7 @@ func NewCreateBackup(input *ddb.CreateBackupInput, mws ...CreateBackupMiddleWare
 // Invoke invokes the CreateBackup operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *CreateBackup) Invoke(ctx context.Context, client *ddb.Client) *CreateBackup {
 	op.SetWaiting() // promise now waiting for a response
+
 	go op.invoke(ctx, client)
 
 	return op

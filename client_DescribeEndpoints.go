@@ -97,21 +97,29 @@ type DescribeEndpoints struct {
 // NewDescribeEndpoints creates a new DescribeEndpoints
 func NewDescribeEndpoints(input *ddb.DescribeEndpointsInput, mws ...DescribeEndpointsMiddleWare) *DescribeEndpoints {
 	return &DescribeEndpoints{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// DynoInvoke invokes the DescribeEndpoints operation and returns a DescribeEndpointsPromise
+// Invoke invokes the DescribeEndpoints operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DescribeEndpoints) Invoke(ctx context.Context, client *ddb.Client) *DescribeEndpoints {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeEndpoints) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeEndpoints) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the DescribeEndpoints operation
+func (op *DescribeEndpoints) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeEndpointsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

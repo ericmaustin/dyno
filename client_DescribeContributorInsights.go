@@ -50,6 +50,7 @@ func (o *DescribeContributorInsightsOutput) Get() (out *ddb.DescribeContributorI
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -97,21 +98,29 @@ type DescribeContributorInsights struct {
 // NewDescribeContributorInsights creates a new DescribeContributorInsights
 func NewDescribeContributorInsights(input *ddb.DescribeContributorInsightsInput, mws ...DescribeContributorInsightsMiddleWare) *DescribeContributorInsights {
 	return &DescribeContributorInsights{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// DynoInvoke invokes the DescribeContributorInsights operation and returns a DescribeContributorInsightsPromise
+// Invoke invokes the DescribeContributorInsights operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DescribeContributorInsights) Invoke(ctx context.Context, client *ddb.Client) *DescribeContributorInsights {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeContributorInsights) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeContributorInsights) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the DescribeContributorInsights operation
+func (op *DescribeContributorInsights) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeContributorInsightsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -50,6 +50,7 @@ func (o *RestoreTableToPointInTimeOutput) Get() (out *ddb.RestoreTableToPointInT
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+	
 	return
 }
 
@@ -103,15 +104,22 @@ func NewRestoreTableToPointInTime(input *ddb.RestoreTableToPointInTimeInput, mws
 	}
 }
 
-// DynoInvoke invokes the RestoreTableToPointInTime operation and returns a RestoreTableToPointInTimePromise
+// Invoke invokes the RestoreTableToPointInTime operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *RestoreTableToPointInTime) Invoke(ctx context.Context, client *ddb.Client) *RestoreTableToPointInTime {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *RestoreTableToPointInTime) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *RestoreTableToPointInTime) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the RestoreTableToPointInTime operation
+func (op *RestoreTableToPointInTime) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(RestoreTableToPointInTimeOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

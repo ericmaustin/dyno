@@ -104,15 +104,22 @@ func NewUpdateGlobalTable(input *ddb.UpdateGlobalTableInput, mws ...UpdateGlobal
 	}
 }
 
-// DynoInvoke invokes the UpdateGlobalTable operation and returns a UpdateGlobalTablePromise
+// Invoke invokes the UpdateGlobalTable operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *UpdateGlobalTable) Invoke(ctx context.Context, client *ddb.Client) *UpdateGlobalTable {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *UpdateGlobalTable) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *UpdateGlobalTable) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the UpdateGlobalTable operation
+func (op *UpdateGlobalTable) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(UpdateGlobalTableOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

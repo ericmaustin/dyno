@@ -52,6 +52,7 @@ func (o *CreateTableOutput) Get() (out *ddb.CreateTableOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -99,7 +100,7 @@ type CreateTable struct {
 // NewCreateTable creates a new CreateTable
 func NewCreateTable(input *ddb.CreateTableInput, mws ...CreateTableMiddleWare) *CreateTable {
 	return &CreateTable{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
@@ -108,6 +109,7 @@ func NewCreateTable(input *ddb.CreateTableInput, mws ...CreateTableMiddleWare) *
 // Invoke invokes the CreateTable operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *CreateTable) Invoke(ctx context.Context, client *ddb.Client) *CreateTable {
 	op.SetWaiting() // promise now waiting for a response
+
 	go op.invoke(ctx, client)
 
 	return op

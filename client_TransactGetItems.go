@@ -52,6 +52,7 @@ func (o *TransactGetItemsOutput) Get() (out *ddb.TransactGetItemsOutput, err err
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+	
 	return
 }
 
@@ -105,16 +106,22 @@ func NewTransactGetItems(input *ddb.TransactGetItemsInput, mws ...TransactGetIte
 	}
 }
 
-// DynoInvoke invokes the TransactGetItems operation and returns a TransactGetItemsPromise
+// Invoke invokes the TransactGetItems operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *TransactGetItems) Invoke(ctx context.Context, client *ddb.Client) *TransactGetItems {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *TransactGetItems) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *TransactGetItems) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the TransactGetItems operation
+func (op *TransactGetItems) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(TransactGetItemsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

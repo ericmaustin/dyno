@@ -103,16 +103,22 @@ func NewListExports(input *ddb.ListExportsInput, mws ...ListExportsMiddleWare) *
 	}
 }
 
-// DynoInvoke invokes the ListExports operation and returns it
+// Invoke invokes the ListExports operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *ListExports) Invoke(ctx context.Context, client *ddb.Client) *ListExports {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ListExports) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *ListExports) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the ListExports operation
+func (op *ListExports) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ListExportsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

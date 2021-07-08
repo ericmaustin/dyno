@@ -105,16 +105,22 @@ func NewTransactWriteItems(input *ddb.TransactWriteItemsInput, mws ...TransactWr
 	}
 }
 
-// DynoInvoke invokes the TransactWriteItems operation and returns a TransactWriteItemsPromise
+// Invoke invokes the TransactWriteItems operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *TransactWriteItems) Invoke(ctx context.Context, client *ddb.Client) *TransactWriteItems {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *TransactWriteItems) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *TransactWriteItems) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the TransactWriteItems operation
+func (op *TransactWriteItems) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(TransactWriteItemsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -103,16 +103,22 @@ func NewListTagsOfResource(input *ddb.ListTagsOfResourceInput, mws ...ListTagsOf
 	}
 }
 
-// DynoInvoke invokes the ListTagsOfResource operation and returns it
+// Invoke invokes the ListTagsOfResource operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *ListTagsOfResource) Invoke(ctx context.Context, client *ddb.Client) *ListTagsOfResource {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ListTagsOfResource) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *ListTagsOfResource) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the ListTagsOfResource operation
+func (op *ListTagsOfResource) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ListTagsOfResourceOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

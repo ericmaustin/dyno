@@ -50,6 +50,7 @@ func (o *DescribeGlobalTableSettingsOutput) Get() (out *ddb.DescribeGlobalTableS
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -97,21 +98,29 @@ type DescribeGlobalTableSettings struct {
 // NewDescribeGlobalTableSettings creates a new DescribeGlobalTableSettings
 func NewDescribeGlobalTableSettings(input *ddb.DescribeGlobalTableSettingsInput, mws ...DescribeGlobalTableSettingsMiddleWare) *DescribeGlobalTableSettings {
 	return &DescribeGlobalTableSettings{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// DynoInvoke invokes the DescribeGlobalTableSettings operation and returns a DescribeGlobalTableSettingsPromise
+// Invoke invokes the DescribeGlobalTableSettings operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DescribeGlobalTableSettings) Invoke(ctx context.Context, client *ddb.Client) *DescribeGlobalTableSettings {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeGlobalTableSettings) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeGlobalTableSettings) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the DescribeGlobalTableSettings operation
+func (op *DescribeGlobalTableSettings) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeGlobalTableSettingsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

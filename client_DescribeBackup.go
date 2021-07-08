@@ -50,6 +50,7 @@ func (o *DescribeBackupOutput) Get() (out *ddb.DescribeBackupOutput, err error) 
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -97,21 +98,29 @@ type DescribeBackup struct {
 // NewDescribeBackup creates a new DescribeBackup
 func NewDescribeBackup(input *ddb.DescribeBackupInput, mws ...DescribeBackupMiddleWare) *DescribeBackup {
 	return &DescribeBackup{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// DynoInvoke invokes the DescribeBackup operation and returns a DescribeBackupPromise
+// Invoke invokes the DescribeBackup operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DescribeBackup) Invoke(ctx context.Context, client *ddb.Client) *DescribeBackup {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeBackup) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeBackup) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the DescribeBackup operation
+func (op *DescribeBackup) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeBackupOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

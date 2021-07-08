@@ -50,6 +50,7 @@ func (o *DeleteBackupOutput) Get() (out *ddb.DeleteBackupOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -126,6 +127,7 @@ func NewDeleteBackup(input *ddb.DeleteBackupInput, mws ...DeleteBackupMiddleWare
 // Invoke invokes the DeleteBackup operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DeleteBackup) Invoke(ctx context.Context, client *ddb.Client) *DeleteBackup {
 	op.SetWaiting() // promise now waiting for a response
+
 	go op.invoke(ctx, client)
 
 	return op

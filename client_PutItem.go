@@ -107,16 +107,22 @@ func NewPutItem(input *ddb.PutItemInput, mws ...PutItemMiddleWare) *PutItem {
 	}
 }
 
-// DynoInvoke invokes the PutItem operation and returns a PutItemPromise
+// Invoke invokes the PutItem operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *PutItem) Invoke(ctx context.Context, client *ddb.Client) *PutItem {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *PutItem) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *PutItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the PutItem operation
+func (op *PutItem) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(PutItemOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

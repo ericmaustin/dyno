@@ -280,6 +280,7 @@ func NewBatchGetItemAll(input *ddb.BatchGetItemInput, mws ...BatchGetItemAllMidd
 // Invoke invokes the BatchGetItemAll operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *BatchGetItemAll) Invoke(ctx context.Context, client *ddb.Client) *BatchGetItemAll {
 	op.SetWaiting() // promise now waiting for a response
+
 	go op.invoke(ctx, client)
 
 	return op

@@ -51,6 +51,7 @@ func (o *UntagResourceOutput) Get() (out *ddb.UntagResourceOutput, err error) {
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+	
 	return
 }
 
@@ -104,16 +105,22 @@ func NewUntagResource(input *ddb.UntagResourceInput, mws ...UntagResourceMiddleW
 	}
 }
 
-// DynoInvoke invokes the UntagResource operation and returns a UntagResourcePromise
+// Invoke invokes the UntagResource operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *UntagResource) Invoke(ctx context.Context, client *ddb.Client) *UntagResource {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *UntagResource) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *UntagResource) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the UntagResource operation
+func (op *UntagResource) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(UntagResourceOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

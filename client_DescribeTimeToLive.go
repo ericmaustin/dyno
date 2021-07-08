@@ -50,6 +50,7 @@ func (o *DescribeTimeToLiveOutput) Get() (out *ddb.DescribeTimeToLiveOutput, err
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -97,21 +98,29 @@ type DescribeTimeToLive struct {
 // NewDescribeTimeToLive creates a new DescribeTimeToLive
 func NewDescribeTimeToLive(input *ddb.DescribeTimeToLiveInput, mws ...DescribeTimeToLiveMiddleWare) *DescribeTimeToLive {
 	return &DescribeTimeToLive{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// DynoInvoke invokes the DescribeTimeToLive operation and returns a DescribeTimeToLivePromise
+// Invoke invokes the DescribeTimeToLive operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DescribeTimeToLive) Invoke(ctx context.Context, client *ddb.Client) *DescribeTimeToLive {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeTimeToLive) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeTimeToLive) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the DescribeTimeToLive operation
+func (op *DescribeTimeToLive) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeTimeToLiveOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -50,6 +50,7 @@ func (o *DescribeLimitsOutput) Get() (out *ddb.DescribeLimitsOutput, err error) 
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -97,21 +98,29 @@ type DescribeLimits struct {
 // NewDescribeLimits creates a new DescribeLimits
 func NewDescribeLimits(input *ddb.DescribeLimitsInput, mws ...DescribeLimitsMiddleWare) *DescribeLimits {
 	return &DescribeLimits{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// DynoInvoke invokes the DescribeLimits operation and returns a DescribeLimitsPromise
+// Invoke invokes the DescribeLimits operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DescribeLimits) Invoke(ctx context.Context, client *ddb.Client) *DescribeLimits {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeLimits) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeLimits) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the DescribeLimits operation
+func (op *DescribeLimits) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeLimitsOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

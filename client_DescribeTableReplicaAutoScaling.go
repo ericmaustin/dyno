@@ -50,6 +50,7 @@ func (o *DescribeTableReplicaAutoScalingOutput) Get() (out *ddb.DescribeTableRep
 	out = o.out
 	err = o.err
 	o.mu.Unlock()
+
 	return
 }
 
@@ -97,21 +98,29 @@ type DescribeTableReplicaAutoScaling struct {
 // NewDescribeTableReplicaAutoScaling creates a new DescribeTableReplicaAutoScaling
 func NewDescribeTableReplicaAutoScaling(input *ddb.DescribeTableReplicaAutoScalingInput, mws ...DescribeTableReplicaAutoScalingMiddleWare) *DescribeTableReplicaAutoScaling {
 	return &DescribeTableReplicaAutoScaling{
-		Promise: NewPromise(),
+		Promise:     NewPromise(),
 		input:       input,
 		middleWares: mws,
 	}
 }
 
-// DynoInvoke invokes the DescribeTableReplicaAutoScaling operation and returns a DescribeTableReplicaAutoScalingPromise
+// Invoke invokes the DescribeTableReplicaAutoScaling operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *DescribeTableReplicaAutoScaling) Invoke(ctx context.Context, client *ddb.Client) *DescribeTableReplicaAutoScaling {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *DescribeTableReplicaAutoScaling) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *DescribeTableReplicaAutoScaling) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the DescribeTableReplicaAutoScaling operation
+func (op *DescribeTableReplicaAutoScaling) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(DescribeTableReplicaAutoScalingOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

@@ -103,15 +103,22 @@ func NewExportTableToPointInTime(input *ddb.ExportTableToPointInTimeInput, mws .
 	}
 }
 
-// DynoInvoke invokes the ExportTableToPointInTime operation and returns a ExportTableToPointInTimePromise
+// Invoke invokes the ExportTableToPointInTime operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *ExportTableToPointInTime) Invoke(ctx context.Context, client *ddb.Client) *ExportTableToPointInTime {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ExportTableToPointInTime) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *ExportTableToPointInTime) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
+
+// invoke invokes the ExportTableToPointInTime operation
+func (op *ExportTableToPointInTime) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ExportTableToPointInTimeOutput)
 
 	defer func() { op.SetResponse(output.Get()) }()

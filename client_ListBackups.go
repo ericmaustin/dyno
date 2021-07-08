@@ -103,19 +103,25 @@ func NewListBackups(input *ddb.ListBackupsInput, mws ...ListBackupsMiddleWare) *
 	}
 }
 
-// DynoInvoke invokes the ListBackups operation and returns a ListBackupsPromise
+// Invoke invokes the ListBackups operation in a goroutine and returns a BatchGetItemAllPromise
 func (op *ListBackups) Invoke(ctx context.Context, client *ddb.Client) *ListBackups {
-	go op.Invoke(ctx, client)
+	op.SetWaiting() // promise now waiting for a response
+	go op.invoke(ctx, client)
 
 	return op
 }
 
 // DynoInvoke implements the Operation interface
-func (op *ListBackups) Invoke(ctx context.Context, client *ddb.Client) {
+func (op *ListBackups) DynoInvoke(ctx context.Context, client *ddb.Client) {
+	op.SetWaiting() // promise ≈now waiting for a response
+	op.invoke(ctx, client)
+}
 
+// invoke invokes the ListBackups operation
+func (op *ListBackups) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(ListBackupsOutput)
 
-	defer func() { op.SetResponse(output.Get())}()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &ListBackupsContext{
 		Context: ctx,

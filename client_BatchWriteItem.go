@@ -124,7 +124,8 @@ func NewBatchWriteItem(input *ddb.BatchWriteItemInput, mws ...BatchWriteItemMidd
 // Invoke invokes the BatchWriteItem operation and returns the BatchWriteItem
 func (op *BatchWriteItem) Invoke(ctx context.Context, client *ddb.Client) *BatchWriteItem {
 	op.SetWaiting() // promise is now waiting for a response
-	go op.Invoke(ctx, client)
+	
+	go op.invoke(ctx, client)
 
 	return op
 }
@@ -139,7 +140,7 @@ func (op *BatchWriteItem) DynoInvoke(ctx context.Context, client *ddb.Client) {
 func (op *BatchWriteItem) invoke(ctx context.Context, client *ddb.Client) {
 	output := new(BatchWriteItemOutput)
 
-	defer func(){ op.SetResponse(output.Get()) }()
+	defer func() { op.SetResponse(output.Get()) }()
 
 	requestCtx := &BatchWriteItemContext{
 		Context: ctx,
@@ -301,7 +302,8 @@ func NewBatchWriteItemAll(input *ddb.BatchWriteItemInput, mws ...BatchWriteItemA
 // Invoke invokes the BatchWriteItemAll operation and returns the BatchWriteItemAll
 func (op *BatchWriteItemAll) Invoke(ctx context.Context, client *ddb.Client) *BatchWriteItemAll {
 	op.SetWaiting() // promise now waiting for a result
-	go op.Invoke(ctx, client)
+
+	go op.invoke(ctx, client)
 
 	return op
 }
