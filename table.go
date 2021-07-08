@@ -557,29 +557,24 @@ func (t *Table) NewPutItemBuilder() *PutItemBuilder {
 	return NewPutItemBuilder(nil).SetTableName(t.Name())
 }
 
-// BatchGet returns a new BatchGetItem for this table with given key items
-func (t *Table) BatchGet(items []map[string]ddbTypes.AttributeValue, mws ...BatchGetItemAllMiddleWare) *BatchGetItemAll {
+// NewBatchGetBuilder returns a new NewBatchGetBuilder for this table with given key items
+func (t *Table) NewBatchGetBuilder(items []map[string]ddbTypes.AttributeValue, mws ...BatchGetItemMiddleWare) *BatchGetItemBuilder{
 	keys := t.ExtractAllKeys(items)
-	input, err := NewBatchGetBuilder(nil).AddKey(t.Name(), keys...).Build()
 
-	if err != nil {
-		// this shouldn't happen when we're only adding keys
-		panic(err)
+	return NewBatchGetBuilder(nil).AddKey(t.Name(), keys...)
+}
+
+// NewBatchWriteBuilder returns a new BatchWriteItemBuilder
+func (t *Table) NewBatchWriteBuilder(puts []map[string]ddbTypes.AttributeValue, deletes []map[string]ddbTypes.AttributeValue, mws ...BatchWriteItemMiddleWare) *BatchWriteItemBuilder {
+	builder := NewBatchWriteItemBuilder(nil)
+
+	if len(puts) > 0 {
+		builder.AddPuts(t.Name(), puts...)
 	}
 
-	return NewBatchGetItemAll(input, mws...)
-}
+	if len(deletes) > 0 {
+		builder.AddDeletes(t.Name(), deletes...)
+	}
 
-// BatchPut returns a new BatchWriteItem for this table with put requests provided items
-func (t *Table) BatchPut(items []map[string]ddbTypes.AttributeValue, mws ...BatchWriteItemAllMiddleWare) *BatchWriteItemAll {
-	input := NewBatchWriteItemBuilder(nil).AddPuts(t.Name(), items...).Build()
-	return NewBatchWriteItemAll(input, mws...)
-}
-
-// BatchDelete returns a new  BatchWriteItem for this table with delete requests for  provided items
-func (t *Table) BatchDelete(items []map[string]ddbTypes.AttributeValue, mws ...BatchWriteItemAllMiddleWare) *BatchWriteItemAll {
-	keys := t.ExtractAllKeys(items)
-	input := NewBatchWriteItemBuilder(nil).AddDeletes(t.Name(), keys...).Build()
-
-	return NewBatchWriteItemAll(input, mws...)
+	return builder
 }

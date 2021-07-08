@@ -1,7 +1,6 @@
 package dyno
 
 import (
-	"context"
 	"fmt"
 	"testing"
 )
@@ -11,7 +10,7 @@ func TestCreateNewTableDeleteTable(t *testing.T) {
 	tbl := CreateTestTable(client)
 
 	// delete the table
-	_, err := client.DeleteTable(context.Background(), tbl.DeleteInput()).Await()
+	_, err := client.DeleteTable(tbl.DeleteInput()).Await()
 	if err != nil {
 		panic(err)
 	}

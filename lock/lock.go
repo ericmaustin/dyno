@@ -51,7 +51,7 @@ type (
 
 	// Lock is a representation of a lock on a specific record in a table
 	Lock struct {
-		DB                     *dyno.Client
+		DB                     *dyno.Session
 		Key                    map[string]types.AttributeValue // the item that is being locked
 		TableName              string
 		SessionID              *string       // this lock sessionId
@@ -329,7 +329,7 @@ func OptContext(ctx context.Context) Opt {
 /*
 Acquire acquires a lock for a given table with a given map of key fields
 */
-func Acquire(tableName string, itemKey interface{}, db *dyno.Client, opts ...Opt) (lock *Lock, err error) {
+func Acquire(tableName string, itemKey interface{}, db *dyno.Session, opts ...Opt) (lock *Lock, err error) {
 
 	var (
 		ctx    context.Context
@@ -389,7 +389,7 @@ func Acquire(tableName string, itemKey interface{}, db *dyno.Client, opts ...Opt
 }
 
 // MustAcquire acquires a lock or panics
-func MustAcquire(tableName string, itemKey interface{}, sess *dyno.Client, opts ...Opt) *Lock {
+func MustAcquire(tableName string, itemKey interface{}, sess *dyno.Session, opts ...Opt) *Lock {
 	lock, err := Acquire(tableName, itemKey, sess, opts...)
 	if err != nil {
 		panic(err)
