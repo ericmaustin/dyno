@@ -13,27 +13,27 @@ dyno is an AWS dynomodb API extension library
 Build inputs for API operations with input builders allowing more straight-forward building
 of more complicated operations. Example:
 ```go
-builder := NewScanBuilder().SetTableName(tableName)
+builder := NewScanBuilder().SetTableName("TableName")
 builder.AddFilter(condition.And(
-    condition.Between("Foo", 0, 2),
     condition.Equal("Bar", "Hello World"),
+    condition.Between("Foo", 0, 2),
 ))
 builder.AddProjectionNames("ID", "TimeStamp")
-builder.Build()
+input, err := builder.Build()
 ```
 
-### Promises
+### Operations as Promises
 
-All `DynamoDB` API calls (e.g. `DynamoDB.Query()`) return a `Promise` type that will execute the API call in
-a go routine and will wait and return values by calling `Promise.Await`.
+All `DynamoDB` API calls (e.g. `DynamoDB.Query()`) return an `Operation` type that will execute the API call in
+a go routine and will wait and return values by calling `Operation.Await`.
 Example:
 ```go
-scanInput := NewScanInput().SetTableName(suite.table.Name())
-scanPromise := client.Scan(scanInput)
-scanOutput, err := scanPromise.Await()
+scanInput := NewScanInput().SetTableName("MyTable")
+scanOp := session.Scan(scanInput)  // here we are using a ``Session`` type
+scanOutput, err := scanOp.Await()
 ```
 
-Each API operation has its own `Promise` type that will return the correct type with `Await()`
+Each dynamodb API operation has its own `Operation` type
 
 ### Middleware
 
@@ -44,15 +44,16 @@ Example:
 // Note: ScanAll does the same thing as Scan except it will keep running Scan operations until no results are left
 // to be returned
 
-var cached []*dynamodb.ScanOutput
+var cached *dynamodb.ScanOutput
 
-testCacheMiddelWare := ScanAllMiddleWareFunc(func(next ScanAllHandler) ScanAllHandler {
-    return ScanAllHandlerFunc(func(ctx *ScanAllContext, output *ScanAllOutput) {
+testCacheMiddelWare := ScanMiddleWareFunc(func(next ScanHandler) ScanHandler {
+    return ScanHandlerFunc(func(ctx *ScanContext, output *ScanOutput) {
         if cached != nil {
             output.Set(cached, nil)
             return
         }
-        next.HandleScanAll(ctx, output)
+        
+        next.HandleScan(ctx, output)
         out, err := output.Get()
         if err != nil {
             panic(err)
@@ -61,14 +62,16 @@ testCacheMiddelWare := ScanAllMiddleWareFunc(func(next ScanAllHandler) ScanAllHa
     })
 })
 
-input, err := NewScanBuilder(nil).SetTableName(s.table.Name()).Build()
+// create a NewScanBuilder, input is nil as we do not have an existing ScanInput
+input, err := NewScanBuilder(nil).SetTableName("MyTable").Build()
 if err != nil {
     panic(err)
 }
 
+// NewScanAll creates a Scan operation that repeats scan api calls until all values are returned
 scan := NewScanAll(input, testCacheMiddelWare)
-scanPromise := scan.Invoke(context.Background(), s.client.DynamoDB())
-out, err := scanPromise.Await()
+scanOperation := scan.Invoke(context.ToDo(), dynamoDBClient)
+out, err := scanOperation.Await()
 ```
 
 ### Encoding
@@ -91,14 +94,14 @@ Example:
 ```go
 pool := NewPool(context.Background(), dynamoDBClient, 10)
 
-var scanPromises []*Scan
+var scanOperations []*Scan
 
 for _, scan := range []*dynamodb.ScanInput{...} {
-    scanPromise := pool.Scan(scanInput)
-    scanPromises = append(scanPromises, scanPromise)
+    scanOperations := pool.Scan(scanInput)
+    scanOperations = append(scanPromises, scanPromise)
 }
 
-for _, promise := range ScanPromises {
+for _, promise := range scanOperations {
 	out, err := promise.Await()
 	...
 }
@@ -117,7 +120,3 @@ lock := lock.MustAcquire(tableName, itemKey, db,
 // release
 err = lock.Release()
 ```
-
----
-
-NOTE: This module is incomplete and in active development
