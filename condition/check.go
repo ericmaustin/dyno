@@ -12,6 +12,7 @@ type CheckBuilder struct {
 	cnd Builder
 }
 
+// SetReturnValuesOnConditionCheckFailure sets a ReturnValuesOnConditionCheckFailure on the CheckBuilder
 func (c *CheckBuilder) SetReturnValuesOnConditionCheckFailure(v types.ReturnValuesOnConditionCheckFailure) *CheckBuilder {
 	c.ReturnValuesOnConditionCheckFailure = v
 	return c

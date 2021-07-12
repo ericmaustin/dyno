@@ -16,4 +16,7 @@ require (
 	gopkg.in/yaml.v2 v2.3.0
 )
 
+retract v1.1.12 // errant release of version 1.x.x
+retract v0.2.0 // lock-up errors in some operations
+
 go 1.16

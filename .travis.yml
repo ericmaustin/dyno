@@ -1,7 +1,7 @@
 language: go
 go:
-- 1.14.x
 - 1.15.x
+- 1.16.x
 before_install:
 - "/bin/bash ./scripts/aws.sh"
 - go get golang.org/x/tools/cmd/cover
