@@ -49,7 +49,7 @@ func (c *CheckBuilder) Build() (*types.ConditionCheck, error) {
 		expr, err := eb.Build()
 
 		if err != nil {
-			return nil, fmt.Errorf("CheckBuilder Build() failed while attempting to build expression: %v", err)
+			return nil, fmt.Errorf("CheckBuilder GetDynamoGlobalSecondaryIndex() failed while attempting to build expression: %v", err)
 		}
 
 		c.ExpressionAttributeNames = expr.Names()

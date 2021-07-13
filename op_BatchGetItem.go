@@ -313,7 +313,7 @@ func (bld *BatchGetItemBuilder) Build() (*ddb.BatchGetItemInput, error) {
 		// build the Expression
 		expr, err := eb.Build()
 		if err != nil {
-			return nil, fmt.Errorf("BatchGetItemBuilder.Build() encountered an error while building an expression: %v", err)
+			return nil, fmt.Errorf("BatchGetItemBuilder.GetDynamoGlobalSecondaryIndex() encountered an error while building an expression: %v", err)
 		}
 
 		exprNames := expr.Names()

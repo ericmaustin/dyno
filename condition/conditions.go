@@ -82,7 +82,7 @@ func NotExists(name string) expression.ConditionBuilder {
 	return expression.Name(name).AttributeNotExists()
 }
 
-// And (Condition And) returns an Expression.Build that joins one or more provided conditions with an AND condition
+// And (Condition And) returns an Expression.GetDynamoGlobalSecondaryIndex that joins one or more provided conditions with an AND condition
 //	returns an expression.ConditionBuilder: the Expression builder value
 func And(left expression.ConditionBuilder, right ...expression.ConditionBuilder) expression.ConditionBuilder {
 
@@ -100,7 +100,7 @@ func And(left expression.ConditionBuilder, right ...expression.ConditionBuilder)
 	return cnd
 }
 
-// Or (Condition Or) returns an Expression.Build that joins one or more provided conditions with an OR condition
+// Or (Condition Or) returns an Expression.GetDynamoGlobalSecondaryIndex that joins one or more provided conditions with an OR condition
 //	returns
 //		expression.Builder: the Expression builder value
 func Or(left expression.ConditionBuilder, right ...expression.ConditionBuilder) expression.ConditionBuilder {

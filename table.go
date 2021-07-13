@@ -15,13 +15,11 @@ import (
 // Table represents a dynamodb table
 type Table struct {
 	*ddbTypes.TableDescription
-	LastSync time.Time
-	// map of global secondary indexes
-	GSIs map[string]*GSI
-	// map of local secondary indexes
-	LSIs                            map[string]*LSI
-	PartitionKeyAttributeDefinition *ddbTypes.AttributeDefinition
-	SortKeyAttributeDefinition      *ddbTypes.AttributeDefinition
+	LastSync                        time.Time
+	GSIs                            map[string]*GSI               // map of global secondary indexes
+	LSIs                            map[string]*LSI               // map of local secondary indexes
+	PartitionKeyAttributeDefinition *ddbTypes.AttributeDefinition // the Partition Key's AttributeDefinition
+	SortKeyAttributeDefinition      *ddbTypes.AttributeDefinition // the Sort Key's AttributeDefinition
 	Tags                            []ddbTypes.Tag
 	mu                              sync.RWMutex
 }
@@ -38,8 +36,7 @@ func (t *Table) Name() string {
 
 // IsOnDemand returns true if the table is set to On Demand pricing
 func (t *Table) IsOnDemand() bool {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
+	t.mu.Lock()
 
 	if t.BillingModeSummary == nil {
 		// default to pay per request
@@ -49,7 +46,11 @@ func (t *Table) IsOnDemand() bool {
 		}
 	}
 
-	return t.BillingModeSummary.BillingMode == ddbTypes.BillingModePayPerRequest
+	out := t.BillingModeSummary.BillingMode == ddbTypes.BillingModePayPerRequest
+
+	t.mu.Unlock()
+
+	return out
 }
 
 // RCUs returns the read cost units for this table
@@ -79,9 +80,10 @@ func (t *Table) WCUs() int64 {
 // Description returns the table description
 func (t *Table) Description() *ddbTypes.TableDescription {
 	t.mu.RLock()
-	defer t.mu.RUnlock()
+	out := t.TableDescription
+	t.mu.RUnlock()
 
-	return t.TableDescription
+	return out
 }
 
 // DescribeTableInput gets the DescribeTableInput for this table
@@ -159,7 +161,6 @@ func (t *Table) PartitionKeyName() string {
 // SetPartitionKey sets the partition key for this table
 func (t *Table) SetPartitionKey(pkName string, attributeType ddbTypes.ScalarAttributeType) *Table {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 
 	t.KeySchema = addPartitionKeyToKeySchema(t.KeySchema, pkName)
 	t.PartitionKeyAttributeDefinition = &ddbTypes.AttributeDefinition{
@@ -168,13 +169,27 @@ func (t *Table) SetPartitionKey(pkName string, attributeType ddbTypes.ScalarAttr
 	}
 	t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *t.PartitionKeyAttributeDefinition)
 
+	t.mu.Unlock()
+
+	return t
+}
+
+// SetPartitionKeyAttributeDefinition sets the partition key for this Table with an AttributeDefinition
+func (t *Table) SetPartitionKeyAttributeDefinition(def *ddbTypes.AttributeDefinition) *Table {
+	t.mu.Lock()
+
+	t.KeySchema = addSortKeyToKeySchema(t.KeySchema, *def.AttributeName)
+	t.PartitionKeyAttributeDefinition = def
+	t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *def)
+
+	t.mu.Unlock()
+
 	return t
 }
 
 // SetSortKey sets the sortKey key for this table
 func (t *Table) SetSortKey(skName string, attributeType ddbTypes.ScalarAttributeType) *Table {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 
 	t.KeySchema = addSortKeyToKeySchema(t.KeySchema, skName)
 	t.SortKeyAttributeDefinition = &ddbTypes.AttributeDefinition{
@@ -183,6 +198,21 @@ func (t *Table) SetSortKey(skName string, attributeType ddbTypes.ScalarAttribute
 	}
 	t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *t.SortKeyAttributeDefinition)
 
+	t.mu.Unlock()
+
+	return t
+}
+
+// SetSortKeyAttributeDefinition sets the sort key for this Table with an AttributeDefinition
+func (t *Table) SetSortKeyAttributeDefinition(def *ddbTypes.AttributeDefinition) *Table {
+	t.mu.Lock()
+
+	t.KeySchema = addSortKeyToKeySchema(t.KeySchema, *def.AttributeName)
+	t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *def)
+	t.SortKeyAttributeDefinition = def
+
+	t.mu.Unlock()
+
 	return t
 }
 
@@ -190,13 +220,16 @@ func (t *Table) SetSortKey(skName string, attributeType ddbTypes.ScalarAttribute
 // provided GSI must have an IndexName or this func will panic
 func (t *Table) AddGSI(gsi ...*GSI) *Table {
 	t.mu.Lock()
-	defer t.mu.Unlock()
+
+	if t.GSIs == nil {
+		t.GSIs = make(map[string]*GSI)
+	}
 
 	for _, g := range gsi {
 		gsiDesc := ddbTypes.GlobalSecondaryIndexDescription{
-			IndexName:  g.IndexName,
-			KeySchema:  g.KeySchema,
-			Projection: g.Projection,
+			IndexName:  &g.IndexName,
+			KeySchema:  g.GetDynamoKeySchema(),
+			Projection: g.GetDynamoProjection(),
 		}
 
 		if g.ProvisionedThroughput != nil {
@@ -208,35 +241,36 @@ func (t *Table) AddGSI(gsi ...*GSI) *Table {
 
 		t.GlobalSecondaryIndexes = append(t.GlobalSecondaryIndexes, gsiDesc)
 
-		if t.GSIs == nil {
-			t.GSIs = make(map[string]*GSI)
+		t.GSIs[g.IndexName] = g
+
+		if g.PartitionKey != nil {
+			t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *g.PartitionKey)
 		}
 
-		t.GSIs[*g.IndexName] = g
-
-		if g.PartitionKeyAttributeDefinition != nil {
-			t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *g.PartitionKeyAttributeDefinition)
-		}
-
-		if g.SortKeyAttributeDefinition != nil {
-			t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *g.SortKeyAttributeDefinition)
+		if g.SortKey != nil {
+			t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *g.SortKey)
 		}
 	}
+
+	t.mu.Unlock()
 
 	return t
 }
 
 // AddLSI adds a new LSI attached to this table
 // provided LSI must have an IndexName or this func will panic
-func (t *Table) AddLSI(lsi ...*LSI) {
+func (t *Table) AddLSI(lsi ...*LSI) *Table {
 	t.mu.Lock()
-	defer t.mu.Unlock()
+
+	if t.LSIs == nil {
+		t.LSIs = make(map[string]*LSI)
+	}
 
 	for _, l := range lsi {
 		lsiDesc := ddbTypes.LocalSecondaryIndexDescription{
-			IndexName:  l.IndexName,
-			KeySchema:  l.KeySchema,
-			Projection: l.Projection,
+			IndexName:  &l.IndexName,
+			KeySchema:  l.GetDynamoKeySchema(),
+			Projection: l.GetDynamoProjection(),
 		}
 
 		t.LocalSecondaryIndexes = append(t.LocalSecondaryIndexes, lsiDesc)
@@ -245,12 +279,15 @@ func (t *Table) AddLSI(lsi ...*LSI) {
 			t.LSIs = make(map[string]*LSI)
 		}
 
-		t.LSIs[*l.IndexName] = l
+		t.LSIs[l.IndexName] = l
 
-		if l.SortKeyAttributeDefinition != nil {
-			t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *l.SortKeyAttributeDefinition)
+		if l.SortKey != nil {
+			t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *l.SortKey)
 		}
 	}
+	t.mu.Unlock()
+
+	return t
 }
 
 // ExtractKeys extracts key values from a dynamodb.AttributeValue map
@@ -342,13 +379,13 @@ func (t *Table) CreateTableInput() (*ddb.CreateTableInput, error) {
 
 	if len(t.GSIs) > 0 {
 		for _, gsi := range t.GSIs {
-			in.GlobalSecondaryIndexes = append(in.GlobalSecondaryIndexes, gsi.GlobalSecondaryIndex)
+			in.GlobalSecondaryIndexes = append(in.GlobalSecondaryIndexes, gsi.GetDynamoGlobalSecondaryIndex())
 		}
 	}
 
 	if len(t.LSIs) > 0 {
 		for _, lsi := range t.LSIs {
-			in.LocalSecondaryIndexes = append(in.LocalSecondaryIndexes, lsi.LocalSecondaryIndex)
+			in.LocalSecondaryIndexes = append(in.LocalSecondaryIndexes, lsi.GetDynamoLocalSecondaryIndex())
 		}
 	}
 
@@ -558,7 +595,7 @@ func (t *Table) NewPutItemBuilder() *PutItemBuilder {
 }
 
 // NewBatchGetBuilder returns a new NewBatchGetBuilder for this table with given key items
-func (t *Table) NewBatchGetBuilder(items []map[string]ddbTypes.AttributeValue, mws ...BatchGetItemMiddleWare) *BatchGetItemBuilder{
+func (t *Table) NewBatchGetBuilder(items []map[string]ddbTypes.AttributeValue, mws ...BatchGetItemMiddleWare) *BatchGetItemBuilder {
 	keys := t.ExtractAllKeys(items)
 
 	return NewBatchGetBuilder(nil).AddKey(t.Name(), keys...)

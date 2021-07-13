@@ -323,7 +323,7 @@ func (bld *UpdateItemBuilder) Build() (*ddb.UpdateItemInput, error) {
 	b, err := expr.Build()
 
 	if err != nil {
-		return nil, fmt.Errorf("UpdateItemBuilder.Build() failed while attempting to build expression: %v", err)
+		return nil, fmt.Errorf("UpdateItemBuilder.GetDynamoGlobalSecondaryIndex() failed while attempting to build expression: %v", err)
 	}
 
 	bld.ConditionExpression = b.Condition()

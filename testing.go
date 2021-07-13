@@ -134,9 +134,11 @@ func CreateTestTable(db *Session) *Table {
 	table := NewTable(TestTableName())
 	table.SetPartitionKey("id", "S")
 	table.SetSortKey("timestamp", "N")
-	table.AddGSI(NewGSI("gsi_test_idx").
+	table.AddGSI(
+		NewGSI("gsi_test_idx").
 		SetPartitionKey("Foo", "N"))
-	table.AddLSI(NewLSI("lsi_test_idx").
+	table.AddLSI(
+		NewLSI("lsi_test_idx").
 		SetPartitionKey("id", "S").
 		SetSortKey("Bar", "N"))
 
