@@ -18,5 +18,6 @@ require (
 
 retract v1.1.12 // errant release of version 1.x.x
 retract v0.2.0 // lock-up errors in some operations
+retract v1.1.0 // bad types in some marshalers
 
 go 1.16
