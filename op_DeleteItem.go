@@ -242,7 +242,7 @@ func (bld *DeleteItemBuilder) Build() (*ddb.DeleteItemInput, error) {
 		expr := expression.NewBuilder().WithCondition(bld.cnd.Builder())
 		e, err := expr.Build()
 		if err != nil {
-			return nil, fmt.Errorf("DeleteItemInput.Build() encountered an error while attempting to build an expression: %v", err)
+			return nil, fmt.Errorf("DeleteItemInput.GetDynamoGlobalSecondaryIndex() encountered an error while attempting to build an expression: %v", err)
 		}
 
 		bld.ConditionExpression = e.Condition()

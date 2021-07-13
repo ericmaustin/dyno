@@ -236,7 +236,7 @@ func (bld *GetItemBuilder) Build() (*ddb.GetItemInput, error) {
 		// build the Expression
 		expr, err := eb.Build()
 		if err != nil {
-			return nil, fmt.Errorf("GetItemBuilder Build() failed while attempting to build expression: %v", err)
+			return nil, fmt.Errorf("GetItemBuilder GetDynamoGlobalSecondaryIndex() failed while attempting to build expression: %v", err)
 		}
 
 		bld.ExpressionAttributeNames = expr.Names()

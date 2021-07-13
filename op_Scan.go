@@ -373,7 +373,7 @@ func (bld *ScanBuilder) Build() (*ddb.ScanInput, error) {
 	expr, err := eb.Build()
 
 	if err != nil {
-		return nil, fmt.Errorf("ScanBuilder Build() failed while attempting to build expression: %v", err)
+		return nil, fmt.Errorf("ScanBuilder GetDynamoGlobalSecondaryIndex() failed while attempting to build expression: %v", err)
 	}
 
 	bld.ExpressionAttributeNames = expr.Names()
