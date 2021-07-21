@@ -178,7 +178,7 @@ func (t *Table) SetPartitionKey(pkName string, attributeType ddbTypes.ScalarAttr
 func (t *Table) SetPartitionKeyAttributeDefinition(def *ddbTypes.AttributeDefinition) *Table {
 	t.mu.Lock()
 
-	t.KeySchema = addSortKeyToKeySchema(t.KeySchema, *def.AttributeName)
+	t.KeySchema = addPartitionKeyToKeySchema(t.KeySchema, *def.AttributeName)
 	t.PartitionKeyAttributeDefinition = def
 	t.AttributeDefinitions = appendUniqueAttributeDefinitions(t.AttributeDefinitions, *def)
 
@@ -424,6 +424,7 @@ func (t *Table) SetOnDemand() *Table {
 	if t.BillingModeSummary == nil {
 		t.BillingModeSummary = new(ddbTypes.BillingModeSummary)
 	}
+
 	t.BillingModeSummary.BillingMode = ddbTypes.BillingModePayPerRequest
 
 	return t

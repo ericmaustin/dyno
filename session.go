@@ -28,6 +28,14 @@ type Session struct {
 	ddb *ddb.Client
 }
 
+// WithContext creates a new Session from the existing session with a new context
+func (s *Session) WithContext(ctx context.Context) *Session {
+	return &Session{
+		ctx: ctx,
+		ddb: s.ddb,
+	}
+}
+
 // DynamoDB gets a dynamo dynamodb.Client
 func (s *Session) DynamoDB() *ddb.Client {
 	return s.ddb

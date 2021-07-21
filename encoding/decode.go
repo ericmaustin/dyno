@@ -10,12 +10,12 @@ import (
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// MapUnmarshaller allows more control over decoding structs from attribute value maps
-type MapUnmarshaller interface {
+// MapUnmarshaler allows more control over decoding structs from attribute value maps
+type MapUnmarshaler interface {
 	UnmarshalAttributeValueMap(avMap map[string]ddb.AttributeValue) error
 }
 
-var itemUnmarshallerReflectType = reflect.TypeOf((*MapUnmarshaller)(nil)).Elem()
+var itemUnmarshallerReflectType = reflect.TypeOf((*MapUnmarshaler)(nil)).Elem()
 
 // UnmarshalMaps decodes a slice of AttributeValue maps into the given input that must be a ptr to a slice
 func UnmarshalMaps(items []map[string]ddb.AttributeValue, input interface{}) error {
@@ -41,7 +41,7 @@ func UnmarshalMaps(items []map[string]ddb.AttributeValue, input interface{}) err
 			// create a new value from the slice's element type
 			target := reflect.New(indirectType)
 			// run the unmarshaller
-			if err := target.Interface().(MapUnmarshaller).UnmarshalAttributeValueMap(item); err != nil {
+			if err := target.Interface().(MapUnmarshaler).UnmarshalAttributeValueMap(item); err != nil {
 				return err
 			}
 
@@ -93,7 +93,7 @@ func UnmarshalMaps(items []map[string]ddb.AttributeValue, input interface{}) err
 // UnmarshalMap unmarshals a map of dynamodb attribute values into given input struct or map
 // if the item is a map, the map must have the keys already set in the map
 func UnmarshalMap(item map[string]ddb.AttributeValue, input interface{}) error {
-	if unmarshaller, ok := input.(MapUnmarshaller); ok {
+	if unmarshaller, ok := input.(MapUnmarshaler); ok {
 		return unmarshaller.UnmarshalAttributeValueMap(item)
 	}
 

@@ -19,5 +19,6 @@ require (
 retract v1.1.12 // errant release of version 1.x.x
 retract v0.2.0 // lock-up errors in some operations
 retract v1.1.0 // bad types in some marshalers
+retract v1.1.1 // error with Table.SetPartitionKeyAttributeDefinition, fatal error in Lock package
 
 go 1.16

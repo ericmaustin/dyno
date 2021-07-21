@@ -27,7 +27,7 @@ func TestIntUnmarshaller(t *testing.T) {
 	foo := 0
 	bar := 0
 
-	decoderMap := ValueUnmarshalerMap(map[string]attributevalue.Unmarshaler{
+	decoderMap := ValueUnmarshalMap(map[string]attributevalue.Unmarshaler{
 		"Foo": IntUnmarshaler(&foo),
 		"Bar": IntUnmarshaler(&bar),
 	})
@@ -60,7 +60,7 @@ func TestInt64Unmarshaller(t *testing.T) {
 	foo := int64(0)
 	bar := int64(0)
 
-	decoderMap := ValueUnmarshalerMap(map[string]attributevalue.Unmarshaler{
+	decoderMap := ValueUnmarshalMap(map[string]attributevalue.Unmarshaler{
 		"Foo": Int64Unmarshaler(&foo),
 		"Bar": Int64Unmarshaler(&bar),
 	})
@@ -93,7 +93,7 @@ func TestStringUnmarshaller(t *testing.T) {
 	foo := ""
 	bar := ""
 
-	decoderMap := ValueUnmarshalerMap(map[string]attributevalue.Unmarshaler{
+	decoderMap := ValueUnmarshalMap(map[string]attributevalue.Unmarshaler{
 		"Foo": StringUnmarshaler(&foo),
 		"Bar": StringUnmarshaler(&bar),
 	})
@@ -126,7 +126,7 @@ func TestFloat64Unmarshaller(t *testing.T) {
 	foo := float64(0)
 	bar := float64(0)
 
-	decoderMap := ValueUnmarshalerMap(map[string]attributevalue.Unmarshaler{
+	decoderMap := ValueUnmarshalMap(map[string]attributevalue.Unmarshaler{
 		"Foo": Float64Unmarshaler(&foo),
 		"Bar": Float64Unmarshaler(&bar),
 	})
@@ -159,7 +159,7 @@ func TestFloat64PtrUnmarshaller(t *testing.T) {
 	foo := float64(0)
 	bar := float64(0)
 
-	decoderMap := ValueUnmarshalerMap(map[string]attributevalue.Unmarshaler{
+	decoderMap := ValueUnmarshalMap(map[string]attributevalue.Unmarshaler{
 		"Foo": Float64Unmarshaler(&foo),
 		"Bar": Float64Unmarshaler(&bar),
 	})
