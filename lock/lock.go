@@ -116,7 +116,7 @@ func (dl *Lock) Acquire() (err error) {
 			return ErrLockTimeout
 		case <-ticker.C:
 
-			updateOutput, err := dl.DB.UpdateItem(ctx, updateInput).Await()
+			updateOutput, err := dl.DB.WithContext(ctx).UpdateItem(updateInput).Await()
 
 			if err != nil {
 				var conditionalCheckError *types.ConditionalCheckFailedException
@@ -238,7 +238,7 @@ func (dl *Lock) renew() {
 	ctx, done := context.WithTimeout(dl.Context, dl.LeaseDuration)
 	defer done()
 
-	output, err := dl.DB.UpdateItem(ctx, updateInput).Await()
+	output, err := dl.DB.WithContext(ctx).UpdateItem(updateInput).Await()
 
 	select {
 	case <-dl.Context.Done():
@@ -270,7 +270,7 @@ func (dl *Lock) clear() {
 		AddCondition(condition.Equal(VersionFieldName, *dl.SessionID)).
 		Build()
 
-	if _, err = dl.DB.UpdateItem(context.Background(), updateInput).Await(); err != nil {
+	if _, err = dl.DB.UpdateItem(updateInput).Await(); err != nil {
 		var conditionalCheckErr *types.ConditionalCheckFailedException
 		if !errors.As(err, &conditionalCheckErr) {
 			panic(ErrConditionalCheckFailedException)
@@ -326,9 +326,7 @@ func OptContext(ctx context.Context) Opt {
 	}
 }
 
-/*
-Acquire acquires a lock for a given table with a given map of key fields
-*/
+// Acquire acquires a lock for a given table with a given map of key fields
 func Acquire(tableName string, itemKey interface{}, db *dyno.Session, opts ...Opt) (lock *Lock, err error) {
 
 	var (

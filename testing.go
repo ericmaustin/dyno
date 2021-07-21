@@ -77,7 +77,7 @@ func (m *TestItemMarshaller) UnmarshalAttributeValueMap(avMap map[string]ddbType
 		m.Embedded = new(TestEmbeddedItem)
 	}
 
-	mm := encoding.ValueUnmarshalerMap{
+	mm := encoding.ValueUnmarshalMap{
 		"id":        encoding.StringUnmarshaler(&m.ID),
 		"timestamp": encoding.UnixNanoUnmarshaler(&m.TimeStamp),
 		"Foo":       encoding.Float64Unmarshaler(&m.Embedded.Foo),

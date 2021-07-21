@@ -17,11 +17,11 @@ func (d UnmarshalerFunc) UnmarshalDynamoDBAttributeValue(v ddb.AttributeValue) e
 	return d(v)
 }
 
-// ValueUnmarshalerMap represents a map of attributevalue.Unmarshaler
-type ValueUnmarshalerMap map[string]ddbav.Unmarshaler
+// ValueUnmarshalMap represents a map of attributevalue.Unmarshaler
+type ValueUnmarshalMap map[string]ddbav.Unmarshaler
 
 // UnmarshalAttributeValueMap runs all the attributevalue.Unmarshalers in the UnmarshalerFunc map
-func (dm ValueUnmarshalerMap) UnmarshalAttributeValueMap(m map[string]ddb.AttributeValue) error {
+func (dm ValueUnmarshalMap) UnmarshalAttributeValueMap(m map[string]ddb.AttributeValue) error {
 	for key, decoder := range dm {
 		if av, ok := m[key]; ok {
 			if err := decoder.UnmarshalDynamoDBAttributeValue(av); err != nil {
