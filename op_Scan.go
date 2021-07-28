@@ -392,20 +392,12 @@ func (bld *ScanBuilder) BuildSegments(segments int32) ([]*ddb.ScanInput, error) 
 		return nil, err
 	}
 
-	if segments > 0 {
-		bld.TotalSegments = &segments
-	}
-
 	return SplitScanIntoSegments(input, segments), nil
 }
 
 // SplitScanIntoSegments splits an input into segments, each segment is a deep copy of the original
 // with a unique segment number
 func SplitScanIntoSegments(input *ddb.ScanInput, segments int32) (inputs []*ddb.ScanInput) {
-	if input.TotalSegments == nil || *input.TotalSegments < 2 {
-		// only one segment
-		return []*ddb.ScanInput{input}
-	}
 	// split into multiple
 	inputs = make([]*ddb.ScanInput, segments)
 
@@ -413,7 +405,8 @@ func SplitScanIntoSegments(input *ddb.ScanInput, segments int32) (inputs []*ddb.
 		// copy the input
 		scanCopy := CopyScan(input)
 		// set the segment to i
-		scanCopy.Segment = &i
+		thisSegment := i // local copy of i
+		scanCopy.Segment = &thisSegment
 		scanCopy.TotalSegments = &segments
 		inputs[i] = scanCopy
 	}
