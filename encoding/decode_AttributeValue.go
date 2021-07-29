@@ -607,7 +607,6 @@ func UnmarshalUnixPtr(av ddb.AttributeValue, v **time.Time) error {
 	return nil
 }
 
-
 // UnmarshalUnix unmarshals an AttributeValue into the given value
 func UnmarshalUnix(av ddb.AttributeValue, v *time.Time) error {
 	return UnmarshalUnixPtr(av, &v)
@@ -624,6 +623,42 @@ func UnixUnmarshaler(v *time.Time) UnmarshalerFunc {
 func UnixPtrUnmarshaler(v **time.Time) UnmarshalerFunc {
 	return func(av ddb.AttributeValue) error {
 		return UnmarshalUnixPtr(av, v)
+	}
+}
+
+// UnmarshalDurationPtr unmarshals an AttributeValue into the given value
+func UnmarshalDurationPtr(av ddb.AttributeValue, v **time.Duration) error {
+	intV := new(int64)
+
+	if err := UnmarshalInt64Ptr(av, &intV); err != nil {
+		return err
+	}
+
+	if *v == nil {
+		*v = new(time.Duration)
+	}
+
+	**v = time.Duration(*intV)
+
+	return nil
+}
+
+// UnmarshalDuration unmarshals an AttributeValue into the given value
+func UnmarshalDuration(av ddb.AttributeValue, v *time.Duration) error {
+	return UnmarshalDurationPtr(av, &v)
+}
+
+// DurationUnmarshaler returns a UnmarshalerFunc func that will unmarshal an AttributeValue into the given ptr
+func DurationUnmarshaler(v *time.Duration) UnmarshalerFunc {
+	return func(av ddb.AttributeValue) error {
+		return UnmarshalDuration(av, v)
+	}
+}
+
+// DurationPtrUnmarshaler returns a UnmarshalerFunc func that will unmarshal an AttributeValue into the given ptr
+func DurationPtrUnmarshaler(v **time.Duration) UnmarshalerFunc {
+	return func(av ddb.AttributeValue) error {
+		return UnmarshalDurationPtr(av, v)
 	}
 }
 

@@ -350,3 +350,37 @@ func UnixMarshaler(v *time.Time, mode NilMode) MarshalFunc {
 		return MarshalUnix(v, mode)
 	}
 }
+
+// MarshalDuration marshals an AttributeValue into the given value
+func MarshalDuration(v *time.Duration, mode NilMode) (ddb.AttributeValue, error) {
+	if v == nil {
+		return numericNil(mode)
+	}
+
+	intV := v.Nanoseconds()
+
+	return MarshalInt64(&intV, mode)
+}
+
+// DurationMarshaler returns a MarshalFunc func that will generate an AttributeValue
+func DurationMarshaler(v *time.Duration, mode NilMode) MarshalFunc {
+	return func() (ddb.AttributeValue, error) {
+		return MarshalDuration(v, mode)
+	}
+}
+
+// MarshalStringSlice marshals an AttributeValue into the given value
+func MarshalStringSlice(v *[]string, mode NilMode) (ddb.AttributeValue, error) {
+	if v == nil {
+		return stringNil(mode)
+	}
+
+	return &ddb.AttributeValueMemberSS{Value: *v}, nil
+}
+
+// StringSliceMarshaler returns a MarshalFunc func that will generate an AttributeValue
+func StringSliceMarshaler(v *[]string, mode NilMode) MarshalFunc {
+	return func() (ddb.AttributeValue, error) {
+		return MarshalStringSlice(v, mode)
+	}
+}
