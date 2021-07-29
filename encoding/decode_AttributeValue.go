@@ -3,6 +3,7 @@ package encoding
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	ddbav "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"strconv"
@@ -25,7 +26,7 @@ func (dm ValueUnmarshalMap) UnmarshalAttributeValueMap(m map[string]ddb.Attribut
 	for key, decoder := range dm {
 		if av, ok := m[key]; ok {
 			if err := decoder.UnmarshalDynamoDBAttributeValue(av); err != nil {
-				return err
+				return fmt.Errorf("error decoding field %s: %s", key, err)
 			}
 		}
 	}
@@ -606,7 +607,6 @@ func UnmarshalUnixPtr(av ddb.AttributeValue, v **time.Time) error {
 	return nil
 }
 
-
 // UnmarshalUnix unmarshals an AttributeValue into the given value
 func UnmarshalUnix(av ddb.AttributeValue, v *time.Time) error {
 	return UnmarshalUnixPtr(av, &v)
@@ -623,5 +623,66 @@ func UnixUnmarshaler(v *time.Time) UnmarshalerFunc {
 func UnixPtrUnmarshaler(v **time.Time) UnmarshalerFunc {
 	return func(av ddb.AttributeValue) error {
 		return UnmarshalUnixPtr(av, v)
+	}
+}
+
+// UnmarshalDurationPtr unmarshals an AttributeValue into the given value
+func UnmarshalDurationPtr(av ddb.AttributeValue, v **time.Duration) error {
+	intV := new(int64)
+
+	if err := UnmarshalInt64Ptr(av, &intV); err != nil {
+		return err
+	}
+
+	if *v == nil {
+		*v = new(time.Duration)
+	}
+
+	**v = time.Duration(*intV)
+
+	return nil
+}
+
+// UnmarshalDuration unmarshals an AttributeValue into the given value
+func UnmarshalDuration(av ddb.AttributeValue, v *time.Duration) error {
+	return UnmarshalDurationPtr(av, &v)
+}
+
+// DurationUnmarshaler returns a UnmarshalerFunc func that will unmarshal an AttributeValue into the given ptr
+func DurationUnmarshaler(v *time.Duration) UnmarshalerFunc {
+	return func(av ddb.AttributeValue) error {
+		return UnmarshalDuration(av, v)
+	}
+}
+
+// DurationPtrUnmarshaler returns a UnmarshalerFunc func that will unmarshal an AttributeValue into the given ptr
+func DurationPtrUnmarshaler(v **time.Duration) UnmarshalerFunc {
+	return func(av ddb.AttributeValue) error {
+		return UnmarshalDurationPtr(av, v)
+	}
+}
+
+// UnmarshalStringSlice unmarshals a string slice
+func UnmarshalStringSlice(av ddb.AttributeValue, v *[]string) error {
+	ssv, ok := av.(*ddb.AttributeValueMemberSS)
+
+	if !ok {
+		if avNull, ok := av.(*ddb.AttributeValueMemberNULL); ok && avNull.Value {
+			// nil
+			return nil
+		}
+
+		return errors.New("cannot decode AttributeValue to StringSlice")
+	}
+
+	*v = ssv.Value
+
+	return nil
+}
+
+// StringSliceUnmarshaler returns a UnmarshalerFunc func that will unmarshal an AttributeValue into a string slice
+func StringSliceUnmarshaler(v *[]string) UnmarshalerFunc {
+	return func(av ddb.AttributeValue) error {
+		return UnmarshalStringSlice(av, v)
 	}
 }

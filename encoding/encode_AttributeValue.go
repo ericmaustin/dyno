@@ -3,6 +3,7 @@ package encoding
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"strconv"
@@ -42,7 +43,7 @@ func (em ValueMarshalMap) MarshalMap() (map[string]ddb.AttributeValue, error) {
 	for k, v := range em {
 		av, err := v.MarshalDynamoDBAttributeValue()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error encoding field %s: %s", k, err)
 		}
 
 		if av != nil {
@@ -58,7 +59,7 @@ func (em ValueMarshalMap) MarshalToMap(input map[string]ddb.AttributeValue) erro
 	for k, v := range em {
 		av, err := v.MarshalDynamoDBAttributeValue()
 		if err != nil {
-			return err
+			return fmt.Errorf("error encoding field %s: %s", k, err)
 		}
 
 		if av != nil {
@@ -347,5 +348,39 @@ func MarshalUnix(v *time.Time, mode NilMode) (ddb.AttributeValue, error) {
 func UnixMarshaler(v *time.Time, mode NilMode) MarshalFunc {
 	return func() (ddb.AttributeValue, error) {
 		return MarshalUnix(v, mode)
+	}
+}
+
+// MarshalDuration marshals an AttributeValue into the given value
+func MarshalDuration(v *time.Duration, mode NilMode) (ddb.AttributeValue, error) {
+	if v == nil {
+		return numericNil(mode)
+	}
+
+	intV := v.Nanoseconds()
+
+	return MarshalInt64(&intV, mode)
+}
+
+// DurationMarshaler returns a MarshalFunc func that will generate an AttributeValue
+func DurationMarshaler(v *time.Duration, mode NilMode) MarshalFunc {
+	return func() (ddb.AttributeValue, error) {
+		return MarshalDuration(v, mode)
+	}
+}
+
+// MarshalStringSlice marshals an AttributeValue into the given value
+func MarshalStringSlice(v *[]string, mode NilMode) (ddb.AttributeValue, error) {
+	if v == nil {
+		return stringNil(mode)
+	}
+
+	return &ddb.AttributeValueMemberSS{Value: *v}, nil
+}
+
+// StringSliceMarshaler returns a MarshalFunc func that will generate an AttributeValue
+func StringSliceMarshaler(v *[]string, mode NilMode) MarshalFunc {
+	return func() (ddb.AttributeValue, error) {
+		return MarshalStringSlice(v, mode)
 	}
 }
