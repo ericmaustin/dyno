@@ -34,6 +34,13 @@ func (dm ValueUnmarshalMap) UnmarshalAttributeValueMap(m map[string]ddb.Attribut
 	return nil
 }
 
+// Unmarshaler returns a UnmarshalerFunc func that will unmarshal an AttributeValue into the given interface
+func Unmarshaler(v interface{}) UnmarshalerFunc {
+	return func(av ddb.AttributeValue) error {
+		return ddbav.Unmarshal(av, v)
+	}
+}
+
 // UnmarshalInt unmarshals an AttributeValue into the given value
 func UnmarshalInt(av ddb.AttributeValue, v *int) error {
 	return UnmarshalIntPtr(av, &v)

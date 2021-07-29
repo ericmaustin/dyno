@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	ddbav "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"strconv"
 	"time"
@@ -34,9 +34,9 @@ func (e MarshalFunc) MarshalDynamoDBAttributeValue() (ddb.AttributeValue, error)
 }
 
 // ValueMarshalMap represents a map of attributevalue.Marshaler values
-type ValueMarshalMap map[string]attributevalue.Marshaler
+type ValueMarshalMap map[string]ddbav.Marshaler
 
-// MarshalMap runs all the attributevalue.Marshaler in the MarshalMap and generates a map of AttributeValues
+// MarshalMap runs all the ddbav.Marshaler in the MarshalMap and generates a map of AttributeValues
 func (em ValueMarshalMap) MarshalMap() (map[string]ddb.AttributeValue, error) {
 	m := make(map[string]ddb.AttributeValue, len(em))
 
@@ -54,7 +54,7 @@ func (em ValueMarshalMap) MarshalMap() (map[string]ddb.AttributeValue, error) {
 	return m, nil
 }
 
-// MarshalToMap runs all the attributevalue.Marshaler in the MarshalMap and adds their values to the input
+// MarshalToMap runs all the ddbav.Marshaler in the MarshalMap and adds their values to the input
 func (em ValueMarshalMap) MarshalToMap(input map[string]ddb.AttributeValue) error {
 	for k, v := range em {
 		av, err := v.MarshalDynamoDBAttributeValue()
@@ -68,6 +68,19 @@ func (em ValueMarshalMap) MarshalToMap(input map[string]ddb.AttributeValue) erro
 	}
 
 	return nil
+}
+
+func standardNil(mode NilMode) (ddb.AttributeValue, error) {
+	switch mode {
+	case NilZero:
+		return nil, errors.New("standard marshaler does not support zero unmarshaler")
+	case NilNull:
+		return &ddb.AttributeValueMemberNULL{Value: true}, nil
+	case NilError:
+		return nil, ErrNil
+	}
+	// NilNil
+	return nil, nil
 }
 
 func numericNil(mode NilMode) (ddb.AttributeValue, error) {
@@ -120,6 +133,15 @@ func bytesNil(mode NilMode) (ddb.AttributeValue, error) {
 	}
 	// NilNil
 	return nil, nil
+}
+
+// Marshaler marshals an AttributeValue into the given value
+func Marshaler(v interface{}, mode NilMode) (ddb.AttributeValue, error) {
+	if v == nil {
+		return standardNil(mode)
+	}
+
+	return ddbav.Marshal(v)
 }
 
 // MarshalInt marshals an AttributeValue into the given value
