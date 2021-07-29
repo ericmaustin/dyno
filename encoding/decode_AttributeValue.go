@@ -3,6 +3,7 @@ package encoding
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	ddbav "github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	ddb "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"strconv"
@@ -25,7 +26,7 @@ func (dm ValueUnmarshalMap) UnmarshalAttributeValueMap(m map[string]ddb.Attribut
 	for key, decoder := range dm {
 		if av, ok := m[key]; ok {
 			if err := decoder.UnmarshalDynamoDBAttributeValue(av); err != nil {
-				return err
+				return fmt.Errorf("error decoding field %s: %s", key, err)
 			}
 		}
 	}
@@ -623,5 +624,30 @@ func UnixUnmarshaler(v *time.Time) UnmarshalerFunc {
 func UnixPtrUnmarshaler(v **time.Time) UnmarshalerFunc {
 	return func(av ddb.AttributeValue) error {
 		return UnmarshalUnixPtr(av, v)
+	}
+}
+
+// UnmarshalStringSlice unmarshals a string slice
+func UnmarshalStringSlice(av ddb.AttributeValue, v *[]string) error {
+	ssv, ok := av.(*ddb.AttributeValueMemberSS)
+
+	if !ok {
+		if avNull, ok := av.(*ddb.AttributeValueMemberNULL); ok && avNull.Value {
+			// nil
+			return nil
+		}
+
+		return errors.New("cannot decode AttributeValue to StringSlice")
+	}
+
+	*v = ssv.Value
+
+	return nil
+}
+
+// StringSliceUnmarshaler returns a UnmarshalerFunc func that will unmarshal an AttributeValue into a string slice
+func StringSliceUnmarshaler(v *[]string) UnmarshalerFunc {
+	return func(av ddb.AttributeValue) error {
+		return UnmarshalStringSlice(av, v)
 	}
 }
