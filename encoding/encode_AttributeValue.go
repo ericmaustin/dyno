@@ -109,6 +109,19 @@ func stringNil(mode NilMode) (ddb.AttributeValue, error) {
 	return nil, nil
 }
 
+func stringSliceNil(mode NilMode) (ddb.AttributeValue, error) {
+	switch mode {
+	case NilZero:
+		panic("NilZero is invalid for string sets as string sets must not be empty")
+	case NilNull:
+		return &ddb.AttributeValueMemberNULL{Value: true}, nil
+	case NilError:
+		return nil, ErrNil
+	}
+	// NilNil
+	return nil, nil
+}
+
 func boolNil(mode NilMode) (ddb.AttributeValue, error) {
 	switch mode {
 	case NilZero:
@@ -393,8 +406,8 @@ func DurationMarshaler(v *time.Duration, mode NilMode) MarshalFunc {
 
 // MarshalStringSlice marshals an AttributeValue into the given value
 func MarshalStringSlice(v *[]string, mode NilMode) (ddb.AttributeValue, error) {
-	if v == nil {
-		return stringNil(mode)
+	if v == nil || len(*v) == 0 { // empty slices are handled the same as nil as string sets cannot be empty
+		return stringSliceNil(mode)
 	}
 
 	return &ddb.AttributeValueMemberSS{Value: *v}, nil
