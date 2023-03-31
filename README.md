@@ -1,3 +1,5 @@
+# THIS PROJECT DEFUNCT AND UNSUPPORTED
+
 DYNO
 ====
 [![Build Status](https://travis-ci.com/ericmaustin/dyno.svg?branch=master)](https://travis-ci.com/ericmaustin/dyno)
